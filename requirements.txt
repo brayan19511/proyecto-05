@@ -1,0 +1,11 @@
+# requirements.txt
+fastapi[standard]
+# database
+sqlalchemy
+psycopg2-binary
+pydantic-settings
+# security
+pwdlib[argon2]
+pyjwt
+python-multipart
+uuid6
