@@ -14,7 +14,27 @@ services:
       - postgres-db:/var/lib/postgresql/data
     networks:
       - checkout-network
-
+  api:
+    build: .
+    # build:
+    #   context: .
+    #   target: ${STAGE}
+    #   dockerfile: Dockerfile
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_HOST: db-postgres  # OJO: Aquí usamos el nombre del servicio 'db'
+      DB_PORT: 5432
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALG: ${JWT_ALG}
+      JWT_EXPIRES_MIN: ${JWT_EXPIRES_MIN}
+    ports:
+      - "${API_PORT}:8000"
+    depends_on:
+      - db-postgres
+    networks:
+      - checkout-network
   pg-admin:
     image: dpage/pgadmin4:latest
     environment:
@@ -29,7 +49,8 @@ services:
       - checkout-network
 volumes:
   postgres-db:
-    external: false
+    # external: false
+
 networks:
   checkout-network:
     driver: bridge
