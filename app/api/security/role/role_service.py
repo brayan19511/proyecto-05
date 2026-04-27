@@ -2,7 +2,7 @@
 
 from sqlalchemy.orm import Session
 
-from app.api.role.role_repository import RoleRepository
+from app.api.security.role.role_repository import RoleRepository
 from app.api.security.role.role_schemas import RoleRequest
 
 
@@ -25,3 +25,6 @@ class RoleService:
         if self.role_repository.delete_role(role_id):
             return {"message": "Role deactivated successfully"}
         return {"message": "Role not found"}
+    def assign_role_to_user(self, user_id: int, role_id: int):
+        self.role_repository.assign_role_to_user(user_id, role_id)
+        
