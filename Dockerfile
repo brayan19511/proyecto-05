@@ -1,3 +1,4 @@
+# Dockerfile
 # 1. Imagen base de Python ligera
 FROM python:3.11-slim
 
