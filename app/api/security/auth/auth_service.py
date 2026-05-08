@@ -3,7 +3,7 @@ from fastapi import HTTPException,status
 from sqlalchemy import UUID
 from uuid6 import uuid7
 
-from app.api.auth.auth_schemas import LoginRequest, PasswordChangeRequest, TokenResponse, UserRegisterSchema
+from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, UserRegisterSchema
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.security import Auth
@@ -31,7 +31,8 @@ class AuthService:
             access_token=token,
             user_id=user.id
         )
-        
+    def get_by_email(self, email: str):
+        return self.authRepository.get_by_email(email)
     def register_user(self,data:UserRegisterSchema):
         if self.authRepository.get_by_email(data.email):
             raise HTTPException(status_code=400, detail="Email ya registrado")

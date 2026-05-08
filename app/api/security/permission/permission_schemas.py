@@ -1,4 +1,4 @@
-
+# app/api/security/permission/permission_schemas.py
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -12,8 +12,8 @@ class PermisionResponse(BaseModel):
     description: str
     active: bool
     
-class AssingnRoleToUserRequest(BaseModel):
-    user_id: UUID
+class AssignRoleToPermissionRequest(BaseModel):
+    permission_id: int
     role_id: int
     
     

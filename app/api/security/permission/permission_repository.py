@@ -1,9 +1,9 @@
-
+# app/api/security/permission/permission_repository.py
 
 from sqlalchemy.orm import Session
 
 from app.api.security.permission.permission_schemas import PermisionCreateRequest
-from app.models.security import Permission
+from app.models.security import Permission, RolePermission
 
 class PermissionRepository:
     def __init__(self, db: Session):
@@ -34,10 +34,8 @@ class PermissionRepository:
             self.db.commit()
             return True
         return False
-    def assign_role_to_user(self, user_id: int, role_id: int):
+    def assign_role_to_permission(self, role_id: int, permission_id: int):
         # Lógica para asignar un rol a un usuario
-        pass
-
-    def check_user_permission(self, user_id: int, permission_name: str) -> bool:
-        # Lógica para verificar si un usuario tiene un permiso específico
-        pass    
+        role_permission = RolePermission(role_id=role_id, permission_id=permission_id)
+        self.db.add(role_permission)
+        self.db.commit()

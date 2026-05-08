@@ -47,10 +47,14 @@ services:
       - "${PGADMIN_PORT}:80"
     depends_on:
       - db-postgres
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
     networks:
       - checkout-network
 volumes:
   postgres-db:
+    # external: false
+  pgadmin-data:
     # external: false
 
 networks:

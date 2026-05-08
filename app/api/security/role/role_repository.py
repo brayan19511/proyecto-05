@@ -1,12 +1,8 @@
-
-
-
+# app/api/security/role/role_repository.py
 from sqlalchemy.orm import Session
 
 from app.api.security.role.role_schemas import RoleRequest
 from app.models.security import Role, UserRole
-
-
 
 class RoleRepository:
     def __init__(self, db:Session):
@@ -14,6 +10,8 @@ class RoleRepository:
 
     def get_role_by_id(self, role_id:int):
         return self.db.query(Role).filter(Role.id == role_id).first()
+    def get_role_by_name(self, name:str):
+        return self.db.query(Role).filter(Role.name == name).first()
 
     def get_all_roles(self):
         return self.db.query(Role).all()
@@ -25,27 +23,28 @@ class RoleRepository:
         self.db.refresh(new_role)
         return new_role
 
-    def delete_role(self, role_id):
-        role = self.get_role_by_id(role_id)
-        if role:
+    def delete_role(self, role:Role):
+        try:
             role.active = False
             self.db.commit()
+            self.db.refresh(role)
             return True
-        return False
-    def update_role(self, role_id:int, role_data:RoleRequest):
-        role = self.get_role_by_id(role_id)
-        if role:
+        except Exception as e:
+            self.db.rollback()
+            raise e
+
+    def update_role(self, role:Role, role_data:RoleRequest):
+        try:
             role.name = role_data.name
             role.active = role_data.active
             self.db.commit()
-            self.db.refresh(role)
-            return role
-        return None
+            return True
+        except Exception as e:
+            self.db.rollback()
+            raise e
+    def is_role_assigned_to_user(self, user_id: int, role_id: int) -> bool:
+        return self.db.query(UserRole).filter_by(user_id=user_id, role_id=role_id).first() is not None
     def assign_role_to_user(self, user_id: int, role_id: int):
-        role = self.get_role_by_id(role_id)
-        if not role:
-            raise ValueError(f"Role with ID {role_id} not found.")
-        
-        user_role = UserRole(user_id=user_id, role_id=role.id)
+        user_role = UserRole(user_id=user_id, role_id=role_id)
         self.db.add(user_role)
         self.db.commit()

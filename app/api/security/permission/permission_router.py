@@ -1,8 +1,8 @@
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.security.permission.permission_schemas import AssingnRoleToUserRequest, PermisionCreateRequest
+from app.api.security.permission.permission_schemas import AssignRoleToPermissionRequest, PermisionCreateRequest
 from app.api.security.permission.permission_service import PermissionService
 from app.api.security.role.role_service import RoleService
 from app.core.db_postgres import get_db
@@ -11,16 +11,20 @@ from app.core.db_postgres import get_db
 router = APIRouter(    prefix="/permission",    tags=["Permission"],)
 
 @router.post("/assign-role")
-def assign_role_to_user(role_request: AssingnRoleToUserRequest, db: Session = Depends(get_db)):
+def assign_role_to_permission(role_request: AssignRoleToPermissionRequest, db: Session = Depends(get_db)):
     """
-    Assign a role to a user.
+    Assign a role to a permission.
 
-    - **user_id**: The ID of the user to whom the role will be assigned.
+    - **permission_id**: The ID of the permission to which the role will be assigned.
     - **role_id**: The ID of the role to be assigned.
     """
-    role_service = RoleService(db)
-    role_service.assign_role_to_user(role_request.user_id, role_request.role_id)
-    return {"message": f"Role with ID {role_request.role_id} assigned to user with ID {role_request.user_id}."}
+    try:
+        # validate role and permission existence and active status
+        permission_service = PermissionService(db)
+        permission_service.assign_role_to_permission(role_request.role_id, role_request.permission_id)
+        return {"message": f"Role with ID {role_request.role_id} assigned to permission with ID {role_request.permission_id}."}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/getall")
 def get_all_permissions(db: Session = Depends(get_db)):

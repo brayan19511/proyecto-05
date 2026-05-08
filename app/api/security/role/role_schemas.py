@@ -1,4 +1,5 @@
-
+# app/api/security/role/role_schemas.py
+from uuid import UUID
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
@@ -12,3 +13,7 @@ class RoleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AssingnRoleToUserRequest(BaseModel):
+    user_id: UUID
+    role_id: int
+    
