@@ -25,6 +25,13 @@ class PermissionService:
         return self.permission_repository.delete_permission(permission_id)  
     
     def assign_role_to_permission(self, role_id: int, permission_id: int):
+        #validar que el rol exista
+        role= self.role_repository.get_role_by_id(role_id)
+        if not role:
+            raise ValueError(f"Role with ID {role_id} does not exist.")
+        if not role.active:
+            raise ValueError(f"Role with ID {role_id} is not active.")
+        
         # validar que el permiso exista
         permission = self.permission_repository.get_permission_by_id(permission_id)
         if not permission:
@@ -32,12 +39,9 @@ class PermissionService:
         # validar que el permiso esté activo        if not permission.active:
         if not permission.active:
             raise ValueError(f"Permission with ID {permission_id} is not active.")
-        #validar que el rol exista
-        # Aquí iría la lógica para validar que el rol exista, similar a como se valida
-        role= self.role_repository.get_role_by_id(role_id)
-        if not role:
-            raise ValueError(f"Role with ID {role_id} does not exist.")
-        if not role.active:
-            raise ValueError(f"Role with ID {role_id} is not active.")
+        
+        # validar que no exista ya la relación (opcional, dependiendo de cómo manejes la tabla intermedia)
+        if permission in role.permissions:
+            raise ValueError(f"Role with ID {role_id} already has permission with ID {permission_id}.")
         # Aquí iría la lógica para asignar un rol a un permiso
         self.permission_repository.assign_role_to_permission(role_id, permission_id)

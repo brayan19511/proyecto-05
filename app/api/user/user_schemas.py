@@ -1,6 +1,6 @@
 # app/api/user/user_schemas.py
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing import Literal, Optional
 from datetime import date, datetime
 
@@ -31,10 +31,27 @@ class UserProfileCreate(BaseModel):
             # Si llega aquí es porque no coincidió con ninguno
             raise ValueError("Formato de fecha no reconocido. Use DD/MM/YYYY o YYYY-MM-DD")
         return v
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_profile(cls, data):
+        # Si el objeto tiene un atributo 'profile', extraemos sus datos al nivel principal
+        if hasattr(data, "profile") and data.profile:
+            profile = data.profile
+            data.name = profile.name
+            data.lastname = profile.lastname
+            data.phone = profile.phone
+            data.birthday = profile.birthday
+            # ... etc
+        return data
 class UserProfileUpdate(UserProfileCreate):
     pass
 
 class UserProfileResponse(UserProfileUpdate):
-    user_id: UUID
+    # Field(alias="id") le dice: "busca 'id' en el objeto Auth"
+    user_id: UUID = Field(alias="id") 
     email: str
-    model_config = ConfigDict(from_attributes=True)
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True # Permite usar tanto 'id' como 'user_id'
+    )

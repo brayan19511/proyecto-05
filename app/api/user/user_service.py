@@ -11,6 +11,8 @@ from .user_schemas import UserProfileUpdate
 class UserService:
     def __init__(self, db: Session):
         self.repository = UserRepository(db)
+    def get_users(self):
+        return self.repository.get_users()
     def get_user_profile(self, user_id: UUID):
         profile = self.repository.get_profile_by_id(user_id)
         if not profile:

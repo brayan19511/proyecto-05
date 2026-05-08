@@ -3,12 +3,16 @@
 
 from uuid import UUID
 from fastapi import APIRouter, Depends
-from app.api.user.user_repository import UserRepository
-from app.api.user.user_schemas import UserProfileCreate, UserProfileResponse, UserProfileUpdate
-from app.api.user.user_service import UserService
+
+from app.api.user import  UserService, UserProfileCreate, UserProfileResponse,UserProfileUpdate
 from app.core.db_postgres import get_db
+from app.core.security import PermissionChecker
 
 router = APIRouter(   prefix="/users",tags=["users"],)
+@router.get("/getall",response_model=list[UserProfileResponse])
+async def get_users(db=Depends(get_db),current_user = Depends(PermissionChecker("sap.read"))):
+    user_servive=UserService(db)
+    return user_servive.get_users()
 
 @router.get("/{user_id}",response_model=UserProfileResponse)
 async def get_user(user_id: UUID,db=Depends(get_db)):

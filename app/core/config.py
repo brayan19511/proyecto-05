@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     DB_HOST: Optional[str] = Field(default="localhost")
     DB_PORT: Optional[int] = Field(default=5432)
     
+    ENV: str = "dev"
+    PROJECT_NAME: str = "Proyecto-rash"
+    
     # 2. La URL completa (Prioridad para la Nube)
     # Si en el .env o en el sistema existe DATABASE_URL, se cargará aquí
     DATABASE_URL: Optional[str] = Field(default=None)

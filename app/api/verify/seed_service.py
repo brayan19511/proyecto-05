@@ -17,10 +17,14 @@ class SeedService:
     def run_seed(self):
         # 1. DEFINIR PERMISOS (Granulares)
         perms_data = [
-            {"code": "sap.read", "desc": "Leer datos de SAP"},
-            {"code": "sap.write", "desc": "Escribir en SAP"},
-            {"code": "sap.execute", "desc": "Ejecutar operaciones en SAP"},
-            {"code": "cic.execute", "desc": "Ejecutar procesos CIC"},
+            # Módulo SAP
+            {"code": "sap.read", "desc": "Ver datos de SAP"},
+            {"code": "sap.write", "desc": "Modificar datos en SAP"},
+            # Módulo Seguridad (Para que los admins puedan gestionar el sistema)
+            {"code": "security.roles.edit", "desc": "Editar roles y sus permisos"},
+            {"code": "security.users.view", "desc": "Ver lista de usuarios y sus perfiles"},
+            # Otros módulos
+            {"code": "cic.execute", "desc": "Ejecutar procesos automáticos CIC"},
         ]
         
         perms_objects = {}

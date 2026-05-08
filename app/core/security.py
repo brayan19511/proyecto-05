@@ -1,6 +1,6 @@
 # app/core/security.py
 from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException,status
+from fastapi import Depends, HTTPException, Request,status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 import jwt
@@ -34,7 +34,7 @@ def decode_token(token: str) -> dict:
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-def get_current_user(
+def get_current_user(request: Request,
     token: str = Depends(oauth2_scheme), 
     db: Session = Depends(get_db)
 ):
@@ -61,5 +61,28 @@ def get_current_user(
     
     if not user.active:
         raise HTTPException(status_code=400, detail="Usuario inactivo")
-        
+    request.state.user_id = user.id
     return user # Retorna el objeto Auth completo
+
+class PermissionChecker:
+    def __init__(self, required_permission: str):
+        self.required_permission = required_permission
+
+    def __call__(self, current_user = Depends(get_current_user)):
+        # 1. El superusuario o Admin total siempre pasa
+        # Asumiendo que tus roles tienen nombres fijos para el "admin" del sistema
+        user_roles = [link.role.name for link in current_user.user_roles_links if link.active]
+        if "Admin" in user_roles:
+            return current_user
+
+        # 2. Verificamos los permisos individuales
+        # Gracias a la @property 'permissions' que creamos en tu modelo Auth
+        user_permissions = [p.code for p in current_user.permissions]
+        
+        if self.required_permission not in user_permissions:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"No tienes el permiso necesario: {self.required_permission}"
+            )
+        
+        return current_user

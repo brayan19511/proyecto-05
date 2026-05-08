@@ -1,5 +1,5 @@
 # app/api/user/user_repository.py
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import UUID, select
 from app.models.security import Auth
 from app.models.user import Information
@@ -7,6 +7,10 @@ from app.models.user import Information
 class UserRepository:
     def __init__(self, db: Session):
         self.db = db
+    def get_users(self):
+        # Usamos selectinload para traer la relación 'profile' de una vez
+        stmt = select(Auth).options(selectinload(Auth.profile))
+        return self.db.execute(stmt).scalars().all()
 
     def get_user_by_id(self, user_id: UUID): # Cambiar int por UUID
         return self.db.get(Auth, user_id)
