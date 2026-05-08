@@ -9,6 +9,11 @@ Copiar el template y completar los datos sensibles (DB Passwords, JWT Secrets, e
 ```
 cp .env.template .env
 nano .env  # O usa tu editor preferido
+-o-
+copy .env.template .env
+notepad .env  # O usa tu editor preferido
+
+
 ```
 # 3. Actualizar y Construir
 Asegúrate de tener la última versión del código y levanta los servicios:
@@ -20,6 +25,16 @@ desarrollo
 ```
 docker compose up -d 
 ```
+# 4. realizar migraciones
+revisar contenedor de api
+```
+docker ps
+``` 
+una vez identificado realizar 
+``` 
+docker exec -it proyecto-05-api-1 python -m alembic upgrade head
+``` 
+
 
 # 4. Verificación (Opcional pero Recomendado)
 Para confirmar que la API y el sistema de auditoría iniciaron correctamente, revisa los logs:
@@ -27,3 +42,4 @@ Para confirmar que la API y el sistema de auditoría iniciaron correctamente, re
 docker logs -f api
 ```
 (Si usas migraciones de base de datos con Alembic, recuerda ejecutar: docker exec -it api alembic upgrade head).
+
