@@ -1,0 +1,27 @@
+# proyecto-05/docker-compose.prod.yml
+# En este archivo, eliminamos el servicio de la base de datos y pgAdmin, ya que en producción usaremos
+#  una base de datos gestionada (como DigitalOcean Managed Databases).
+# Además, ajustamos la configuración del servicio 'api' para que se conecte a la base de datos externa
+#  usando una variable de entorno para el host.}
+services:
+  api:
+    build: .
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Aquí pones la IP privada o el endpoint de DigitalOcean
+      DB_HOST: ${DB_EXTERNAL_HOST} 
+      DB_PORT: 5432
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALG: ${JWT_ALG}
+      JWT_EXPIRES_MIN: ${JWT_EXPIRES_MIN}
+    ports:
+      - "${API_PORT}:8000"
+    networks:
+      - checkout-network
+
+networks:
+  checkout-network:
+    driver: bridge

@@ -20,6 +20,7 @@ class SeedService:
             # Módulo SAP
             {"code": "sap.read", "desc": "Ver datos de SAP"},
             {"code": "sap.write", "desc": "Modificar datos en SAP"},
+            {"code": "sap.execute", "desc": "Ejecutar operaciones en SAP"},
             # Módulo Seguridad (Para que los admins puedan gestionar el sistema)
             {"code": "security.roles.edit", "desc": "Editar roles y sus permisos"},
             {"code": "security.users.view", "desc": "Ver lista de usuarios y sus perfiles"},
