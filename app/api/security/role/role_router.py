@@ -6,31 +6,32 @@ from sqlalchemy.orm import Session
 from app.api.security.role.role_schemas import AssingnRoleToUserRequest, RoleRequest
 from app.api.security.role.role_service import RoleService
 from app.core.db_postgres import get_db
+from app.core.security import PermissionChecker
 
 
 router = APIRouter(    prefix="/roles",    tags=["roles"],)
 
 @router.get("/")
-async def get_roles(db:Session=Depends(get_db)):
+async def get_roles(db:Session=Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     router_service = RoleService(db)  # Replace with actual DB session
     return router_service.get_all_roles()
 @router.post("/register")
-async def create_role(data: RoleRequest, db:Session=Depends(get_db)):
+async def create_role(data: RoleRequest, db:Session=Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     router_service = RoleService(db)  # Replace with actual DB session
     return router_service.create_role(data)
 @router.get("/{role_id}")
-async def get_role(role_id: str, db:Session=Depends(get_db)):
+async def get_role(role_id: str, db:Session=Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     router_service = RoleService(db)  # Replace with actual DB session
     return router_service.get_role(role_id)
 @router.put("/{role_id}")
-async def update_role(role_id: str, data: RoleRequest, db:Session=Depends(get_db)):
+async def update_role(role_id: str, data: RoleRequest, db:Session=Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     service = RoleService(db)
     try:
         return service.update_role(role_id, data)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 @router.delete("/{role_id}")
-async def delete_role(role_id: str, db:Session=Depends(get_db)):
+async def delete_role(role_id: str, db:Session=Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     service = RoleService(db)
     try:
         service.delete_role(role_id)
@@ -38,7 +39,7 @@ async def delete_role(role_id: str, db:Session=Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 @router.post("/assign-role")
-def assign_role_to_user(role_request: AssingnRoleToUserRequest, db: Session = Depends(get_db)):
+async def assign_role_to_user(role_request: AssingnRoleToUserRequest, db: Session = Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     """
     Assign a role to a user.
 
