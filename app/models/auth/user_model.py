@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db_postgres import Base
 
 if TYPE_CHECKING:
-    from .security import Auth
+    from .security_model import Auth
 
 class Information(Base):
     __tablename__ = "information"

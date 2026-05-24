@@ -12,9 +12,8 @@ from app.core.db_postgres import Base  # O de donde venga tu DeclarativeBase
 
 # 2. IMPORTA TODOS TUS MODELOS AQUÍ
 # Esto es vital para que Alembic vea las tablas
-from app.models.security import Auth, Role, Permission, UserRole, RolePermission
-from app.models.user import Information
-from app.models.audit import AuditLog
+# from app.models.provision_model import Provision,ProvisionConcept,ProvisionDocument,ProvisionStatus,Currency,Area,Attachment
+from app.models import * 
 
 
 # this is the Alembic Config object, which provides
@@ -105,6 +104,9 @@ def run_migrations_online() -> None:
             connection.execute(text('CREATE SCHEMA IF NOT EXISTS "security";'))
             connection.execute(text('CREATE SCHEMA IF NOT EXISTS "user";'))
             connection.execute(text('CREATE SCHEMA IF NOT EXISTS "audit";'))
+            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "finance";'))
+            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "storage";'))
+            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "master";'))
             context.run_migrations()
 
 

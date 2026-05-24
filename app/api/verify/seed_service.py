@@ -15,6 +15,25 @@ class SeedService:
         self.perm_service = PermissionService(db)
         
     def run_seed(self):
+        
+            self.create_roles_and_permissions()
+
+            return {"status": "success", "message": "Seeding completed"}
+
+    def create_masters(self):
+        # Aquí podrías implementar la creación de datos maestros como áreas, monedas, etc.
+        data_areas = ["Finanzas", "Recursos Humanos", "Tecnología"]
+        for area_name in data_areas:
+            # Implementa la lógica para crear áreas si no existen
+            pass
+        data_currencies = ["USD", "EUR", "PEN"]
+        for currency_code in data_currencies:
+            # Implementa la lógica para crear monedas si no existen
+            pass
+        
+        pass
+    def create_roles_and_permissions(self):
+        # Aquí podrías implementar solo la parte de creación de roles y permisos sin tocar usuarios
         # 1. DEFINIR PERMISOS (Granulares)
         perms_data = [
             # Módulo SAP
@@ -65,5 +84,3 @@ class SeedService:
             admin_user = self.auth_service.register_user(UserRegisterSchema(email=admin_email, password="admin123"))
             # Asignar rol
             self.role_service.assign_role_to_user(admin_user["id"], admin_role.id)
-
-        return {"status": "success", "message": "Seeding completed"}

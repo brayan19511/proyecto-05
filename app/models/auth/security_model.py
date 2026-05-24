@@ -16,7 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db_postgres import Base
 
 if TYPE_CHECKING:
-    from .user import Information
+    from .user_model import Information
 
 
 # -------------------------
@@ -165,3 +165,22 @@ class RolePermission(Base):
 
     role: Mapped["Role"] = relationship(back_populates="permission_links")
     permission: Mapped["Permission"] = relationship(lazy="joined")
+# TODO: agregar relación con empresa para filtrar permisos por empresa
+# class UserCompany(Base):
+#     __tablename__ = "user_companies"
+#     __table_args__ = {"schema": "security"}
+
+#     user_id: Mapped[UUID] = mapped_column(
+#         ForeignKey("security.auth.id"),
+#         primary_key=True
+#     )
+
+#     company_id: Mapped[int] = mapped_column(
+#         ForeignKey("master.companies.id"),
+#         primary_key=True
+#     )
+
+#     active: Mapped[bool] = mapped_column(
+#         Boolean,
+#         default=True
+#     )
