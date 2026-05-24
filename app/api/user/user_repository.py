@@ -1,8 +1,8 @@
 # app/api/user/user_repository.py
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import UUID, select
-from app.models.security import Auth
-from app.models.user import Information
+from app.models import Auth
+from app.models import Information
 
 class UserRepository:
     def __init__(self, db: Session):

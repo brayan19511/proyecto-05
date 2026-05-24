@@ -6,8 +6,8 @@ from uuid6 import uuid7
 from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, UserRegisterSchema
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models.security import Auth
-from app.models.user import Information
+from app.models import Auth
+from app.models import Information
 
 
 class AuthService:

@@ -10,6 +10,7 @@ from app.core.db_postgres import Base
 from uuid import uuid4
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from uuid import UUID
+
 from app.models.common.mixin_model import AuditMixin
 
 

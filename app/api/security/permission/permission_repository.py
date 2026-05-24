@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session
 
 from app.api.security.permission.permission_schemas import PermisionCreateRequest
-from app.models.security import Permission, RolePermission
+from app.models import Permission, RolePermission
 
 class PermissionRepository:
     def __init__(self, db: Session):

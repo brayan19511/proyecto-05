@@ -19,6 +19,7 @@ from uuid import UUID
 
 from app.models.common.mixin_model import AuditMixin
 
+
     
 class ProvisionConcept(Base,AuditMixin): 
     __tablename__ = "provision_concepts" 

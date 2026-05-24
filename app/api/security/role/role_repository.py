@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.api.security.role.role_schemas import RoleRequest
-from app.models.security import Role, UserRole
+from app.models import Role, UserRole
 
 class RoleRepository:
     def __init__(self, db:Session):

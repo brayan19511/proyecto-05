@@ -25,8 +25,8 @@ Para que el comando `--autogenerate` detecte los cambios, los modelos deben esta
 from app.core.db_postgres import Base
 
 # 2. IMPORTA TODOS TUS MODELOS AQUÍ (Vital para que Alembic los vea)
-from app.models.security import Auth, Role, Permission, UserRole, RolePermission
-from app.models.user import Information
+from app.models import Auth, Role, Permission, UserRole, RolePermission
+from app.models import Information
 
 # 3. Asigna la metadata
 target_metadata = Base.metadata

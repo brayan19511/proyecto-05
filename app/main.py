@@ -1,14 +1,15 @@
 # app/main.py
 from fastapi import FastAPI
 
+from app.api.master import master_router
 from app.api.security import security_router
 from app.api.user import user_router
 from app.api.verify import verify_router
-from app.core import config
+from app.core.config import settings
 from app.core.handlers import register_exception_handlers
 from app.core.middleware import AuditMiddleware
 
-app = FastAPI(title=config.PROJECT_NAME)
+app = FastAPI(title=settings.PROJECT_NAME)
 
 # =========================================================
 # 1. REGISTRO DE MIDDLEWARES
@@ -24,6 +25,7 @@ register_exception_handlers(app)
 # =========================================================
 # 3. RUTAS (ROUTERS)
 # =========================================================
+app.include_router(prefix="/api", router=master_router.router)
 app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)
 app.include_router(prefix="/api", router=user_router.router)

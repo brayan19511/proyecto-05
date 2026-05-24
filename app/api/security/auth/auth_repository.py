@@ -1,8 +1,8 @@
 # app/api/security/auth/auth_repository.py
 from sqlalchemy.orm import Session
 from sqlalchemy import UUID, func, select
-from app.models.security import Auth, Role, UserRole
-from app.models.user import Information
+from app.models import Auth, Role, UserRole
+from app.models import Information
 
 
 class AuthRepository:

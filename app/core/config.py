@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     DB_PORT: Optional[int] = Field(default=5432)
     
     ENV: str = "dev"
-    PROJECT_NAME: str = "Proyecto-rash"
+    PROJECT_NAME: str = Field(default="Proyecto-rash") 
     
     # 2. La URL completa (Prioridad para la Nube)
     # Si en el .env o en el sistema existe DATABASE_URL, se cargará aquí

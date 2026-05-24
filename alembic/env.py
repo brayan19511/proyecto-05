@@ -12,7 +12,7 @@ from app.core.db_postgres import Base  # O de donde venga tu DeclarativeBase
 
 # 2. IMPORTA TODOS TUS MODELOS AQUÍ
 # Esto es vital para que Alembic vea las tablas
-# from app.models.provision_model import Provision,ProvisionConcept,ProvisionDocument,ProvisionStatus,Currency,Area,Attachment
+# from app.modelsprovision_model import Provision,ProvisionConcept,ProvisionDocument,ProvisionStatus,Currency,Area,Attachment
 from app.models import * 
 
 

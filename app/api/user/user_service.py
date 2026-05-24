@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.user import Information
+from app.models import Information
 from .user_repository import UserRepository
 from .user_schemas import UserProfileUpdate
 
