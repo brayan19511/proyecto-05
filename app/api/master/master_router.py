@@ -72,20 +72,16 @@ async def delete_area(area_id: int, db=Depends(get_db)):
 
 # Currency
 @router.get("/currency")
-async def get_currency(db=Depends(get_db)):
+async def get_currency(search: str | None = None, db=Depends(get_db),):
     master_service = MasterService(db)
-    data = master_service.get_all_currencies()
-    return data
+    return master_service.get_currencies(search)
+
 @router.get("/currency/{currency_id}")
 async def get_currency_by_id(currency_id: int, db=Depends(get_db)):
     master_service = MasterService(db)
     data = master_service.get_currency_by_id(currency_id)
     return data
-@router.get("/currency/code/{code}")
-async def get_currency_by_code(code: str, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_currency_by_code(code)
-    return data
+
 @router.post("/currency")
 async def create_currency(currency_data: CurrencyCreateRequest, db=Depends(get_db)):
     master_service = MasterService(db)

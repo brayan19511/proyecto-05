@@ -8,10 +8,15 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class UserTokenResponse(BaseModel):
+    user_id: UUID
+    email: EmailStr
+    roles: Optional[list[str]] = []
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user_id: UUID
+    user: UserTokenResponse
 
 # Para mostrar información básica del usuario en el token o respuesta
 class UserAuthSchema(BaseModel):

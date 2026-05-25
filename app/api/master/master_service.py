@@ -1,5 +1,7 @@
 
 
+from re import search
+
 from fastapi import HTTPException
 from app.api.master.master_repository import MasterRepository
 from app.api.master.master_schema import AreaCreateRequest, AreaUpdateRequest, CompanyCreateRequest, CompanyUpdateRequest, CurrencyCreateRequest, CurrencyUpdateRequest
@@ -69,6 +71,8 @@ class MasterService:
             raise HTTPException(status_code=404, detail="Area not found")
         return data
     # Currency
+    def get_currencies(self, search: str | None = None):
+        return self.master_repository.get_currencies(search)
     def get_all_currencies(self):
         return self.master_repository.get_all_currencies()
     def get_currency_by_id(self, currency_id: int):

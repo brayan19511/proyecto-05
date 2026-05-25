@@ -1,7 +1,9 @@
 # app/main.py
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.master import master_router
+from app.api.provisions import provisions_router
 from app.api.security import security_router
 from app.api.user import user_router
 from app.api.verify import verify_router
@@ -12,19 +14,34 @@ from app.core.middleware import AuditMiddleware
 app = FastAPI(title=settings.PROJECT_NAME)
 
 # =========================================================
-# 1. REGISTRO DE MIDDLEWARES
+# 1. CORS
+# =========================================================
+origins = [
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# =========================================================
+# 2. REGISTRO DE MIDDLEWARES
 # =========================================================
 # Se añade antes de los routers para que capture todo el flujo
 app.add_middleware(AuditMiddleware)
 
 # =========================================================
-# 2. MANEJO DE EXCEPCIONES
+# 3. MANEJO DE EXCEPCIONES
 # =========================================================
 register_exception_handlers(app)
 
 # =========================================================
-# 3. RUTAS (ROUTERS)
+# 4. RUTAS (ROUTERS)
 # =========================================================
+app.include_router(prefix="/api", router=provisions_router.router)
 app.include_router(prefix="/api", router=master_router.router)
 app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)

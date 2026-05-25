@@ -3,7 +3,7 @@ from fastapi import HTTPException,status
 from sqlalchemy import UUID
 from uuid6 import uuid7
 
-from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, UserRegisterSchema
+from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, UserRegisterSchema, UserTokenResponse
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import Auth
@@ -29,7 +29,11 @@ class AuthService:
         token=create_access_token(token_data)
         return TokenResponse(
             access_token=token,
-            user_id=user.id
+            user=UserTokenResponse(
+                user_id=user.id,
+                email=user.email,
+                roles=[role.role.name for role in user.user_roles_links if role.active]
+            )
         )
     def get_by_email(self, email: str):
         return self.authRepository.get_by_email(email)

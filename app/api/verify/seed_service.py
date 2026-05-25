@@ -1,5 +1,7 @@
 # app/api/security/seed/seed_service.py
 from sqlalchemy.orm import Session
+from app.api.master.master_schema import AreaCreateRequest, CompanyCreateRequest, CurrencyCreateRequest
+from app.api.master.master_service import MasterService
 from app.api.security.auth.auth_schemas import UserRegisterSchema
 from app.api.security.role.role_service import RoleService
 from app.api.security.auth.auth_service import AuthService
@@ -13,25 +15,42 @@ class SeedService:
         self.role_service = RoleService(db)
         self.auth_service = AuthService(db)
         self.perm_service = PermissionService(db)
+        self.master_service = MasterService(db) # Si tienes un servicio para datos maestros
         
     def run_seed(self):
-        
+            self.create_masters()  
             self.create_roles_and_permissions()
 
             return {"status": "success", "message": "Seeding completed"}
 
+
+
     def create_masters(self):
         # Aquí podrías implementar la creación de datos maestros como áreas, monedas, etc.
-        data_areas = ["Finanzas", "Recursos Humanos", "Tecnología"]
-        for area_name in data_areas:
-            # Implementa la lógica para crear áreas si no existen
-            pass
-        data_currencies = ["USD", "EUR", "PEN"]
-        for currency_code in data_currencies:
-            # Implementa la lógica para crear monedas si no existen
-            pass
+        # compañías
+        companies_data = [
+            CompanyCreateRequest(code="RASH", name="RASH PERU SRL", rut="20378890161"),
+        ]
+        for company in companies_data:
+            self.master_service.create_company(company)
+        # areas
+        areas_data = [
+            AreaCreateRequest(code="CON", name="Contabilidad", description="Área de contabilidad"),
+            AreaCreateRequest(code="FIN", name="Finanzas", description="Área de finanzas"),
+            AreaCreateRequest(code="RRHH", name="Recursos Humanos", description="Área de recursos humanos"),
+            AreaCreateRequest(code="TI", name="Tecnología", description="Área de tecnología"),
+        ]
         
-        pass
+        for area in areas_data:
+            self.master_service.create_area(area) 
+        currencies_data = [
+            CurrencyCreateRequest(code="PEN", name="Sol Peruano", symbol="S/"),
+            CurrencyCreateRequest(code="USD", name="Dólar Americano", symbol="$"),
+            CurrencyCreateRequest(code="EUR", name="Euro", symbol="€"),
+        ]
+        for currency in currencies_data:
+            self.master_service.create_currency(currency)
+
     def create_roles_and_permissions(self):
         # Aquí podrías implementar solo la parte de creación de roles y permisos sin tocar usuarios
         # 1. DEFINIR PERMISOS (Granulares)
