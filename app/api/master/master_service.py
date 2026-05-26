@@ -19,7 +19,7 @@ class MasterService:
             raise HTTPException(status_code=404, detail="Company not found")
         return data
     def create_company(self, company_data: CompanyCreateRequest):
-        if self.master_repository.get_company_by_code(company_data.code):
+        if self.master_repository.get_companies(company_data.code):
             raise HTTPException(status_code=400, detail="Company code already exists")
         try:
             return self.master_repository.create_company(company_data)
@@ -44,7 +44,7 @@ class MasterService:
             raise HTTPException(status_code=404, detail="Area not found")
         return data
     def create_area(self, area_data: AreaCreateRequest):
-        if self.master_repository.get_area_by_code(area_data.code):
+        if self.master_repository.get_areas(area_data.code):
             raise HTTPException(status_code=400, detail="Area code already exists")
         try:
             return self.master_repository.create_area(area_data)
@@ -69,7 +69,7 @@ class MasterService:
             raise HTTPException(status_code=404, detail="Currency not found")
         return data
     def create_currency(self, currency_data: CurrencyCreateRequest):
-        if self.master_repository.get_currency_by_code(currency_data.code):
+        if self.master_repository.get_currencies(currency_data.code):
             raise HTTPException(status_code=400, detail="Currency code already exists")
         try:
             return self.master_repository.create_currency(currency_data)
