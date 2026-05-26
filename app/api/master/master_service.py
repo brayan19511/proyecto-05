@@ -11,15 +11,10 @@ class MasterService:
     def __init__(self, db):
         self.master_repository = MasterRepository(db)
     # company
-    def get_all_companies(self):
-        return self.master_repository.get_all_companies()
+    def get_companies(self, search: str | None = None):
+        return self.master_repository.get_companies(search)
     def get_company_by_id(self, company_id: int):
         data=self.master_repository.get_company_by_id(company_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Company not found")
-        return data
-    def get_company_by_code(self, code: str):
-        data=self.master_repository.get_company_by_code(code)
         if not data:
             raise HTTPException(status_code=404, detail="Company not found")
         return data
@@ -41,15 +36,10 @@ class MasterService:
             raise HTTPException(status_code=404, detail="Company not found")
         return data
     # area
-    def get_all_areas(self):
-        return self.master_repository.get_all_areas()
+    def get_areas(self, search: str | None = None):
+        return self.master_repository.get_areas(search)
     def get_area_by_id(self, area_id: int):
         data = self.master_repository.get_area_by_id(area_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Area not found")
-        return data
-    def get_area_by_code(self, code: str):
-        data = self.master_repository.get_area_by_code(code)
         if not data:
             raise HTTPException(status_code=404, detail="Area not found")
         return data
@@ -73,15 +63,8 @@ class MasterService:
     # Currency
     def get_currencies(self, search: str | None = None):
         return self.master_repository.get_currencies(search)
-    def get_all_currencies(self):
-        return self.master_repository.get_all_currencies()
     def get_currency_by_id(self, currency_id: int):
         data = self.master_repository.get_currency_by_id(currency_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Currency not found")
-        return data
-    def get_currency_by_code(self, code: str):
-        data = self.master_repository.get_currency_by_code(code)
         if not data:
             raise HTTPException(status_code=404, detail="Currency not found")
         return data

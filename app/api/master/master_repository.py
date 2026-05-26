@@ -18,14 +18,16 @@ class MasterRepository:
         self.db = db
 
     # company
-    def get_all_companies(self):
-        return self.db.query(Company).all()
+  
+    def get_companies(self, search: str | None = None):
+        query = self.db.query(Company)
 
+        if search:
+            query = query.filter(Company.code.ilike(f"%{search}%"))
+
+        return query.all()
     def get_company_by_id(self, company_id: int):
         return self.db.query(Company).filter(Company.id == company_id).first()
-
-    def get_company_by_code(self, code: str):
-        return self.db.query(Company).filter(Company.code.like(f"%{code}%")).all()
 
     def create_company(self, company_data: CompanyCreateRequest):
         new_company = Company(**company_data.model_dump())
@@ -53,15 +55,16 @@ class MasterRepository:
         return False
 
     # area
-    def get_all_areas(self):
-        return self.db.query(Area).all()
+    def get_areas(self, search: str | None = None):
+        query = self.db.query(Area)
+
+        if search:
+            query = query.filter(Area.code.ilike(f"%{search}%"))
+
+        return query.all()
 
     def get_area_by_id(self, area_id: int):
         return self.db.query(Area).filter(Area.id == area_id).first()
-
-    def get_area_by_code(self, code: str):
-        return self.db.query(Area).filter(Area.code.like(f"%{code}%")).all()
-        # return self.db.query(Area).filter(Area.code == code).first()
 
     def create_area(self, area_data: AreaCreateRequest):
         new_area = Area(**area_data.model_dump())
@@ -97,14 +100,8 @@ class MasterRepository:
 
         return query.all()
 
-    def get_all_currencies(self):
-        return self.db.query(Currency).all()
-
     def get_currency_by_id(self, currency_id: int):
         return self.db.query(Currency).filter(Currency.id == currency_id).first()
-
-    def get_currency_by_code(self, code: str):
-        return self.db.query(Currency).filter(Currency.code.like(f"%{code}%")).all()
 
     def create_currency(self, currency_data: CurrencyCreateRequest):
         new_currency = Currency(**currency_data.model_dump())

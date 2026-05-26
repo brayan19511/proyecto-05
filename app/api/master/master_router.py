@@ -9,19 +9,14 @@ router = APIRouter(   prefix="/master",tags=["Master"],)
 
 # Company
 @router.get("/company")
-async def get_company(db=Depends(get_db)):
+async def get_company(search: str | None = None, db=Depends(get_db)):
     master_service = MasterService(db)
-    data = master_service.get_all_companies()
+    data = master_service.get_companies(search)
     return data
 @router.get("/company/{company_id}")
 async def get_company_by_id(company_id: int, db=Depends(get_db)):
     master_service = MasterService(db)
     data = master_service.get_company_by_id(company_id)
-    return data
-@router.get("/company/code/{code}")
-async def get_company_by_code(code: str, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_company_by_code(code)
     return data
 @router.post("/company")
 async def create_company(company_data: CompanyCreateRequest, db=Depends(get_db)):
@@ -40,19 +35,14 @@ async def delete_company(company_id: int, db=Depends(get_db)):
     return data
 # Area
 @router.get("/area")
-async def get_area(db=Depends(get_db)):
+async def get_area(search: str | None = None, db=Depends(get_db)):
     master_service = MasterService(db)
-    data = master_service.get_all_areas()
+    data = master_service.get_areas(search)
     return data
 @router.get("/area/{area_id}")
 async def get_area_by_id(area_id: int, db=Depends(get_db)):
     master_service = MasterService(db)
     data = master_service.get_area_by_id(area_id)
-    return data
-@router.get("/area/code/{code}")
-async def get_area_by_code(code: str, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_area_by_code(code)
     return data
 @router.post("/area")
 async def create_area(area_data: AreaCreateRequest, db=Depends(get_db)):
