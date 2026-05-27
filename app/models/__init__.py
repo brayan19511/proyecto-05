@@ -9,5 +9,6 @@ __all__ = [
     "Base", 
     "Auth", "Role", "UserRole", "Information",
     "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission" , 
-    "Provision", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus", "Currency", "Area", "Attachment"
+    "Provision", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus", "Currency", "Area", "Attachment",
+    
     ]

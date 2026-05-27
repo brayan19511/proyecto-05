@@ -1,8 +1,8 @@
-"""generate models
+"""init
 
-Revision ID: 205b51acfb27
+Revision ID: f94eaeda6c5e
 Revises: 
-Create Date: 2026-05-23 21:56:56.710613
+Create Date: 2026-05-26 21:47:43.210475
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '205b51acfb27'
+revision: str = 'f94eaeda6c5e'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -103,23 +103,6 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     schema='audit'
     )
-    op.create_table('provision_concepts',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('code', sa.String(length=50), nullable=False),
-    sa.Column('name', sa.String(length=100), nullable=False),
-    sa.Column('description', sa.String(length=255), nullable=False),
-    sa.Column('active', sa.Boolean(), nullable=False),
-    sa.Column('code_sap', sa.String(length=50), nullable=True),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
-    sa.Column('created_by', sa.Uuid(), nullable=True),
-    sa.Column('updated_by', sa.Uuid(), nullable=True),
-    sa.ForeignKeyConstraint(['created_by'], ['security.auth.id'], ),
-    sa.ForeignKeyConstraint(['updated_by'], ['security.auth.id'], ),
-    sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('code'),
-    schema='finance'
-    )
     op.create_table('provision_statuses',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('code', sa.String(length=20), nullable=False),
@@ -139,6 +122,22 @@ def upgrade() -> None:
     sa.Column('code', sa.String(length=50), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
     sa.Column('description', sa.String(length=255), nullable=False),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.Uuid(), nullable=True),
+    sa.Column('updated_by', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by'], ['security.auth.id'], ),
+    sa.ForeignKeyConstraint(['updated_by'], ['security.auth.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('code'),
+    schema='master'
+    )
+    op.create_table('companies',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('code', sa.String(length=20), nullable=False),
+    sa.Column('name', sa.String(length=255), nullable=False),
+    sa.Column('rut', sa.String(length=20), nullable=True),
     sa.Column('active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
@@ -220,6 +219,26 @@ def upgrade() -> None:
     sa.UniqueConstraint('document_number'),
     schema='user'
     )
+    op.create_table('provision_concepts',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('code', sa.String(length=50), nullable=False),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('description', sa.String(length=255), nullable=True),
+    sa.Column('active', sa.Boolean(), nullable=False),
+    sa.Column('code_sap', sa.String(length=50), nullable=True),
+    sa.Column('company_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.Uuid(), nullable=True),
+    sa.Column('updated_by', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['company_id'], ['master.companies.id'], ),
+    sa.ForeignKeyConstraint(['created_by'], ['security.auth.id'], ),
+    sa.ForeignKeyConstraint(['updated_by'], ['security.auth.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('company_id', 'code'),
+    schema='finance'
+    )
+    op.create_index(op.f('ix_finance_provision_concepts_company_id'), 'provision_concepts', ['company_id'], unique=False, schema='finance')
     op.create_table('provisions',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('ticket_code', sa.String(length=50), nullable=False),
@@ -228,31 +247,61 @@ def upgrade() -> None:
     sa.Column('area_id', sa.Integer(), nullable=False),
     sa.Column('currency_id', sa.Integer(), nullable=False),
     sa.Column('amount', sa.Numeric(precision=18, scale=2), nullable=False),
-    sa.Column('provision_date', sa.DateTime(), nullable=True),
+    sa.Column('provision_date', sa.Date(), nullable=False),
     sa.Column('observations', sa.String(length=500), nullable=True),
-    sa.Column('sap_document_number', sa.String(length=100), nullable=True),
-    sa.Column('sap_sent', sa.Boolean(), nullable=False),
+    sa.Column('sap_status', sa.String(length=50), nullable=True),
+    sa.Column('company_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', sa.Uuid(), nullable=True),
     sa.Column('updated_by', sa.Uuid(), nullable=True),
     sa.ForeignKeyConstraint(['area_id'], ['master.areas.id'], ),
+    sa.ForeignKeyConstraint(['company_id'], ['master.companies.id'], ),
     sa.ForeignKeyConstraint(['concept_id'], ['finance.provision_concepts.id'], ),
     sa.ForeignKeyConstraint(['created_by'], ['security.auth.id'], ),
     sa.ForeignKeyConstraint(['currency_id'], ['master.currencies.id'], ),
     sa.ForeignKeyConstraint(['status_id'], ['finance.provision_statuses.id'], ),
     sa.ForeignKeyConstraint(['updated_by'], ['security.auth.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('ticket_code'),
+    sa.UniqueConstraint('company_id', 'ticket_code'),
     schema='finance'
     )
+    op.create_index(op.f('ix_finance_provisions_area_id'), 'provisions', ['area_id'], unique=False, schema='finance')
+    op.create_index(op.f('ix_finance_provisions_company_id'), 'provisions', ['company_id'], unique=False, schema='finance')
+    op.create_index(op.f('ix_finance_provisions_concept_id'), 'provisions', ['concept_id'], unique=False, schema='finance')
+    op.create_index(op.f('ix_finance_provisions_status_id'), 'provisions', ['status_id'], unique=False, schema='finance')
+    op.create_index(op.f('ix_finance_provisions_ticket_code'), 'provisions', ['ticket_code'], unique=False, schema='finance')
+    op.create_index('ix_provision_company_status', 'provisions', ['company_id', 'status_id'], unique=False, schema='finance')
     op.create_table('provision_documents',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('provision_id', sa.Uuid(), nullable=False),
+    sa.Column('document_type', sa.String(length=50), nullable=True),
     sa.Column('document_number', sa.String(length=100), nullable=True),
-    sa.Column('supplier_rut', sa.String(length=20), nullable=True),
+    sa.Column('supplier_tax_id', sa.String(length=20), nullable=True),
     sa.Column('supplier_name', sa.String(length=255), nullable=True),
     sa.Column('amount', sa.Numeric(precision=18, scale=2), nullable=False),
+    sa.Column('currency_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.Uuid(), nullable=True),
+    sa.Column('updated_by', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['created_by'], ['security.auth.id'], ),
+    sa.ForeignKeyConstraint(['currency_id'], ['master.currencies.id'], ),
+    sa.ForeignKeyConstraint(['provision_id'], ['finance.provisions.id'], ),
+    sa.ForeignKeyConstraint(['updated_by'], ['security.auth.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema='finance'
+    )
+    op.create_index('ix_provision_document_provision', 'provision_documents', ['provision_id'], unique=False, schema='finance')
+    op.create_table('provision_sap_syncs',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('provision_id', sa.Uuid(), nullable=False),
+    sa.Column('request_payload', sa.Text(), nullable=True),
+    sa.Column('response_payload', sa.Text(), nullable=True),
+    sa.Column('sap_document_number', sa.String(length=100), nullable=True),
+    sa.Column('status', sa.String(length=50), nullable=False),
+    sa.Column('message', sa.String(length=500), nullable=True),
+    sa.Column('sent_at', sa.DateTime(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', sa.Uuid(), nullable=True),
@@ -263,22 +312,56 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     schema='finance'
     )
+    op.create_index('ix_sap_sync_provision', 'provision_sap_syncs', ['provision_id'], unique=False, schema='finance')
+    op.create_table('provision_status_history',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('provision_id', sa.Uuid(), nullable=False),
+    sa.Column('status_id', sa.Integer(), nullable=False),
+    sa.Column('changed_by_user_id', sa.Uuid(), nullable=True),
+    sa.Column('comments', sa.String(length=500), nullable=True),
+    sa.Column('changed_at', sa.DateTime(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_by', sa.Uuid(), nullable=True),
+    sa.Column('updated_by', sa.Uuid(), nullable=True),
+    sa.ForeignKeyConstraint(['changed_by_user_id'], ['security.auth.id'], ),
+    sa.ForeignKeyConstraint(['created_by'], ['security.auth.id'], ),
+    sa.ForeignKeyConstraint(['provision_id'], ['finance.provisions.id'], ),
+    sa.ForeignKeyConstraint(['status_id'], ['finance.provision_statuses.id'], ),
+    sa.ForeignKeyConstraint(['updated_by'], ['security.auth.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema='finance'
+    )
+    op.create_index('ix_status_history_provision', 'provision_status_history', ['provision_id'], unique=False, schema='finance')
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index('ix_status_history_provision', table_name='provision_status_history', schema='finance')
+    op.drop_table('provision_status_history', schema='finance')
+    op.drop_index('ix_sap_sync_provision', table_name='provision_sap_syncs', schema='finance')
+    op.drop_table('provision_sap_syncs', schema='finance')
+    op.drop_index('ix_provision_document_provision', table_name='provision_documents', schema='finance')
     op.drop_table('provision_documents', schema='finance')
+    op.drop_index('ix_provision_company_status', table_name='provisions', schema='finance')
+    op.drop_index(op.f('ix_finance_provisions_ticket_code'), table_name='provisions', schema='finance')
+    op.drop_index(op.f('ix_finance_provisions_status_id'), table_name='provisions', schema='finance')
+    op.drop_index(op.f('ix_finance_provisions_concept_id'), table_name='provisions', schema='finance')
+    op.drop_index(op.f('ix_finance_provisions_company_id'), table_name='provisions', schema='finance')
+    op.drop_index(op.f('ix_finance_provisions_area_id'), table_name='provisions', schema='finance')
     op.drop_table('provisions', schema='finance')
+    op.drop_index(op.f('ix_finance_provision_concepts_company_id'), table_name='provision_concepts', schema='finance')
+    op.drop_table('provision_concepts', schema='finance')
     op.drop_table('information', schema='user')
     op.drop_table('attachments', schema='storage')
     op.drop_table('user_roles', schema='security')
     op.drop_table('role_permissions', schema='security')
     op.drop_table('currencies', schema='master')
+    op.drop_table('companies', schema='master')
     op.drop_table('areas', schema='master')
     op.drop_table('provision_statuses', schema='finance')
-    op.drop_table('provision_concepts', schema='finance')
     op.drop_table('log_steps', schema='audit')
     op.drop_table('log_details', schema='audit')
     op.drop_table('role', schema='security')

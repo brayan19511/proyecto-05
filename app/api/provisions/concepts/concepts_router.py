@@ -1,25 +1,65 @@
+# app/api/provisions/concepts/concepts_router.py
+from fastapi import APIRouter, Depends
+from app.api.provisions.concepts.concepts_schema import (
+    ConceptCreateRequest,
+    ConceptResponse,
+    ConceptUpdateRequest,
+)
+from app.api.provisions.concepts.concepts_service import ConceptsService
+from app.core.db_postgres import get_db
+from app.core.security import PermissionChecker, get_current_user
 
-from fastapi import APIRouter
+router = APIRouter(
+    tags=["Provisions"],
+)
 
 
-router = APIRouter(    prefix="/concepts",    tags=["Provisions"],)
+@router.get("/", response_model=list[ConceptResponse])
+async def get_concepts(
+    search: str | None = None,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    concepts_service = ConceptsService(db)
+    return concepts_service.get_concepts(search=search)
 
 
-@router.get("/")
-async def get_concepts():
-    return {"message": "List of concepts"}
 @router.post("/")
-async def create_concept():
-    return {"message": "Concept created"}
-@router.get("/{concept_id}")
-async def get_concept(concept_id: int):
-    return {"message": f"Details of concept {concept_id}"}
+async def create_concept(
+    concept_data: ConceptCreateRequest,
+    db=Depends(get_db),
+    current_user=Depends(PermissionChecker("provisions.concepts.edit")),
+):
+    concepts_service = ConceptsService(db)
+    return concepts_service.create_concept(concept_data, current_user.id)
+
+
+@router.get("/{concept_id}", response_model=ConceptResponse)
+async def get_concept(
+    concept_id: int,
+    db=Depends(get_db),
+    current_user=Depends(PermissionChecker("provisions.concepts.edit")),
+):
+    concepts_service = ConceptsService(db)
+    return concepts_service.get_concept_by_id(concept_id)
+
+
 @router.put("/{concept_id}")
-async def update_concept(concept_id: int):
-    return {"message": f"Concept {concept_id} updated"}
+async def update_concept(
+    concept_id: int,
+    concept_data: ConceptUpdateRequest,
+    db=Depends(get_db),
+    current_user=Depends(PermissionChecker("provisions.concepts.edit")),
+):
+    concepts_service = ConceptsService(db)
+    return concepts_service.update_concept(concept_id, concept_data, current_user.id)
+
+
 @router.delete("/{concept_id}")
-async def delete_concept(concept_id: int):
-    return {"message": f"Concept {concept_id} deleted"}
-
-
-
+async def delete_concept(
+    concept_id: int,
+    db=Depends(get_db),
+    current_user=Depends(PermissionChecker("provisions.concepts.edit")),
+):
+    concepts_service = ConceptsService(db)
+    return concepts_service.delete_concept(concept_id, current_user.id)

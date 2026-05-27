@@ -39,7 +39,8 @@ class MasterRepository:
     def update_company(self, company_id: int, company_data: CompanyUpdateRequest):
         company = self.get_company_by_id(company_id)
         if company:
-            for key, value in company_data.model_dump().items():
+            update_data = company_data.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
                 setattr(company, key, value)
             self.db.commit()
             self.db.refresh(company)
@@ -76,7 +77,8 @@ class MasterRepository:
     def update_area(self, area_id: int, area_data: AreaUpdateRequest):
         area = self.get_area_by_id(area_id)
         if area:
-            for key, value in area_data.model_dump().items():
+            update_data = area_data.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
                 setattr(area, key, value)
             self.db.commit()
             self.db.refresh(area)
@@ -113,7 +115,8 @@ class MasterRepository:
     def update_currency(self, currency_id: int, currency_data: CurrencyUpdateRequest):
         currency = self.get_currency_by_id(currency_id)
         if currency:
-            for key, value in currency_data.model_dump().items():
+            update_data = currency_data.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
                 setattr(currency, key, value)
             self.db.commit()
             self.db.refresh(currency)

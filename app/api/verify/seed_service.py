@@ -64,6 +64,10 @@ class SeedService:
             {"code": "security.users.view", "desc": "Ver lista de usuarios y sus perfiles"},
             # Otros módulos
             {"code": "cic.execute", "desc": "Ejecutar procesos automáticos CIC"},
+            # master
+            {"code": "master.data.edit", "desc": "Editar datos maestros como áreas, monedas, etc."},
+            {"code": "provisions.concepts.edit", "desc": "Gestionar conceptos de provisiones"},
+            {}
         ]
         
         perms_objects = {}

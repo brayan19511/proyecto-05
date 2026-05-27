@@ -1,6 +1,7 @@
 # app/models/master/master_model.py
 
 from sqlalchemy import (
+    Index,
     String,
     Boolean,
     Text,
@@ -66,6 +67,11 @@ class Area(Base,AuditMixin):
 class Attachment(Base, AuditMixin):
     __tablename__ = "attachments"
     __table_args__ = {"schema": "storage"}
+#     Index(
+#     "ix_attachment_entity",
+#     "entity_type",
+#     "entity_id"
+# )
 
     id: Mapped[UUID] = mapped_column(
         primary_key=True,

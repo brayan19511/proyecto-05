@@ -1,14 +1,9 @@
 from uuid import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy import (
-    String,
-    Boolean,
     DateTime,
     ForeignKey,
-    Text,
     func,
-    UniqueConstraint,
-    Numeric,
 )
 class AuditMixin:
     created_at: Mapped[DateTime] = mapped_column(
