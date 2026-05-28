@@ -18,20 +18,20 @@ class MasterService:
         if not data:
             raise HTTPException(status_code=404, detail="Company not found")
         return data
-    def create_company(self, company_data: CompanyCreateRequest):
+    def create_company(self, company_data: CompanyCreateRequest,current_user_id: int):
         if self.master_repository.get_companies(company_data.code):
             raise HTTPException(status_code=400, detail="Company code already exists")
         try:
-            return self.master_repository.create_company(company_data)
+            return self.master_repository.create_company(company_data, current_user_id)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-    def update_company(self, company_id: int, company_data: CompanyUpdateRequest):
-        data = self.master_repository.update_company(company_id, company_data)
+    def update_company(self, company_id: int, company_data: CompanyUpdateRequest, current_user_id: int):
+        data = self.master_repository.update_company(company_id, company_data, current_user_id)
         if not data:
             raise HTTPException(status_code=404, detail="Company not found")
         return data
-    def delete_company(self, company_id: int):
-        data = self.master_repository.delete_company(company_id)
+    def delete_company(self, company_id: int, current_user_id: int):
+        data = self.master_repository.delete_company(company_id, current_user_id)
         if not data:
             raise HTTPException(status_code=404, detail="Company not found")
         return data
@@ -43,20 +43,20 @@ class MasterService:
         if not data:
             raise HTTPException(status_code=404, detail="Area not found")
         return data
-    def create_area(self, area_data: AreaCreateRequest):
+    def create_area(self, area_data: AreaCreateRequest, current_user_id: int):
         if self.master_repository.get_areas(area_data.code):
             raise HTTPException(status_code=400, detail="Area code already exists")
         try:
-            return self.master_repository.create_area(area_data)
+            return self.master_repository.create_area(area_data, current_user_id)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-    def update_area(self, area_id: int, area_data: AreaUpdateRequest):
-        data = self.master_repository.update_area(area_id, area_data)
+    def update_area(self, area_id: int, area_data: AreaUpdateRequest, current_user_id: int):
+        data = self.master_repository.update_area(area_id, area_data, current_user_id)
         if not data:
             raise HTTPException(status_code=404, detail="Area not found")
         return data
-    def delete_area(self, area_id: int):
-        data = self.master_repository.delete_area(area_id)
+    def delete_area(self, area_id: int, current_user_id: int):
+        data = self.master_repository.delete_area(area_id, current_user_id)
         if not data:
             raise HTTPException(status_code=404, detail="Area not found")
         return data
@@ -68,20 +68,20 @@ class MasterService:
         if not data:
             raise HTTPException(status_code=404, detail="Currency not found")
         return data
-    def create_currency(self, currency_data: CurrencyCreateRequest):
+    def create_currency(self, currency_data: CurrencyCreateRequest, current_user_id: int):
         if self.master_repository.get_currencies(currency_data.code):
             raise HTTPException(status_code=400, detail="Currency code already exists")
         try:
-            return self.master_repository.create_currency(currency_data)
+            return self.master_repository.create_currency(currency_data, current_user_id)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-    def update_currency(self, currency_id: int, currency_data: CurrencyUpdateRequest):
-        data = self.master_repository.update_currency(currency_id, currency_data)
+    def update_currency(self, currency_id: int, currency_data: CurrencyUpdateRequest, current_user_id: int):
+        data = self.master_repository.update_currency(currency_id, currency_data, current_user_id)
         if not data:
             raise HTTPException(status_code=404, detail="Currency not found")
         return data
-    def delete_currency(self, currency_id: int):
-        data = self.master_repository.delete_currency(currency_id)
+    def delete_currency(self, currency_id: int, current_user_id: int):
+        data = self.master_repository.delete_currency(currency_id, current_user_id)
         if not data:
             raise HTTPException(status_code=404, detail="Currency not found")
         return data

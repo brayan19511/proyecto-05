@@ -102,7 +102,8 @@ class Provision(Base, AuditMixin):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
 
     ticket_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    
     status_id: Mapped[int] = mapped_column(
         ForeignKey("finance.provision_statuses.id"), nullable=False, index=True
     )

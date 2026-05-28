@@ -66,8 +66,12 @@ class SeedService:
             {"code": "cic.execute", "desc": "Ejecutar procesos automáticos CIC"},
             # master
             {"code": "master.data.edit", "desc": "Editar datos maestros como áreas, monedas, etc."},
+            # cocepts
             {"code": "provisions.concepts.edit", "desc": "Gestionar conceptos de provisiones"},
-            {}
+            # provisiones
+            {"code": "provisions.view", "desc": "Ver provisiones"},
+            {"code": "provisions.edit", "desc": "Gestionar provisiones"},
+            
         ]
         
         perms_objects = {}

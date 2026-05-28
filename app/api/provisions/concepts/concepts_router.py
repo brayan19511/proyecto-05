@@ -10,7 +10,7 @@ from app.core.db_postgres import get_db
 from app.core.security import PermissionChecker, get_current_user
 
 router = APIRouter(
-    tags=["Provisions"],
+    tags=["Provisions Concepts"],
 )
 
 
@@ -44,7 +44,7 @@ async def get_concept(
     return concepts_service.get_concept_by_id(concept_id)
 
 
-@router.put("/{concept_id}")
+@router.put("/{concept_id}", response_model=ConceptResponse)
 async def update_concept(
     concept_id: int,
     concept_data: ConceptUpdateRequest,

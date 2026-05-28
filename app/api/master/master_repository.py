@@ -29,16 +29,17 @@ class MasterRepository:
     def get_company_by_id(self, company_id: int):
         return self.db.query(Company).filter(Company.id == company_id).first()
 
-    def create_company(self, company_data: CompanyCreateRequest):
-        new_company = Company(**company_data.model_dump())
+    def create_company(self, company_data: CompanyCreateRequest,current_user_id: int):
+        new_company = Company(**company_data.model_dump(),created_by=current_user_id)
         self.db.add(new_company)
         self.db.commit()
         self.db.refresh(new_company)
         return new_company
 
-    def update_company(self, company_id: int, company_data: CompanyUpdateRequest):
+    def update_company(self, company_id: int, company_data: CompanyUpdateRequest, current_user_id: int):
         company = self.get_company_by_id(company_id)
         if company:
+            company.updated_by = current_user_id
             update_data = company_data.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(company, key, value)
@@ -47,7 +48,7 @@ class MasterRepository:
             return company
         return None
 
-    def delete_company(self, company_id: int):
+    def delete_company(self, company_id: int, current_user_id: int):
         company = self.get_company_by_id(company_id)
         if company:
             company.active = False
@@ -67,16 +68,17 @@ class MasterRepository:
     def get_area_by_id(self, area_id: int):
         return self.db.query(Area).filter(Area.id == area_id).first()
 
-    def create_area(self, area_data: AreaCreateRequest):
-        new_area = Area(**area_data.model_dump())
+    def create_area(self, area_data: AreaCreateRequest, current_user_id: int):
+        new_area = Area(**area_data.model_dump(), created_by=current_user_id)
         self.db.add(new_area)
         self.db.commit()
         self.db.refresh(new_area)
         return new_area
 
-    def update_area(self, area_id: int, area_data: AreaUpdateRequest):
+    def update_area(self, area_id: int, area_data: AreaUpdateRequest, current_user_id: int):
         area = self.get_area_by_id(area_id)
         if area:
+            area.updated_by = current_user_id
             update_data = area_data.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(area, key, value)
@@ -85,10 +87,11 @@ class MasterRepository:
             return area
         return None
 
-    def delete_area(self, area_id: int):
+    def delete_area(self, area_id: int, current_user_id: int):
         area = self.get_area_by_id(area_id)
         if area:
             area.active = False
+            area.updated_by = current_user_id
             self.db.commit()
             return True
         return False
@@ -105,16 +108,17 @@ class MasterRepository:
     def get_currency_by_id(self, currency_id: int):
         return self.db.query(Currency).filter(Currency.id == currency_id).first()
 
-    def create_currency(self, currency_data: CurrencyCreateRequest):
-        new_currency = Currency(**currency_data.model_dump())
+    def create_currency(self, currency_data: CurrencyCreateRequest, current_user_id: int):
+        new_currency = Currency(**currency_data.model_dump(), created_by=current_user_id)
         self.db.add(new_currency)
         self.db.commit()
         self.db.refresh(new_currency)
         return new_currency
 
-    def update_currency(self, currency_id: int, currency_data: CurrencyUpdateRequest):
+    def update_currency(self, currency_id: int, currency_data: CurrencyUpdateRequest, current_user_id: int):
         currency = self.get_currency_by_id(currency_id)
         if currency:
+            currency.updated_by = current_user_id
             update_data = currency_data.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(currency, key, value)
@@ -123,10 +127,11 @@ class MasterRepository:
             return currency
         return None
 
-    def delete_currency(self, currency_id: int):
+    def delete_currency(self, currency_id: int, current_user_id: int):
         currency = self.get_currency_by_id(currency_id)
         if currency:
             currency.active = False
+            currency.updated_by = current_user_id
             self.db.commit()
             return True
         return False
