@@ -1,87 +1,267 @@
-
-
-from re import search
+# app/api/master/master_service.py
 
 from fastapi import HTTPException
-from app.api.master.master_repository import MasterRepository
-from app.api.master.master_schema import AreaCreateRequest, AreaUpdateRequest, CompanyCreateRequest, CompanyUpdateRequest, CurrencyCreateRequest, CurrencyUpdateRequest
+from sqlalchemy.orm import Session
+
+from app.models.master.master_model import (
+    Company,
+    Area,
+    Currency,
+)
+
+from app.api.master.master_repository import (
+    MasterRepository,
+)
+
+from app.api.master.master_schema import (
+    CompanyCreateRequest,
+    CompanyUpdateRequest,
+    AreaCreateRequest,
+    AreaUpdateRequest,
+    CurrencyCreateRequest,
+    CurrencyUpdateRequest,
+)
 
 
 class MasterService:
-    def __init__(self, db):
-        self.master_repository = MasterRepository(db)
-    # company
+
+    def __init__(self, db: Session):
+
+        self.repository = MasterRepository(db)
+
+    # ==========================================
+    # COMPANY
+    # ==========================================
+
     def get_companies(self, search: str | None = None):
-        return self.master_repository.get_companies(search)
+        return self.repository.get_companies(search)
+
     def get_company_by_id(self, company_id: int):
-        data=self.master_repository.get_company_by_id(company_id)
-        if not data:
+
+        company = self.repository.get_company_by_id(company_id)
+
+        if not company:
             raise HTTPException(status_code=404, detail="Company not found")
-        return data
-    def create_company(self, company_data: CompanyCreateRequest,current_user_id: int):
-        if self.master_repository.get_companies(company_data.code):
+
+        return company
+
+    def create_company(
+        self,
+        request: CompanyCreateRequest,
+        current_user_id: int,
+    ):
+
+        if self.repository.get_company_by_code(request.code):
             raise HTTPException(status_code=400, detail="Company code already exists")
+
         try:
-            return self.master_repository.create_company(company_data, current_user_id)
+
+            company = Company(**request.model_dump(), created_by=current_user_id)
+
+            self.repository.create_company(company)
+
+            self.repository.commit()
+
+            return company
+
         except Exception as e:
+
+            self.repository.rollback()
             raise HTTPException(status_code=400, detail=str(e))
-    def update_company(self, company_id: int, company_data: CompanyUpdateRequest, current_user_id: int):
-        data = self.master_repository.update_company(company_id, company_data, current_user_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Company not found")
-        return data
-    def delete_company(self, company_id: int, current_user_id: int):
-        data = self.master_repository.delete_company(company_id, current_user_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Company not found")
-        return data
-    # area
-    def get_areas(self, search: str | None = None):
-        return self.master_repository.get_areas(search)
-    def get_area_by_id(self, area_id: int):
-        data = self.master_repository.get_area_by_id(area_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Area not found")
-        return data
-    def create_area(self, area_data: AreaCreateRequest, current_user_id: int):
-        if self.master_repository.get_areas(area_data.code):
-            raise HTTPException(status_code=400, detail="Area code already exists")
+
+    def update_company(
+        self,
+        company_id: int,
+        request: CompanyUpdateRequest,
+        current_user_id: int,
+    ):
+
         try:
-            return self.master_repository.create_area(area_data, current_user_id)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    def update_area(self, area_id: int, area_data: AreaUpdateRequest, current_user_id: int):
-        data = self.master_repository.update_area(area_id, area_data, current_user_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Area not found")
-        return data
-    def delete_area(self, area_id: int, current_user_id: int):
-        data = self.master_repository.delete_area(area_id, current_user_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="Area not found")
-        return data
-    # Currency
+
+            company = self.repository.get_company_by_id(company_id)
+
+            if not company:
+                raise HTTPException(status_code=404, detail="Company not found")
+
+            for key, value in request.model_dump(exclude_unset=True).items():
+                setattr(company, key, value)
+
+            company.updated_by = current_user_id
+
+            self.repository.commit()
+
+            return company
+
+        except Exception:
+            self.repository.rollback()
+            raise
+
+    def delete_company(
+        self,
+        company_id: int,
+        current_user_id: int,
+    ):
+
+        company = self.repository.get_company_by_id(company_id)
+
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
+
+        company.active = False
+        company.updated_by = current_user_id
+
+        self.repository.commit()
+
+        return True
+
+    # ==========================================
+    # CURRENCY
+    # ==========================================
+
     def get_currencies(self, search: str | None = None):
-        return self.master_repository.get_currencies(search)
+        return self.repository.get_currencies(search)
+
     def get_currency_by_id(self, currency_id: int):
-        data = self.master_repository.get_currency_by_id(currency_id)
-        if not data:
+        curreny = self.repository.get_currency_by_id(currency_id)
+        if not curreny:
             raise HTTPException(status_code=404, detail="Currency not found")
-        return data
-    def create_currency(self, currency_data: CurrencyCreateRequest, current_user_id: int):
-        if self.master_repository.get_currencies(currency_data.code):
+        return curreny
+
+    def create_currency(
+        self,
+        request: CurrencyCreateRequest,
+        current_user_id: int,
+    ):
+
+        if self.repository.get_currency_by_code(request.code):
             raise HTTPException(status_code=400, detail="Currency code already exists")
+
         try:
-            return self.master_repository.create_currency(currency_data, current_user_id)
+
+            currency = Currency(**request.model_dump(), created_by=current_user_id)
+
+            self.repository.create_currency(currency)
+
+            self.repository.commit()
+
+            return currency
+
         except Exception as e:
+
+            self.repository.rollback()
             raise HTTPException(status_code=400, detail=str(e))
-    def update_currency(self, currency_id: int, currency_data: CurrencyUpdateRequest, current_user_id: int):
-        data = self.master_repository.update_currency(currency_id, currency_data, current_user_id)
-        if not data:
+
+    def update_currency(
+        self,
+        currency_id: int,
+        request: CurrencyUpdateRequest,
+        current_user_id: int,
+    ):
+
+        currency = self.repository.get_currency_by_id(currency_id)
+
+        if not currency:
             raise HTTPException(status_code=404, detail="Currency not found")
-        return data
-    def delete_currency(self, currency_id: int, current_user_id: int):
-        data = self.master_repository.delete_currency(currency_id, current_user_id)
-        if not data:
+
+        for key, value in request.model_dump(exclude_unset=True).items():
+            setattr(currency, key, value)
+
+        currency.updated_by = current_user_id
+
+        self.repository.commit()
+
+        return currency
+
+    def delete_currency(
+        self,
+        currency_id: int,
+        current_user_id: int,
+    ):
+
+        currency = self.repository.get_currency_by_id(currency_id)
+
+        if not currency:
             raise HTTPException(status_code=404, detail="Currency not found")
-        return data
+
+        currency.active = False
+        currency.updated_by = current_user_id
+
+        self.repository.commit()
+
+        return True
+
+    # ==========================================
+    # AREA
+    # ==========================================
+
+    def get_areas(self, search: str | None = None):
+        return self.repository.get_areas(search)
+
+    def get_area_by_id(self, area_id: int):
+        area = self.repository.get_area_by_id(area_id)
+        if not area:
+            raise HTTPException(status_code=404, detail="Area not found")
+        return area
+
+    def create_area(
+        self,
+        request: AreaCreateRequest,
+        current_user_id: int,
+    ):
+
+        if self.repository.get_area_by_code(request.code):
+            raise HTTPException(status_code=400, detail="Area code already exists")
+
+        try:
+
+            area = Area(**request.model_dump(), created_by=current_user_id)
+
+            self.repository.create_area(area)
+
+            self.repository.commit()
+
+            return area
+
+        except Exception as e:
+
+            self.repository.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+
+    def update_area(
+        self,
+        area_id: int,
+        request: AreaUpdateRequest,
+        current_user_id: int,
+    ):
+
+        area = self.repository.get_area_by_id(area_id)
+
+        if not area:
+            raise HTTPException(status_code=404, detail="Area not found")
+
+        for key, value in request.model_dump(exclude_unset=True).items():
+            setattr(area, key, value)
+
+        area.updated_by = current_user_id
+
+        self.repository.commit()
+
+        return area
+
+    def delete_area(
+        self,
+        area_id: int,
+        current_user_id: int,
+    ):
+
+        area = self.repository.get_area_by_id(area_id)
+
+        if not area:
+            raise HTTPException(status_code=404, detail="Area not found")
+
+        area.active = False
+        area.updated_by = current_user_id
+
+        self.repository.commit()
+
+        return True

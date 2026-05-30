@@ -26,6 +26,17 @@ class ProvisionService:
 
         self.db = db
         self.repository = ProvisionRepository(db)
+    # =====================================================
+    # PROVISION STATUS
+    # =====================================================
+    def get_provision_statuses(
+        self,
+        search: str | None = None
+    ):
+
+        return self.repository.get_provision_statuses(
+            search=search
+        )
 
     # =====================================================
     # CREATE PROVISION

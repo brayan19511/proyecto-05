@@ -5,7 +5,7 @@ from app.core.db_postgres import get_db
 from app.api.provisions.provision.provision_schema import ProvisionCreateRequest
 from app.api.provisions.provision.provision_service import ProvisionService
 router = APIRouter(
-    tags=["Provision"],
+    tags=["Provisions"],
 )
 
 @router.post("")
