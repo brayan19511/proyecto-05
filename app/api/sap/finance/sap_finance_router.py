@@ -1,9 +1,12 @@
 # app\api\sap\finance\sap_finance_router.py
 from datetime import date
 import io
+import os
+import os
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query,Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
 import pandas as pd
 from sqlalchemy.orm import Session
 
@@ -124,11 +127,11 @@ def exportar_libro_mayor_excel(
     
     
     
-@router.get("/gasto/", response_model=List[ReglaGastoResponse])
+@router.get("/reglas-gastos/", response_model=list[ReglaGastoResponse])
 def listar_reglas(db: Session = Depends(get_db)):
     return db.query(ReglasGastos).order_by(ReglasGastos.prioridad.asc()).all()
 
-@router.post("/gasto/", response_model=ReglaGastoResponse)
+@router.post("/reglas-gastos/", response_model=ReglaGastoResponse)
 def crear_regla(payload: ReglaGastoCreate, db: Session = Depends(get_db)):
     nueva_regla = ReglasGastos(**payload.dict())
     db.add(nueva_regla)
@@ -136,7 +139,7 @@ def crear_regla(payload: ReglaGastoCreate, db: Session = Depends(get_db)):
     db.refresh(nueva_regla)
     return nueva_regla
 
-@router.put("/gasto/{regla_id}", response_model=ReglaGastoResponse)
+@router.put("/reglas-gastos/{regla_id}", response_model=ReglaGastoResponse)
 def actualizar_regla(regla_id: int, payload: ReglaGastoCreate, db: Session = Depends(get_db)):
     regla = db.query(ReglasGastos).filter(ReglasGastos.id_regla == regla_id).first()
     if not regla:
@@ -147,7 +150,7 @@ def actualizar_regla(regla_id: int, payload: ReglaGastoCreate, db: Session = Dep
     db.refresh(regla)
     return regla
 
-@router.delete("/gasto/{regla_id}")
+@router.delete("/reglas-gastos/{regla_id}")
 def eliminar_regla(regla_id: int, db: Session = Depends(get_db)):
     regla = db.query(ReglasGastos).filter(ReglasGastos.id_regla == regla_id).first()
     if not regla:
@@ -156,8 +159,27 @@ def eliminar_regla(regla_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success", "message": "Regla eliminada correctamente"}
     
-    
-    
+templates = Jinja2Templates(directory="app/api/sap/template")
+# PÁGINA 1: GESTIÓN DE REGLAS
+@router.get("/web/reglas", response_class=HTMLResponse)
+def vista_crud_reglas(request: Request):
+    # En las nuevas versiones, se pasa el request directo y los datos van en un diccionario plano después
+    return templates.TemplateResponse(
+        request, 
+        "reglas_crud.html", 
+        {"active_page": "reglas"}
+    )
+
+
+# PÁGINA 2: DESCARGA DE REPORTES EXCEL
+@router.get("/web/descargar", response_class=HTMLResponse)
+def vista_descargar_reporte(request: Request):
+    # Lo mismo aquí: request, nombre de la plantilla, y los datos limpios
+    return templates.TemplateResponse(
+        request, 
+        "descargar_reporte.html", 
+        {"active_page": "descargar"}
+    )
 # @router.get("/libro-mayor")
 # def get_libro_mayor_account(
 #     start_date: date,

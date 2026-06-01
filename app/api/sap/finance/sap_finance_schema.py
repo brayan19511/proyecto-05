@@ -41,7 +41,8 @@ class ReglaGastoCreate(BaseModel):
     monto_max: float | None = None
     codigo: str  # Categoría Ejecutiva 1
     subcodigo: str  # Categoría Ejecutiva 2
-    nombre_cuenta: str  # Nombre Destino para Reporte    
+    nombre_cuenta: str  # Nombre Destino para Reporte
+    activo: bool = True    
 class ReglasGastosRequest(BaseModel):
     prioridad: int
     tipo_regla: str  # 'CUENTA', 'MIXTA', 'TEXTO'
@@ -55,6 +56,7 @@ class ReglasGastosRequest(BaseModel):
     codigo: str  # Categoría Ejecutiva 1
     subcodigo: str  # Categoría Ejecutiva 2
     nombre_cuenta: str  # Nombre Destino para Reporte
+    activo: bool = True
 class ReglaGastoResponse(BaseModel):
     id_regla: int
     prioridad: int
@@ -69,3 +71,4 @@ class ReglaGastoResponse(BaseModel):
     codigo: str  # Categoría Ejecutiva 1
     subcodigo: str  # Categoría Ejecutiva 2
     nombre_cuenta: str  # Nombre Destino para Reporte
+    activo: bool = True

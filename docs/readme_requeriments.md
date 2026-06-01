@@ -1,5 +1,5 @@
 # HISTORIAS DE USUARIO - PROYECTO-05
-
+ pip freeze > requirements.txt 
 ## 1. MÓDULO: AUTH & AUTORIZACIÓN
 
 ### 1.1 Autenticación Unificada
