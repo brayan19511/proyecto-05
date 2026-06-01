@@ -27,3 +27,45 @@ class LibroMayorRequest(BaseModel):
             
             # Si llega aquí es porque no coincidió con ninguno
             raise ValueError("Formato de fecha no reconocido. Use DD/MM/YYYY o YYYY-MM-DD")
+        
+        
+class ReglaGastoCreate(BaseModel):
+    prioridad: int
+    tipo_regla: str  # 'CUENTA', 'MIXTA', 'TEXTO'
+    cuenta: str | None = None  # Mapea con cuenta_asociada de SAP
+    cuenta_contrapartida: str | None = None
+    centro_costo: str | None = None
+    filtro_texto: str | None = None  # Texto que debe incluir
+    texto_excluido: str | None = None  # Texto que NO debe incluir
+    monto_min: float | None = None
+    monto_max: float | None = None
+    codigo: str  # Categoría Ejecutiva 1
+    subcodigo: str  # Categoría Ejecutiva 2
+    nombre_cuenta: str  # Nombre Destino para Reporte    
+class ReglasGastosRequest(BaseModel):
+    prioridad: int
+    tipo_regla: str  # 'CUENTA', 'MIXTA', 'TEXTO'
+    cuenta: str | None = None  # Mapea con cuenta_asociada de SAP
+    cuenta_contrapartida: str | None = None
+    centro_costo: str | None = None
+    filtro_texto: str | None = None  # Texto que debe incluir
+    texto_excluido: str | None = None  # Texto que NO debe incluir
+    monto_min: float | None = None
+    monto_max: float | None = None
+    codigo: str  # Categoría Ejecutiva 1
+    subcodigo: str  # Categoría Ejecutiva 2
+    nombre_cuenta: str  # Nombre Destino para Reporte
+class ReglaGastoResponse(BaseModel):
+    id_regla: int
+    prioridad: int
+    tipo_regla: str  # 'CUENTA', 'MIXTA', 'TEXTO'
+    cuenta: str | None = None  # Mapea con cuenta_asociada de SAP
+    cuenta_contrapartida: str | None = None
+    centro_costo: str | None = None
+    filtro_texto: str | None = None  # Texto que debe incluir
+    texto_excluido: str | None = None  # Texto que NO debe incluir
+    monto_min: float | None = None
+    monto_max: float | None = None
+    codigo: str  # Categoría Ejecutiva 1
+    subcodigo: str  # Categoría Ejecutiva 2
+    nombre_cuenta: str  # Nombre Destino para Reporte

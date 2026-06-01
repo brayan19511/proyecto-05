@@ -8,7 +8,7 @@ from alembic import context
 
 # 1. IMPORTA TU CONFIGURACIÓN Y TU BASE
 from app.core.config import settings
-from app.core.db_postgres import Base  # O de donde venga tu DeclarativeBase
+from app.core.db.db_postgres import Base  # O de donde venga tu DeclarativeBase
 
 # 2. IMPORTA TODOS TUS MODELOS AQUÍ
 # Esto es vital para que Alembic vea las tablas

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.security.role.role_schemas import AssingnRoleToUserRequest, RoleRequest
 from app.api.security.role.role_service import RoleService
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker
 
 

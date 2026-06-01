@@ -6,7 +6,7 @@ from sqlalchemy import (
     Boolean,
     Text,
 )
-from app.core.db_postgres import Base
+from app.core.db.db_postgres import Base
 
 from uuid import uuid4
 from sqlalchemy.orm import Mapped, mapped_column, relationship

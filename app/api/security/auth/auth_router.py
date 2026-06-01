@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from app.api.security.auth.auth_schemas import *
 from app.api.security.auth.auth_service import AuthService
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

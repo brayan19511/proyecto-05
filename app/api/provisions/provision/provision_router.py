@@ -1,7 +1,7 @@
 # app/api/provisions/provision/provision_router.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 from app.api.provisions.provision.provision_schema import ProvisionCreateRequest
 from app.api.provisions.provision.provision_service import ProvisionService
 router = APIRouter(

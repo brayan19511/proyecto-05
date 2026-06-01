@@ -21,7 +21,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from app.core.db_postgres import Base
+from app.core.db.db_postgres import Base
 from app.models.common.mixin_model import AuditMixin
 from app.models.master.master_model import Company
 if TYPE_CHECKING:

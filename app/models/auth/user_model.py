@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 from sqlalchemy import String,  DateTime, ForeignKey, func, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.db_postgres import Base
+from app.core.db.db_postgres import Base
 
 if TYPE_CHECKING:
     from .security_model import Auth

@@ -6,7 +6,7 @@ from app.api.provisions.concepts.concepts_schema import (
     ConceptUpdateRequest,
 )
 from app.api.provisions.concepts.concepts_service import ConceptsService
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker, get_current_user
 
 router = APIRouter(
