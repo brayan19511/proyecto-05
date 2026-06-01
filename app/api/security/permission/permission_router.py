@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.security.permission.permission_schemas import AssignRoleToPermissionRequest, PermisionCreateRequest
 from app.api.security.permission.permission_service import PermissionService
 from app.api.security.role.role_service import RoleService
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 
 
 router = APIRouter(    prefix="/permission",    tags=["Permission"],)

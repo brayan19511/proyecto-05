@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 from app.api.verify.seed_service import SeedService
 
 

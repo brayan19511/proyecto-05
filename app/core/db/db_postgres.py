@@ -1,4 +1,4 @@
-# app/core/db.py
+# app\core\db\db_postgres.py
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
 from app.core.config import settings

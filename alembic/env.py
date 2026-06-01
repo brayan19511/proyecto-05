@@ -8,7 +8,7 @@ from alembic import context
 
 # 1. IMPORTA TU CONFIGURACIÓN Y TU BASE
 from app.core.config import settings
-from app.core.db_postgres import Base  # O de donde venga tu DeclarativeBase
+from app.core.db.db_postgres import Base  # O de donde venga tu DeclarativeBase
 
 # 2. IMPORTA TODOS TUS MODELOS AQUÍ
 # Esto es vital para que Alembic vea las tablas
@@ -104,9 +104,7 @@ def run_migrations_online() -> None:
             connection.execute(text('CREATE SCHEMA IF NOT EXISTS "security";'))
             connection.execute(text('CREATE SCHEMA IF NOT EXISTS "user";'))
             connection.execute(text('CREATE SCHEMA IF NOT EXISTS "audit";'))
-            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "finance";'))
-            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "storage";'))
-            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "master";'))
+            connection.execute(text('CREATE SCHEMA IF NOT EXISTS "coolbox";'))
             context.run_migrations()
 
 

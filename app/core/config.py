@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 from typing import Optional
 
+
 class Settings(BaseSettings):
     # 1. Definimos las piezas (Opcionales para que no explote si falta una)
     POSTGRES_USER: Optional[str] = Field(default=None)
@@ -10,17 +11,28 @@ class Settings(BaseSettings):
     POSTGRES_DB: Optional[str] = Field(default=None)
     DB_HOST: Optional[str] = Field(default="localhost")
     DB_PORT: Optional[int] = Field(default=5432)
-    
+
     ENV: str = "dev"
-    PROJECT_NAME: str = Field(default="Proyecto-rash") 
-    
+    PROJECT_NAME: str = Field(default="Proyecto-rash")
+
     # 2. La URL completa (Prioridad para la Nube)
     # Si en el .env o en el sistema existe DATABASE_URL, se cargará aquí
     DATABASE_URL: Optional[str] = Field(default=None)
 
+    DB_RASH_USER: Optional[str] = Field(default=None)
+    DB_RASH_PASSWORD: Optional[str] = Field(default=None)
+    DB_RASH_HOST: Optional[str] = Field(default=None)
+    DB_RASH_DB: Optional[str] = Field(default=None)
+    DB_RASH_PORT: Optional[str] = Field(default=None)
+
     JWT_SECRET: str
     JWT_ALG: str = "HS256"
     JWT_EXPIRES_MIN: int = 3600
+
+    @property
+    def ASYNC_DATABASE_ICG_URL(self) -> str:
+        # Construcción manual para la DB RASH
+        return f"mssql+pyodbc://{self.DB_RASH_USER}:{self.DB_RASH_PASSWORD}@{self.DB_RASH_HOST}/{self.DB_RASH_DB}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
 
     # 3. Propiedad de Python pura (Sin computed_field para evitar el AttributeError)
     @property
@@ -33,14 +45,15 @@ class Settings(BaseSettings):
             if "postgresql+psycopg2://" not in url:
                 url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
             return url
-        
+
         # Caso Local: Construcción manual
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"
 
     model_config = SettingsConfigDict(
-        env_file=".env", 
+        env_file=".env",
         extra="ignore",
-        env_ignore_empty=True # Ignora variables vacías en el .env
+        env_ignore_empty=True,  # Ignora variables vacías en el .env
     )
+
 
 settings = Settings()

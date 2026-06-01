@@ -7,7 +7,7 @@ import jwt
 from sqlalchemy.orm import Session
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.config import settings
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 
 
 pwd_context = PasswordHash.recommended()

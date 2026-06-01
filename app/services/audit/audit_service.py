@@ -1,4 +1,4 @@
-from app.core.db_postgres import SessionLocal # Importa tu generador de sesiones
+from app.core.db.db_postgres import SessionLocal # Importa tu generador de sesiones
 from .audit_repository import AuditRepository
 
 class AuditService:

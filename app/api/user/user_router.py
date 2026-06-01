@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.api.user import  UserService, UserProfileCreate, UserProfileResponse,UserProfileUpdate
-from app.core.db_postgres import get_db
+from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker
 
 router = APIRouter(   prefix="/users",tags=["users"],)
