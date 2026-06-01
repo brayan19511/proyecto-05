@@ -3,12 +3,12 @@ from datetime import date
 import pandas as pd
 import numpy as np
 from fastapi import HTTPException, status
-from app.api.coolbox.ventas.ventas_repository import VentasRepository
-from app.api.coolbox.ventas.ventas_dest_repository import VentasDestRepository
+from app.api.coolbox.ventas.repository.icg_repository import IcgRepository
+from app.api.coolbox.ventas.repository.ventas_dest_repository import VentasDestRepository
 
 class VentasService:
     def __init__(self, db_fuente, db_destino):
-        self.repo_fuente = VentasRepository(db_fuente)
+        self.repo_fuente = IcgRepository(db_fuente)
         self.repo_destino = VentasDestRepository(db_destino)
 
     def ejecutar_etl_ventas(self, fecha: date):

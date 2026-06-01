@@ -1,9 +1,36 @@
 # app/api/coolbox/ventas/ventas_repository.py
 from sqlalchemy import text
 
-class VentasRepository:
+
+class IcgRepository:
     def __init__(self, db):
         self.db = db
+
+    def get_productos(self):
+        sql = text(
+            """SELECT 
+                T1.CODARTICULO, T1.REFPROVEEDOR, T1.DESCRIPCION , T1.DESCRIPADIC,
+                T6.DESCRIPCION AS MARCA, 
+                T5.CO_RUBR, 
+                T2.DESCRIPCION AS RUBRO, 
+                T5.CO_FAMI, T3.DESCRIPCION AS FAMILIA, 
+                T5.CO_SFAM, T4.DESCRIPCION AS SUBFAMILIA, 
+                T5.CODIGOSAP, T5.ESTADOSARTICULOS, T5.TI_ITEM, T5.ORIGEN,T1.DESCATALOGADO
+                FROM     ARTICULOS AS T1 
+                INNER JOIN SECCIONES AS T2 
+                    ON T1.DPTO = T2.NUMDPTO AND T1.SECCION = T2.NUMSECCION 
+                LEFT OUTER JOIN FAMILIAS AS T3
+                    ON T1.DPTO = T3.NUMDPTO AND T1.SECCION = T3.NUMSECCION AND T1.FAMILIA = T3.NUMFAMILIA 
+                LEFT OUTER JOIN SUBFAMILIAS AS T4 
+                    ON T1.DPTO = T4.NUMDPTO AND T1.SECCION = T4.NUMSECCION AND T1.FAMILIA = T4.NUMFAMILIA AND T1.SUBFAMILIA = T4.NUMSUBFAMILIA 
+                LEFT OUTER JOIN ARTICULOSCAMPOSLIBRES AS T5 
+                    ON T1.CODARTICULO = T5.CODARTICULO 
+                LEFT OUTER JOIN MARCA AS T6 
+                    ON T1.MARCA = T6.CODMARCA
+                WHERE  (T1.CODARTICULO NOT IN (32869))"""
+        )
+        result = self.db.execute(sql)
+        return result.mappings().all()
 
     def get_ventas(self, fecha):
         sql = text("""
@@ -30,6 +57,7 @@ class VentasRepository:
         )
 
         return result.mappings().all()
+
     def obtener_totales_control_fuente(self, fecha):
         sql = text("""
             SELECT 
