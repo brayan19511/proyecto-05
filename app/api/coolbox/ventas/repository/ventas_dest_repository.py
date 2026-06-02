@@ -31,7 +31,9 @@ class VentasDestRepository:
                     descuento=float(row['MONTO_DESCUENTO']),
                     total=float(row['TOTAL']),
                     canal=row['CANAL'],
-                    cliente=row['CODCLIENTE']
+                    cliente=row['CODCLIENTE'] ,
+                    iva=float(row['IVA']) ,
+                    vendedor=row['CODVENDEDOR'] 
                 )
             )
         

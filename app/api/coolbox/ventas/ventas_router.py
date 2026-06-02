@@ -20,6 +20,17 @@ async def procesar_ventas_por_fecha(
     service = VentasService(db_fuente=db_fuente, db_destino=db_destino)
     resultado = service.ejecutar_etl_ventas(fecha)
     return resultado
+@router.get("/procesar-ventas-rango", status_code=status.HTTP_201_CREATED)
+async def procesar_ventas_por_rango(
+    fecha_inicio: date,
+    fecha_fin: date,
+    db_fuente=Depends(get_db_coolbox),
+    db_destino=Depends(get_db)
+):
+    # Pasamos ambas conexiones al servicio
+    service = VentasService(db_fuente=db_fuente, db_destino=db_destino)
+    resultado = service.ejecutar_etl_ventas_rango(fecha_inicio, fecha_fin)
+    return resultado
 @router.get("/procesar-catalogo", status_code=status.HTTP_201_CREATED)
 async def procesar_productos(
     db_fuente=Depends(get_db_coolbox),

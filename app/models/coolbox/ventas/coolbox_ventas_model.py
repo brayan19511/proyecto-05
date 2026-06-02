@@ -30,7 +30,10 @@ class Ventas(Base):
     descuento: Mapped[float] = mapped_column(nullable=False)
     total: Mapped[float] = mapped_column(nullable=False)
     canal: Mapped[str] = mapped_column(String, nullable=False)
-    cliente: Mapped[str] = mapped_column(String, nullable=False)
+    cliente: Mapped[str] = mapped_column(String, nullable=True)
+    vendedor: Mapped[str] = mapped_column(String, nullable=True)
+    iva: Mapped[float] = mapped_column(nullable=True)
+    
 class Producto(Base):
     __tablename__ = "productos"
     __table_args__ = {"schema": "coolbox"}
