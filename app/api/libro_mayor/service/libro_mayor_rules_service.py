@@ -28,8 +28,8 @@ class LibroMayorRulesService:
 
         df["codigo"] = "SIN_CLASIFICAR"
         df["subcodigo"] = "OTROS"
-
-        df["nombre_cuenta"] = df["nombre_cuenta_asociada"]
+        if "nombre_cuenta_asociada" in df.columns:
+            df["nombre_cuenta"] = df["nombre_cuenta_asociada"]
 
         # derivado de cuenta_asociada
         df["tipo_cuenta"] = df["cuenta_asociada"].astype(str).str[:2]
@@ -96,3 +96,25 @@ class LibroMayorRulesService:
             mask &= df["cargo_abono_ml"] <= regla.monto_max
 
         return mask
+    def reprocesar(
+        self,
+        df: pd.DataFrame,
+        reglas: list[ReglasGastos],
+        user_id: str | None = None
+    ):
+
+        if df.empty:
+            return df
+
+        # limpiar clasificación anterior
+        df["id_regla"] = None
+        df["tiene_regla"] = False
+        df["codigo"] = "SIN_CLASIFICAR"
+        df["subcodigo"] = "OTROS"
+
+        for regla in reglas:
+            self._aplicar_regla(df, regla)
+
+        df["updated_by"] = user_id
+
+        return df

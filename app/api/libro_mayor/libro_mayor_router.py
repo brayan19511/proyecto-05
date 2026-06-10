@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.libro_mayor.libro_mayor_schema import LibroMayorResponse
 from app.api.libro_mayor.libro_mayor_service import LibroMayorService
+from app.api.libro_mayor.service.libro_mayor_reproces_service import LibroMayorReprocessService
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
 
@@ -14,6 +15,15 @@ def get_libro_mayor_service(
     db_local=Depends(get_db), db_sap=Depends(get_db_sap)
 ) -> LibroMayorService:
     return LibroMayorService(db_local, db_sap)
+
+
+def get_reprocess_service(
+    db_local=Depends(get_db)
+) -> LibroMayorReprocessService:
+
+    return LibroMayorReprocessService(
+        db_local=db_local
+    )
 
 
 @router.get("/sync-date")
@@ -34,6 +44,7 @@ def sincronizacion(
             status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
         )
 
+
 @router.get("/sync-delta")
 def sincronizacion_detlta(
     start_date: date = Query(default=None),
@@ -52,7 +63,38 @@ def sincronizacion_detlta(
             status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
         )
 
-@router.get("/get-all", response_model=list[LibroMayorResponse],response_model_by_alias=False)
+
+@router.get("/reprocess/account")
+def reprocess_account(
+    account: str = Query(...),
+    libro_mayor_reprocess: LibroMayorReprocessService = Depends(get_reprocess_service),
+):
+    try:
+        return libro_mayor_reprocess.reprocess_account(account=account)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+        )
+@router.get("/reprocess/rule")
+def reprocess_gasto_by_id(
+    rule: int = Query(...),
+    libro_mayor_reprocess: LibroMayorReprocessService = Depends(get_reprocess_service),
+):
+    try:
+        return libro_mayor_reprocess.reprocess_rule(rule_id=rule)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+        )
+
+
+
+
+@router.get("/get-all", response_model=list[LibroMayorResponse], response_model_by_alias=False)
 def obtenerLibroMayor(
     start_date: date = Query(...),
     end_date: date = Query(...),
@@ -69,3 +111,5 @@ def obtenerLibroMayor(
         raise HTTPException(
             status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
         )
+
+
