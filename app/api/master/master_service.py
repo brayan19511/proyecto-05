@@ -48,7 +48,7 @@ class MasterService:
     def create_company(
         self,
         request: CompanyCreateRequest,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         if self.repository.get_company_by_code(request.code):
@@ -73,7 +73,7 @@ class MasterService:
         self,
         company_id: int,
         request: CompanyUpdateRequest,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         try:
@@ -99,7 +99,7 @@ class MasterService:
     def delete_company(
         self,
         company_id: int,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         company = self.repository.get_company_by_id(company_id)
@@ -130,7 +130,7 @@ class MasterService:
     def create_currency(
         self,
         request: CurrencyCreateRequest,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         if self.repository.get_currency_by_code(request.code):
@@ -155,7 +155,7 @@ class MasterService:
         self,
         currency_id: int,
         request: CurrencyUpdateRequest,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         currency = self.repository.get_currency_by_id(currency_id)
@@ -175,7 +175,7 @@ class MasterService:
     def delete_currency(
         self,
         currency_id: int,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         currency = self.repository.get_currency_by_id(currency_id)
@@ -206,7 +206,7 @@ class MasterService:
     def create_area(
         self,
         request: AreaCreateRequest,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         if self.repository.get_area_by_code(request.code):
@@ -231,7 +231,7 @@ class MasterService:
         self,
         area_id: int,
         request: AreaUpdateRequest,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         area = self.repository.get_area_by_id(area_id)
@@ -251,7 +251,7 @@ class MasterService:
     def delete_area(
         self,
         area_id: int,
-        current_user_id: int,
+        current_user_id: int|None,
     ):
 
         area = self.repository.get_area_by_id(area_id)

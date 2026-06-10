@@ -18,8 +18,8 @@ class SeedService:
         self.master_service = MasterService(db) # Si tienes un servicio para datos maestros
         
     def run_seed(self):
-            user=self.create_roles_and_permissions()
-            self.create_masters(user.id)  
+            self.create_roles_and_permissions()
+            self.create_masters()  
             return {"status": "success", "message": "Seeding completed"}
 
 
