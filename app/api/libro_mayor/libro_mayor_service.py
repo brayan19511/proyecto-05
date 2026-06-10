@@ -41,6 +41,19 @@ class LibroMayorService:
         )
         return data_sap
 
+    def get_libro_mayor_by_sap_delta(
+        self, start_date: date, end_date: date, account: str
+    ) -> list[LibroMayorSap]:
+        # obtener desde sap
+        if account not in SUPPORTED_ACCOUNTS:
+            raise HTTPException(
+                status_code=400, detail=f"Cuenta no soportada: {account}"
+            )
+        data_sap = self.sap_repository.get_libro_mayor_delta(
+            start_date=start_date,end_date= end_date,account= account
+        )
+        return data_sap
+
     def get_libro_mayor_by_account(self, start_date: date, end_date: date, account: str):
         if account not in SUPPORTED_ACCOUNTS:
             raise HTTPException(
@@ -59,10 +72,12 @@ class LibroMayorService:
 
         df = pd.DataFrame.from_records(data_sap)
         # limpiamos columnas no mapeadas
-        columnas_validas = {column.name for column in LibroMayor.__table__.columns}
+        columnas_validas = {
+            column.name for column in LibroMayor.__table__.columns}
         df = df[[c for c in df.columns if c in columnas_validas]]
 
-        df = self.rules_service.aplicar(df=df, reglas=reglas, user_id=self.user_id)
+        df = self.rules_service.aplicar(
+            df=df, reglas=reglas, user_id=self.user_id)
 
         resultado = self.libro_mayor_repository.upsert(df)
 
@@ -73,3 +88,37 @@ class LibroMayorService:
             "sin_clasificar": int((~df["tiene_regla"]).sum()),
             **resultado,
         }
+
+    def sync_delta(self, start_date, end_date, account):
+        
+        if not start_date:
+            last_libro=self.libro_mayor_repository.get_last_libro_mayor(account=account)
+            if not last_libro:
+                raise ValueError(
+                    f"No existen registros sincronizados para la cuenta {account}"
+                )
+            start_date=last_libro.fecha_actualizacion
+            end_date=None
+            
+        
+        data_sap = self.get_libro_mayor_by_sap_delta(
+            start_date=start_date, end_date=end_date, account=account)
+        reglas = self.libro_mayor_repository.get_reglas_activas()
+
+        df = pd.DataFrame.from_records(data_sap)
+        # limpiamos columnas no mapeadas
+        columnas_validas = {
+            column.name for column in LibroMayor.__table__.columns}
+        df = df[[c for c in df.columns if c in columnas_validas]]
+
+        df = self.rules_service.aplicar(
+            df=df, reglas=reglas, user_id=self.user_id)
+
+        resultado = self.libro_mayor_repository.upsert(df)
+
+        return {
+            "account": account,
+            "registros_sap": len(df),
+            "clasificados": int(df["tiene_regla"].sum()),
+            "sin_clasificar": int((~df["tiene_regla"]).sum()),
+            **resultado, }

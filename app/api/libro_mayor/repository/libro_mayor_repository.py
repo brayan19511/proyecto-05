@@ -27,6 +27,14 @@ class LibroMayorRepository:
         query=query.filter(LibroMayor.tipo_cuenta==account)
         registros = query.all()
         return registros
+    def get_last_libro_mayor(self, account: str)->LibroMayor:
+        last_registro=(
+                        self.db.query(LibroMayor)
+                        .filter(LibroMayor.tipo_cuenta==account)
+                        .order_by(LibroMayor.fecha_creacion.desc())
+                        .first()
+                        )
+        return last_registro
             
     # guardar ventas bulk
     def upsert(self, df_limpio: pd.DataFrame):

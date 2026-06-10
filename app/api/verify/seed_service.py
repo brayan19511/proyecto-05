@@ -18,21 +18,20 @@ class SeedService:
         self.master_service = MasterService(db) # Si tienes un servicio para datos maestros
         
     def run_seed(self):
-            self.create_masters()  
-            self.create_roles_and_permissions()
-
+            user=self.create_roles_and_permissions()
+            self.create_masters(user.id)  
             return {"status": "success", "message": "Seeding completed"}
 
 
 
-    def create_masters(self):
+    def create_masters(self,user_id):
         # Aquí podrías implementar la creación de datos maestros como áreas, monedas, etc.
         # compañías
         companies_data = [
             CompanyCreateRequest(code="RASH", name="RASH PERU SRL", rut="20378890161"),
         ]
         for company in companies_data:
-            self.master_service.create_company(company)
+            self.master_service.create_company(company,user_id)
         # areas
         areas_data = [
             AreaCreateRequest(code="CON", name="Contabilidad", description="Área de contabilidad"),
@@ -49,7 +48,7 @@ class SeedService:
             CurrencyCreateRequest(code="EUR", name="Euro", symbol="€"),
         ]
         for currency in currencies_data:
-            self.master_service.create_currency(currency)
+            self.master_service.create_currency(currency,user_id)
 
     def create_roles_and_permissions(self):
         # Aquí podrías implementar solo la parte de creación de roles y permisos sin tocar usuarios
@@ -111,3 +110,4 @@ class SeedService:
             admin_user = self.auth_service.register_user(UserRegisterSchema(email=admin_email, password="admin123"))
             # Asignar rol
             self.role_service.assign_role_to_user(admin_user["id"], admin_role.id)
+        return admin_user
