@@ -1,3 +1,4 @@
+# app\api\libro_mayor\repository\libro_mayor_repository.py
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert

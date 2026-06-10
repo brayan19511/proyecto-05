@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.libro_mayor import libro_mayor_router
 from app.api.master import master_router
 from app.api.provisions import provisions_router
 from app.api.sap import sap_router
@@ -42,7 +43,8 @@ register_exception_handlers(app)
 # =========================================================
 # 4. RUTAS (ROUTERS)
 # =========================================================
-app.include_router(prefix="/api", router=sap_router.router)
+# app.include_router(prefix="/api", router=sap_router.router)
+app.include_router(prefix="/api", router=libro_mayor_router.router)
 app.include_router(prefix="/api", router=provisions_router.router)
 app.include_router(prefix="/api", router=master_router.router)
 app.include_router(prefix="/api", router=verify_router.router)
