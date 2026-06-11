@@ -50,7 +50,7 @@ class LibroMayorService:
                 status_code=400, detail=f"Cuenta no soportada: {account}"
             )
         data_sap = self.sap_repository.get_libro_mayor_delta(
-            start_date=start_date,end_date= end_date,account= account
+            start_date=start_date, end_date=end_date, account=account
         )
         return data_sap
 
@@ -90,17 +90,17 @@ class LibroMayorService:
         }
 
     def sync_delta(self, start_date, end_date, account):
-        
+
         if not start_date:
-            last_libro=self.libro_mayor_repository.get_last_libro_mayor(account=account)
+            last_libro = self.libro_mayor_repository.get_last_libro_mayor(
+                account=account)
             if not last_libro:
                 raise ValueError(
                     f"No existen registros sincronizados para la cuenta {account}"
                 )
-            start_date=last_libro.fecha_actualizacion
-            end_date=None
-            
-        
+            start_date = last_libro.fecha_actualizacion
+            end_date = None
+
         data_sap = self.get_libro_mayor_by_sap_delta(
             start_date=start_date, end_date=end_date, account=account)
         reglas = self.libro_mayor_repository.get_reglas_activas()
@@ -122,3 +122,23 @@ class LibroMayorService:
             "clasificados": int(df["tiene_regla"].sum()),
             "sin_clasificar": int((~df["tiene_regla"]).sum()),
             **resultado, }
+
+    def export_excel(
+        self,
+        start_date,
+        end_date,
+        account
+    ):
+
+        registros = (
+            self.libro_mayor_repository
+            .get_libro_mayor_by_account(
+                start_date,
+                end_date,
+                account
+            )
+        )
+
+        return self.libro_mayor_repository.to_dataframe_date(
+            registros
+        )

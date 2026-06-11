@@ -2,6 +2,7 @@
 from datetime import date
 import math
 
+import numpy as np
 import pandas as pd
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -67,7 +68,19 @@ class LibroMayorRepository:
 
     # guardar ventas bulk
     def upsert(self, df_limpio: pd.DataFrame):
-
+        df_limpio = df_limpio.where(
+            pd.notnull(df_limpio),
+            None
+        )
+        df_limpio = df_limpio.replace(
+            {
+                np.nan: None,
+                "nan": None,
+                "NaN": None,
+                "NAN": None,
+                "None": None,
+            }
+        )
         registros = df_limpio.to_dict(orient="records")
 
         stmt = insert(LibroMayor).values(registros)
@@ -115,6 +128,7 @@ class LibroMayorRepository:
 
         if df.empty:
             return {"procesados": 0}
+        df = df.where(pd.notnull(df), None)
 
         registros = df[
             [
@@ -162,3 +176,48 @@ class LibroMayorRepository:
             }
             for row in registros
         ])
+
+    def to_dataframe_date(
+        self,
+        registros: list[LibroMayor]
+    ) -> pd.DataFrame:
+
+        if not registros:
+            return pd.DataFrame()
+
+        df = pd.DataFrame([
+            {
+                column.name: getattr(row, column.name)
+                for column in LibroMayor.__table__.columns
+            }
+            for row in registros
+        ])
+
+        if not df.empty:
+
+            df["anio"] = pd.to_datetime(
+                df["fecha_contabilizacion"]
+            ).dt.year
+
+            df["mes"] = pd.to_datetime(
+                df["fecha_contabilizacion"]
+            ).dt.month
+
+            meses = {
+                1: "Enero",
+                2: "Febrero",
+                3: "Marzo",
+                4: "Abril",
+                5: "Mayo",
+                6: "Junio",
+                7: "Julio",
+                8: "Agosto",
+                9: "Septiembre",
+                10: "Octubre",
+                11: "Noviembre",
+                12: "Diciembre",
+            }
+
+            df["nmes"] = df["mes"].map(meses)
+
+        return df

@@ -9,6 +9,7 @@ from app.api.sap import sap_router
 from app.api.security import security_router
 from app.api.user import user_router
 from app.api.verify import verify_router
+from app.api.web import web_router
 from app.core.config import settings
 from app.core.handlers import register_exception_handlers
 from app.core.middleware import AuditMiddleware
@@ -44,6 +45,7 @@ register_exception_handlers(app)
 # 4. RUTAS (ROUTERS)
 # =========================================================
 # app.include_router(prefix="/api", router=sap_router.router)
+app.include_router(prefix="/api", router=web_router.router)
 app.include_router(prefix="/api", router=libro_mayor_router.router)
 app.include_router(prefix="/api", router=provisions_router.router)
 app.include_router(prefix="/api", router=master_router.router)
