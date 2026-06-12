@@ -10,8 +10,8 @@ from fastapi.templating import Jinja2Templates
 import pandas as pd
 from sqlalchemy.orm import Session
 
-from app.api.sap.finance.sap_finance_schema import ReglaGastoCreate, ReglaGastoResponse
-from app.api.sap.finance.sap_finance_service import SapFinanceService
+from app.api.sap_legacy.finance.sap_finance_schema import ReglaGastoCreate, ReglaGastoResponse
+from app.api.sap_legacy.finance.sap_finance_service import SapFinanceService
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
 from app.models.finance.libro_mayor_model import LibroMayor, ReglasGastos

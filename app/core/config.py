@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     DB_SAP_PORT: str
     DB_SAP_USER: str
     DB_SAP_PASSWORD: str
+    
+    SAP_URL: str
 
     @property
     def DATABASE_URL_SAP(self) -> str:

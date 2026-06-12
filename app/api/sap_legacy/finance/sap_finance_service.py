@@ -4,8 +4,8 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from app.api.sap.finance.sap_finance_repository import SapRepository
-from app.api.sap.libro_mayor.LibroMayorRepository import LibroMayorRepository
+from app.api.sap_legacy.finance.sap_finance_repository import SapRepository
+from app.api.sap_legacy.libro_mayor.LibroMayorRepository import LibroMayorRepository
 from app.core.audit_utils import add_step
 from app.models.finance.libro_mayor_model import LibroMayor
 
