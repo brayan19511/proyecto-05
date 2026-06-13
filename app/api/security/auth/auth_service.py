@@ -7,7 +7,6 @@ from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, User
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import Auth
-from app.models import Information
 
 
 class AuthService:

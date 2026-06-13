@@ -12,6 +12,7 @@ from app.core.audit_utils import get_request_body
 from app.core.audit_utils import audit_steps_context
 from app.services.audit.audit_service import AuditService
 
+
 class AuditMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
@@ -40,19 +41,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         query_params = dict(request.query_params)
 
-        client_ip = (
-            request.client.host
-            if request.client
-            else "unknown"
-        )
+        client_ip = request.client.host if request.client else "unknown"
 
         user_agent = request.headers.get("user-agent")
-
-        user_id = getattr(
-            request.state,
-            "user_id",
-            None
-        )
 
         # =====================================================
         # REQUEST BODY
@@ -64,16 +55,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
             try:
                 body_bytes = await get_request_body(request)
 
-                req_body = (
-                    json.loads(body_bytes)
-                    if body_bytes
-                    else None
-                )
+                req_body = json.loads(body_bytes) if body_bytes else None
 
             except Exception:
-                req_body = {
-                    "error": "Could not parse body"
-                }
+                req_body = {"error": "Could not parse body"}
 
         # =====================================================
         # CREA AUDITORÍA INICIAL (RUNNING)
@@ -82,7 +67,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         audit_id = AuditService.start_audit(
             {
                 "trace_id": trace_id,
-                "user_id": user_id,
+                # "user_id": user_id,
                 "method": method,
                 "path": path,
                 "environment": settings.ENV,
@@ -116,11 +101,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 detail_data={
                     "level": "ERROR",
                     "error_message": str(exc),
-                    "error_stack": getattr(
-                        request.state,
-                        "error_stack",
-                        None
-                    ),
+                    "error_stack": getattr(request.state, "error_stack", None),
                 },
                 steps_data=audit_steps_capturados,
             )
@@ -139,30 +120,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # DATOS DE RESPUESTA
         # =====================================================
 
-        content_length = response.headers.get(
-            "content-length"
-        )
+        content_length = response.headers.get("content-length")
 
-        if (
-            not content_length
-            and hasattr(response, "body")
-        ):
+        if not content_length and hasattr(response, "body"):
             content_length = len(response.body)
 
         try:
-            response_size = (
-                int(content_length)
-                if content_length
-                else 0
-            )
+            response_size = int(content_length) if content_length else 0
         except (ValueError, TypeError):
             response_size = 0
 
         end_time_dt = datetime.now(timezone.utc)
 
-        duration_ms = (
-            time.time() - start_time_float
-        ) * 1000
+        duration_ms = (time.time() - start_time_float) * 1000
 
         # =====================================================
         # RESPONSE BODY
@@ -170,29 +140,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         response_body = None
 
-        if "application/json" in response.headers.get(
-            "content-type",
-            ""
-        ):
+        if "application/json" in response.headers.get("content-type", ""):
 
-            response_body_bytes = [
-                section
-                async for section
-                in response.body_iterator
-            ]
+            response_body_bytes = [section async for section in response.body_iterator]
 
-            response.body_iterator = iterate_in_threadpool(
-                iter(response_body_bytes)
-            )
+            response.body_iterator = iterate_in_threadpool(iter(response_body_bytes))
 
             try:
-                response_body = json.loads(
-                    response_body_bytes[0].decode()
-                )
+                response_body = json.loads(response_body_bytes[0].decode())
             except Exception:
-                response_body = {
-                    "info": "Body no serializable"
-                }
+                response_body = {"info": "Body no serializable"}
 
         # =====================================================
         # NIVEL DE AUDITORÍA
@@ -206,17 +163,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if response.status_code >= 500:
             level = "ERROR"
 
-        error_msg = getattr(
-            request.state,
-            "error_message",
-            None
-        )
+        error_msg = getattr(request.state, "error_message", None)
 
-        error_stk = getattr(
-            request.state,
-            "error_stack",
-            None
-        )
+        error_stk = getattr(request.state, "error_stack", None)
 
         # =====================================================
         # FINALIZAR AUDITORÍA EN BACKGROUND
@@ -233,6 +182,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 "finished_at": end_time_dt,
                 "ip_address": client_ip,
                 "user_agent": user_agent,
+                "user_id": getattr(request.state, "user_id", None),
             },
             {
                 "request_headers": dict(request.headers),

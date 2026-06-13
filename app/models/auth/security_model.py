@@ -1,7 +1,8 @@
 # app/models/security.py
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
-from uuid import UUID
+from uuid import UUID, uuid4
+
 
 from sqlalchemy import (
     String,
@@ -14,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db.db_postgres import Base
+from app.models.common.mixin_model import AuditMixin
 
 if TYPE_CHECKING:
     from .user_model import Information
@@ -34,9 +36,7 @@ class UserRole(Base):
     )
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, onupdate=func.now()
     )
@@ -58,16 +58,12 @@ class Auth(Base):
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, onupdate=func.now()
     )
 
-    profile: Mapped["Information"] = relationship(
-        back_populates="auth", uselist=False
-    )
+    profile: Mapped["Information"] = relationship(back_populates="auth", uselist=False)
 
     user_roles_links: Mapped[List["UserRole"]] = relationship(
         back_populates="user", lazy="selectin"
@@ -102,9 +98,7 @@ class Role(Base):
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, onupdate=func.now()
     )
@@ -119,7 +113,9 @@ class Role(Base):
 
     @property
     def permissions(self):
-        return [link.permission for link in self.permission_links if link.permission.active]
+        return [
+            link.permission for link in self.permission_links if link.permission.active
+        ]
 
 
 # -------------------------
@@ -134,16 +130,14 @@ class Permission(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    code: Mapped[str] = mapped_column(String, nullable=False)  
+    code: Mapped[str] = mapped_column(String, nullable=False)
     # ej: "sap.read", "cic.execute"
 
     description: Mapped[str] = mapped_column(String)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime, onupdate=func.now()
     )
@@ -165,6 +159,8 @@ class RolePermission(Base):
 
     role: Mapped["Role"] = relationship(back_populates="permission_links")
     permission: Mapped["Permission"] = relationship(lazy="joined")
+
+
 # TODO: agregar relación con empresa para filtrar permisos por empresa
 # class UserCompany(Base):
 #     __tablename__ = "user_companies"
@@ -184,3 +180,26 @@ class RolePermission(Base):
 #         Boolean,
 #         default=True
 #     )
+
+
+class ApiKey(Base, AuditMixin):
+    __tablename__ = "api_key"
+    __table_args__ = {"schema": "security"}
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("security.auth.id"), nullable=False
+    )
+
+    name: Mapped[str] = mapped_column(String)
+
+    key_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped["Auth"] = relationship(foreign_keys=[user_id])

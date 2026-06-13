@@ -10,6 +10,7 @@ from app.api.libro_mayor.libro_mayor_service import LibroMayorService
 from app.api.libro_mayor.service.libro_mayor_reproces_service import LibroMayorReprocessService
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
+from app.core.security import get_current_user
 
 
 router = APIRouter(prefix="/libro-mayor", tags=["LIBRO MAYOR"])
@@ -55,6 +56,7 @@ def sincronizacion_detlta(
     end_date: date = Query(default=None),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    
 ):
     try:
         return libro_mayor_service.sync_delta(
@@ -73,6 +75,7 @@ def reprocess_account(
     account: str = Query(...),
     libro_mayor_reprocess: LibroMayorReprocessService = Depends(
         get_reprocess_service),
+    current_user=Depends(get_current_user)
 ):
     try:
         return libro_mayor_reprocess.reprocess_account(account=account)
@@ -89,6 +92,7 @@ def reprocess_gasto_by_id(
     rule: int = Query(...),
     libro_mayor_reprocess: LibroMayorReprocessService = Depends(
         get_reprocess_service),
+    current_user=Depends(get_current_user)
 ):
     try:
         return libro_mayor_reprocess.reprocess_rule(rule_id=rule)
@@ -106,6 +110,7 @@ def obtenerLibroMayor(
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    current_user=Depends(get_current_user)
 ):
     try:
         return libro_mayor_service.get_libro_mayor_by_account(
@@ -124,6 +129,7 @@ def export_excel(
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    current_user=Depends(get_current_user)
 ):
     try:
 
