@@ -19,7 +19,6 @@ from app.core.db.db_postgres import get_db
 
 pwd_context = PasswordHash.recommended()
 
-
 # ==========================================================
 # PASSWORDS
 # ==========================================================
