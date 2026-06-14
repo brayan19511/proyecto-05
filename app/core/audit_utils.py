@@ -49,22 +49,24 @@ def add_step(
             f"[{status}] {name}: {message}"
         )
 def get_client_ip(request: Request) -> str:
-
-    forwarded = request.headers.get(
-        "x-forwarded-for"
-    )
-
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-
-    real_ip = request.headers.get(
-        "x-real-ip"
-    )
-
-    if real_ip:
-        return real_ip
-
+    # 1. Buscar en los headers puros del scope de la petición
+    # ASGI guarda los headers como una lista de tuplas de bytes: [(b"host", b"localhost"), (b"x-forwarded-for", b"192.168.1.50")]
+    headers = dict(request.scope.get("headers", []))
+    
+    # Intentar obtener x-forwarded-for en bytes
+    x_forwarded_for = headers.get(b"x-forwarded-for")
+    if x_forwarded_for:
+        # Decodificar el byte a string y procesarlo
+        ip_string = x_forwarded_for.decode("utf-8")
+        return ip_string.split(",")[0].strip()
+        
+    # Intentar obtener x-real-ip en bytes
+    x_real_ip = headers.get(b"x-real-ip")
+    if x_real_ip:
+        return x_real_ip.decode("utf-8").strip()
+        
+    # 2. Si no viene de un proxy, usar el cliente directo de FastAPI
     if request.client:
         return request.client.host
-
-    return "unknown"
+        
+    return "0.0.0.0"

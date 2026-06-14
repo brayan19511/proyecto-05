@@ -43,3 +43,13 @@ docker logs -f api
 ```
 (Si usas migraciones de base de datos con Alembic, recuerda ejecutar: docker exec -it api alembic upgrade head).
 
+
+
+# 5. Subir a docker hub
+```
+docker build -t  brayan1951/backend-finance:v1.0.0 .
+```
+```
+docker push  brayan1951/backend-finance:v1.0.0 
+```
+
