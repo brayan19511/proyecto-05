@@ -8,7 +8,7 @@ from fastapi import BackgroundTasks, Request
 from fastapi.concurrency import iterate_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.audit_utils import get_request_body
+from app.core.audit_utils import get_client_ip, get_request_body
 from app.core.audit_utils import audit_steps_context
 from app.services.audit.audit_service import AuditService
 
@@ -41,7 +41,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         query_params = dict(request.query_params)
 
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = get_client_ip(request)
 
         user_agent = request.headers.get("user-agent")
 
@@ -200,3 +200,6 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response.background = background_tasks
 
         return response
+
+
+    
