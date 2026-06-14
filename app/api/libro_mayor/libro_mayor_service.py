@@ -155,7 +155,11 @@ class LibroMayorService:
             last_record = self.libro_mayor_repository.get_last_libro_mayor(account)
 
             if not last_record:
-                raise ValueError(f"No existen registros para {account}")
+                return self.sync(
+                    start_date=date(2026, 1, 1),
+                    end_date=date.today(),
+                    account=account,
+                )
 
             start_date = last_record.fecha_actualizacion
             end_date = None

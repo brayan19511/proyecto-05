@@ -123,6 +123,42 @@ def sync_delta_libro_mayor(
         )
 
 
+@router.post("/sync-delta-all")
+def sync_delta_all(
+    libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+):
+
+    try:
+
+        resultados = []
+
+        for account in ["97", "95"]:
+
+            resultado = libro_mayor_service.sync_delta(
+                account=account,
+                start_date=None,
+                end_date=None,
+            )
+
+            resultados.append(resultado)
+
+        return {"accounts": resultados}
+
+    except ValueError as ve:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(ve),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
 # ==========================================================
 # REPROCESAMIENTO
 # ==========================================================
@@ -331,7 +367,6 @@ def export_excel(
 
 def get_service_rule(db=Depends(get_db)):
     return ReglasGastosService(db)
-
 
 
 @router.get("/rule")

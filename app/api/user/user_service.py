@@ -35,7 +35,11 @@ class UserService:
     def update_profile(self, user_id: UUID, data: UserProfileUpdate):
         profile = self.repository.get_profile_by_id(user_id)
         if not profile:
-            raise HTTPException(status_code=404, detail="Perfil no encontrado")
+            new_profile = Information(
+                        user_id=user_id,
+                        **data.model_dump()
+                        )
+            return self.repository.add_profile(new_profile)
         if data.document_number and data.document_number != profile.document_number:
             if self.repository.exists_by_document(data.document_type, data.document_number):
                 raise HTTPException(status_code=400, detail="Documento ya registrado en otro perfil")

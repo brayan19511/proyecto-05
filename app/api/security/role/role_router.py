@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.security.role.role_schemas import AssingnRoleToUserRequest, RoleRequest
+from app.api.security.role.role_schemas import AssingnRoleToUserRequest, RoleRequest, RoleResponse
 from app.api.security.role.role_service import RoleService
 from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker
@@ -11,7 +11,7 @@ from app.core.security import PermissionChecker
 
 router = APIRouter(    prefix="/roles",    tags=["roles"],)
 
-@router.get("/")
+@router.get("/", response_model=list[RoleResponse])
 async def get_roles(db:Session=Depends(get_db),current_user = Depends(PermissionChecker("security.roles.edit"))):
     router_service = RoleService(db)  # Replace with actual DB session
     return router_service.get_all_roles()

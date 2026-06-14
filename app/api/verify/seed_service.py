@@ -24,7 +24,7 @@ class SeedService:
 
 
 
-    def create_masters(self,user_id):
+    def create_masters(self,user_id=None):
         # Aquí podrías implementar la creación de datos maestros como áreas, monedas, etc.
         # compañías
         companies_data = [
@@ -41,7 +41,7 @@ class SeedService:
         ]
         
         for area in areas_data:
-            self.master_service.create_area(area) 
+            self.master_service.create_area(area,user_id) 
         currencies_data = [
             CurrencyCreateRequest(code="PEN", name="Sol Peruano", symbol="S/"),
             CurrencyCreateRequest(code="USD", name="Dólar Americano", symbol="$"),
