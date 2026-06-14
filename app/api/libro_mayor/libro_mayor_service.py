@@ -103,13 +103,11 @@ class LibroMayorService:
         end_date: date,
         account: str,
     ):
-        print("======sync=====")
         data_sap = self.get_libro_mayor_by_sap(
             start_date,
             end_date,
             account,
         )
-        print(len(data_sap))
         reglas = self.libro_mayor_repository.get_reglas_activas()
 
         df = pd.DataFrame.from_records(data_sap)

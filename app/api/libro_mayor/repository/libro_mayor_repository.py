@@ -226,7 +226,6 @@ class LibroMayorRepository:
                 "None": None,
             }
         )
-        print(df.columns.tolist())
         registros = df.to_dict(
             orient="records"
         )

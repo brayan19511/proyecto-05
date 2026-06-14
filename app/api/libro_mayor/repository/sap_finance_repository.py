@@ -25,8 +25,6 @@ class SapRepository:
               AND "cuenta_asociada" LIKE :account
         """)
         
-        print("======get_libro_mayor_by_accountc=====")
-        print(sql)
         result = self.db.execute(
             sql, 
             {"start_date": start_date, "end_date": end_date, "account": f"{account}%"}
