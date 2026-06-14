@@ -74,9 +74,7 @@ class LibroMayorRepository:
 
         return (
             self.db.query(LibroMayor)
-            .filter(
-                LibroMayor.tipo_cuenta == tipo_cuenta
-            )
+            .filter(LibroMayor.tipo_cuenta == tipo_cuenta)
             .yield_per(self.BATCH_SIZE)
             .all()
         )
@@ -91,9 +89,7 @@ class LibroMayorRepository:
 
         return (
             self.db.query(LibroMayor)
-            .filter(
-                LibroMayor.id_regla == rule_id
-            )
+            .filter(LibroMayor.id_regla == rule_id)
             .yield_per(self.BATCH_SIZE)
             .all()
         )
@@ -130,12 +126,8 @@ class LibroMayorRepository:
 
         return (
             self.db.query(LibroMayor)
-            .filter(
-                LibroMayor.tipo_cuenta == account
-            )
-            .order_by(
-                LibroMayor.fecha_actualizacion.desc()
-            )
+            .filter(LibroMayor.tipo_cuenta == account)
+            .order_by(LibroMayor.fecha_actualizacion.desc())
             .first()
         )
 
@@ -155,31 +147,21 @@ class LibroMayorRepository:
         query = self.db.query(LibroMayor)
 
         if regla.cuenta:
-            query = query.filter(
-                LibroMayor.cuenta_asociada == regla.cuenta
-            )
+            query = query.filter(LibroMayor.cuenta_asociada == regla.cuenta)
 
         if regla.cuenta_contrapartida:
             query = query.filter(
-                LibroMayor.cuenta_contrapartida
-                == regla.cuenta_contrapartida
+                LibroMayor.cuenta_contrapartida == regla.cuenta_contrapartida
             )
 
         if regla.centro_costo:
-            query = query.filter(
-                LibroMayor.centro_costo
-                == regla.centro_costo
-            )
+            query = query.filter(LibroMayor.centro_costo == regla.centro_costo)
 
         if regla.monto_min is not None:
-            query = query.filter(
-                LibroMayor.cargo_abono_ml >= regla.monto_min
-            )
+            query = query.filter(LibroMayor.cargo_abono_ml >= regla.monto_min)
 
         if regla.monto_max is not None:
-            query = query.filter(
-                LibroMayor.cargo_abono_ml <= regla.monto_max
-            )
+            query = query.filter(LibroMayor.cargo_abono_ml <= regla.monto_max)
 
         return query.yield_per(self.BATCH_SIZE).all()
 
@@ -193,9 +175,7 @@ class LibroMayorRepository:
 
         return (
             self.db.query(LibroMayor)
-            .filter(
-                LibroMayor.id_regla == rule_id
-            )
+            .filter(LibroMayor.id_regla == rule_id)
             .yield_per(self.BATCH_SIZE)
             .all()
         )
@@ -226,42 +206,51 @@ class LibroMayorRepository:
                 "None": None,
             }
         )
-        registros = df.to_dict(
-            orient="records"
-        )
 
-        stmt = insert(
-            LibroMayor
-        ).values(registros)
+        total = len(df)
 
-        update_columns = {
-            column.name: getattr(
-                stmt.excluded,
-                column.name,
+        for inicio in range(
+            0,
+            total,
+            self.BATCH_SIZE,
+        ):
+
+            lote_df = df.iloc[inicio : inicio + self.BATCH_SIZE]
+
+            registros = lote_df.to_dict(orient="records")
+
+            stmt = insert(LibroMayor).values(registros)
+
+            update_columns = {
+                column.name: getattr(
+                    stmt.excluded,
+                    column.name,
+                )
+                for column in LibroMayor.__table__.columns
+                if column.name
+                not in (
+                    "transaccion_id",
+                    "linea",
+                    "created_at",
+                    "created_by",
+                )
+            }
+
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[
+                    "transaccion_id",
+                    "linea",
+                ],
+                set_=update_columns,
             )
-            for column in LibroMayor.__table__.columns
-            if column.name
-            not in (
-                "transaccion_id",
-                "linea",
-                "created_at",
-                "created_by",
-            )
-        }
 
-        stmt = stmt.on_conflict_do_update(
-            index_elements=[
-                "transaccion_id",
-                "linea",
-            ],
-            set_=update_columns,
-        )
+            self.db.execute(stmt)
 
-        self.db.execute(stmt)
-        self.db.commit()
+            self.db.commit()
 
         return {
-            "procesados": len(registros)
+            "procesados": total,
+            "lotes": math.ceil(total / self.BATCH_SIZE),
         }
 
     # =====================================================
@@ -274,9 +263,7 @@ class LibroMayorRepository:
     ):
 
         if df.empty:
-            return {
-                "procesados": 0
-            }
+            return {"procesados": 0}
 
         df = df.where(
             pd.notnull(df),
@@ -294,9 +281,7 @@ class LibroMayorRepository:
                 "nombre_cuenta",
                 "updated_by",
             ]
-        ].to_dict(
-            orient="records"
-        )
+        ].to_dict(orient="records")
 
         for i in range(
             0,
@@ -304,9 +289,7 @@ class LibroMayorRepository:
             self.BATCH_SIZE,
         ):
 
-            lote = registros[
-                i : i + self.BATCH_SIZE
-            ]
+            lote = registros[i : i + self.BATCH_SIZE]
 
             self.db.bulk_update_mappings(
                 LibroMayor,
@@ -317,10 +300,7 @@ class LibroMayorRepository:
 
         return {
             "procesados": len(registros),
-            "lotes": math.ceil(
-                len(registros)
-                / self.BATCH_SIZE
-            ),
+            "lotes": math.ceil(len(registros) / self.BATCH_SIZE),
         }
 
     # =====================================================
@@ -353,20 +333,14 @@ class LibroMayorRepository:
         registros,
     ) -> pd.DataFrame:
 
-        df = self.to_dataframe(
-            registros
-        )
+        df = self.to_dataframe(registros)
 
         if df.empty:
             return df
 
-        df["anio"] = pd.to_datetime(
-            df["fecha_contabilizacion"]
-        ).dt.year
+        df["anio"] = pd.to_datetime(df["fecha_contabilizacion"]).dt.year
 
-        df["mes"] = pd.to_datetime(
-            df["fecha_contabilizacion"]
-        ).dt.month
+        df["mes"] = pd.to_datetime(df["fecha_contabilizacion"]).dt.month
 
         meses = {
             1: "Enero",
@@ -383,8 +357,6 @@ class LibroMayorRepository:
             12: "Diciembre",
         }
 
-        df["nmes"] = df["mes"].map(
-            meses
-        )
+        df["nmes"] = df["mes"].map(meses)
 
         return df
