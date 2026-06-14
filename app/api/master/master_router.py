@@ -80,14 +80,16 @@ def delete_company(
 
 @router.get("/currency")
 def get_currency(
-    search: str | None = None, service: MasterService = Depends(get_master_service)
+    search: str | None = None,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(get_current_user),
 ):
     return service.get_currencies(search)
 
 
 @router.get("/currency/{currency_id}")
 def get_currency_by_id(
-    currency_id: int, service: MasterService = Depends(get_master_service)
+    currency_id: int, service: MasterService = Depends(get_master_service), current_user=Depends(get_current_user),
 ):
     return service.get_currency_by_id(currency_id)
 

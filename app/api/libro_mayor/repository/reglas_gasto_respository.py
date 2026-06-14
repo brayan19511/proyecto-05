@@ -6,7 +6,14 @@ class ReglasGatosRepository:
 
     def __init__(self, db: Session):
         self.db = db
-
+    def get_all(self):
+        return (
+            self.db.query(ReglasGastos)
+            .order_by(
+                ReglasGastos.prioridad.asc()
+            )
+            .all()
+        )
     def get_by_id(self, id: int) -> ReglasGastos | None:
         return (
             self.db.query(ReglasGastos)
@@ -25,7 +32,7 @@ class ReglasGatosRepository:
     def get_by_account(self, account: str):
         return (
             self.db.query(ReglasGastos)
-            .filter(ReglasGastos.cuenta == account)
+            .filter(ReglasGastos.cuenta.ilike(f"%{account}%"))
             .all()
         )
 
@@ -63,3 +70,4 @@ class ReglasGatosRepository:
         self.db.commit()
 
         return True
+    

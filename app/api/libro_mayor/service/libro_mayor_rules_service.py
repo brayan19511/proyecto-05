@@ -1,6 +1,5 @@
 # app/api/libro_mayor/rules_engine.py
 import pandas as pd
-from datetime import datetime
 from app.models.finance.libro_mayor_model import ReglasGastos
 
 
@@ -18,10 +17,17 @@ class LibroMayorRulesService:
         self._inicializar_columnas(df, user_id)
         for regla in reglas:
             self._aplicar_regla(df, regla)
+        # eliminar columna auxiliar
+        df.drop(
+            columns=["_descripcion_lower"],
+            inplace=True,
+            errors="ignore"
+        )
 
         return df
 
     def _inicializar_columnas(self, df: pd.DataFrame, user_id: str | None):
+        df["_descripcion_lower"] = df["descripcion"].fillna("").str.lower()
 
         df["id_regla"] = None
         df["tiene_regla"] = False
@@ -34,9 +40,10 @@ class LibroMayorRulesService:
         # derivado de cuenta_asociada
         df["tipo_cuenta"] = df["cuenta_asociada"].astype(str).str[:2]
 
-        df["created_by"] = user_id
-        df["updated_by"] = user_id
+        if "created_by" not in df.columns:
+            df["created_by"] = user_id
 
+        df["updated_by"] = user_id
 
     def _aplicar_regla(self, df: pd.DataFrame, regla: ReglasGastos):
 
@@ -71,23 +78,13 @@ class LibroMayorRulesService:
 
             texto = regla.filtro_texto.lower()
 
-            mask &= (
-                df["descripcion"]
-                .fillna("")
-                .str.lower()
-                .str.contains(texto, regex=False)
-            )
+            mask &= df["_descripcion_lower"].str.contains(texto, regex=False)
 
         if regla.texto_excluido:
 
             texto = regla.texto_excluido.lower()
 
-            mask &= ~(
-                df["descripcion"]
-                .fillna("")
-                .str.lower()
-                .str.contains(texto, regex=False)
-            )
+            mask &= ~df["_descripcion_lower"].str.contains(texto, regex=False)
 
         if regla.monto_min is not None:
             mask &= df["cargo_abono_ml"] >= regla.monto_min
@@ -96,25 +93,19 @@ class LibroMayorRulesService:
             mask &= df["cargo_abono_ml"] <= regla.monto_max
 
         return mask
+
     def reprocesar(
         self,
         df: pd.DataFrame,
         reglas: list[ReglasGastos],
-        user_id: str | None = None
+        user_id: str | None = None,
     ):
-
         if df.empty:
             return df
 
-        # limpiar clasificación anterior
-        df["id_regla"] = None
-        df["tiene_regla"] = False
-        df["codigo"] = "SIN_CLASIFICAR"
-        df["subcodigo"] = "OTROS"
+        self._inicializar_columnas(df, user_id)
 
         for regla in reglas:
             self._aplicar_regla(df, regla)
-
-        df["updated_by"] = user_id
 
         return df

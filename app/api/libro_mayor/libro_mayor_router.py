@@ -1,127 +1,270 @@
 from datetime import date
 import io
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
 import pandas as pd
 
-from app.api.libro_mayor.libro_mayor_schema import LibroMayorResponse
-from app.api.libro_mayor.libro_mayor_service import LibroMayorService
-from app.api.libro_mayor.service.libro_mayor_reproces_service import LibroMayorReprocessService
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+)
+from fastapi.responses import StreamingResponse
+
+from app.api.libro_mayor.libro_mayor_schema import (
+    LibroMayorResponse,
+    ReglaGastoCreate,
+    ReglaGastoUpdate,
+    SyncRequest,
+    SyncDeltaRequest,
+    ReprocessDateRangeRequest,
+)
+from app.api.libro_mayor.libro_mayor_service import (
+    LibroMayorService,
+)
+from app.api.libro_mayor.service.libro_mayor_reproces_service import (
+    LibroMayorReprocessService,
+)
+
+from app.api.libro_mayor.service.reglas_gastos_servive import ReglasGastosService
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
-from app.core.security import get_current_user
+from app.core.security import (
+    get_current_user,
+)
+
+router = APIRouter(
+    prefix="/libro-mayor",
+    tags=["LIBRO MAYOR"],
+)
 
 
-router = APIRouter(prefix="/libro-mayor", tags=["LIBRO MAYOR"])
+# ==========================================================
+# DEPENDENCIES
+# ==========================================================
 
 
 def get_libro_mayor_service(
-    db_local=Depends(get_db), db_sap=Depends(get_db_sap)
+    db_local=Depends(get_db),
+    db_sap=Depends(get_db_sap),
 ) -> LibroMayorService:
-    return LibroMayorService(db_local, db_sap)
-
-
-def get_reprocess_service(
-    db_local=Depends(get_db)
-) -> LibroMayorReprocessService:
-
-    return LibroMayorReprocessService(
-        db_local=db_local
+    return LibroMayorService(
+        db_local=db_local,
+        db_sap=db_sap,
     )
 
 
-@router.get("/sync-date")
-def sincronizacion(
-    start_date: date = Query(...),
-    end_date: date = Query(...),
-    account: str = Query(...),
+def get_reprocess_service(
+    db_local=Depends(get_db),
+) -> LibroMayorReprocessService:
+    return LibroMayorReprocessService(
+        db_local=db_local,
+    )
+
+
+# ==========================================================
+# SINCRONIZACION
+# ==========================================================
+
+
+@router.post("/sync")
+def sync_libro_mayor(
+    data: SyncRequest,
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
 ):
     try:
+
         return libro_mayor_service.sync(
-            start_date=start_date, end_date=end_date, account=account
+            start_date=data.start_date,
+            end_date=data.end_date,
+            account=data.account,
         )
+
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+
         raise HTTPException(
-            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+            status_code=400,
+            detail=str(ve),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
         )
 
 
-@router.get("/sync-delta")
-def sincronizacion_detlta(
-    start_date: date = Query(default=None),
-    end_date: date = Query(default=None),
-    account: str = Query(...),
+@router.post("/sync-delta")
+def sync_delta_libro_mayor(
+    data: SyncDeltaRequest,
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    
 ):
     try:
+
         return libro_mayor_service.sync_delta(
-            start_date=start_date, end_date=end_date, account=account
+            start_date=data.start_date,
+            end_date=data.end_date,
+            account=data.account,
         )
+
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+
         raise HTTPException(
-            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+            status_code=400,
+            detail=str(ve),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
         )
 
 
-@router.get("/reprocess/account")
-def reprocess_account(
-    account: str = Query(...),
-    libro_mayor_reprocess: LibroMayorReprocessService = Depends(
-        get_reprocess_service),
-    current_user=Depends(get_current_user)
+# ==========================================================
+# REPROCESAMIENTO
+# ==========================================================
+
+
+@router.post("/reprocess/rule/{rule_id}")
+def reprocess_rule(
+    rule_id: int,
+    libro_mayor_reprocess: LibroMayorReprocessService = Depends(get_reprocess_service),
+    current_user=Depends(get_current_user),
 ):
     try:
-        return libro_mayor_reprocess.reprocess_account(account=account)
+
+        libro_mayor_reprocess.user_id = str(current_user.id)
+
+        return libro_mayor_reprocess.reprocess_rule(rule_id=rule_id)
+
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+
         raise HTTPException(
-            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+            status_code=400,
+            detail=str(ve),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
         )
 
 
-@router.get("/reprocess/rule")
-def reprocess_gasto_by_id(
-    rule: int = Query(...),
-    libro_mayor_reprocess: LibroMayorReprocessService = Depends(
-        get_reprocess_service),
-    current_user=Depends(get_current_user)
+@router.post("/reprocess/date-range")
+def reprocess_date_range(
+    data: ReprocessDateRangeRequest,
+    libro_mayor_reprocess: LibroMayorReprocessService = Depends(get_reprocess_service),
+    current_user=Depends(get_current_user),
 ):
     try:
-        return libro_mayor_reprocess.reprocess_rule(rule_id=rule)
+
+        libro_mayor_reprocess.user_id = str(current_user.id)
+
+        return libro_mayor_reprocess.reprocess_date_range(
+            account=data.account,
+            start_date=data.start_date,
+            end_date=data.end_date,
+        )
+
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+
         raise HTTPException(
-            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+            status_code=400,
+            detail=str(ve),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
         )
 
 
-@router.get("/get-all", response_model=list[LibroMayorResponse], response_model_by_alias=False)
-def obtenerLibroMayor(
+# ==========================================================
+# CONSULTAS
+# ==========================================================
+
+
+@router.get(
+    "/get-all",
+    response_model=list[LibroMayorResponse],
+    response_model_by_alias=False,
+)
+def get_libro_mayor(
     start_date: date = Query(...),
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
+
         return libro_mayor_service.get_libro_mayor_by_account(
-            start_date=start_date, end_date=end_date, account=account
+            start_date=start_date,
+            end_date=end_date,
+            account=account,
         )
+
     except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+
         raise HTTPException(
-            status_code=500, detail=f"Error interno en la sincronización: {str(e)}"
+            status_code=400,
+            detail=str(ve),
         )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
+@router.get(
+    "/get-by-sap",
+    # response_model=list[LibroMayorResponse],
+    # response_model_by_alias=False,
+)
+def get_libro_mayor_sap(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    account: str = Query(...),
+    libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    current_user=Depends(get_current_user),
+):
+    try:
+
+        return libro_mayor_service.get_libro_mayor_by_sap(
+            start_date=start_date,
+            end_date=end_date,
+            account=account,
+        )
+
+    except ValueError as ve:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(ve),
+        )
+
+    except Exception as e:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
+# ==========================================================
+# EXPORTACION
+# ==========================================================
+
 
 @router.get("/export-excel")
 def export_excel(
@@ -129,7 +272,7 @@ def export_excel(
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     try:
 
@@ -140,53 +283,148 @@ def export_excel(
         )
 
         if df.empty:
+
             raise HTTPException(
                 status_code=404,
-                detail="No existen registros"
+                detail="No existen registros",
             )
 
         buffer = io.BytesIO()
 
         with pd.ExcelWriter(
             buffer,
-            engine="openpyxl"
+            engine="openpyxl",
         ) as writer:
 
             df.to_excel(
                 writer,
                 sheet_name="Libro Mayor",
-                index=False
+                index=False,
             )
 
         buffer.seek(0)
 
-        filename = (
-            f"libro_mayor_"
-            f"{account}_"
-            f"{start_date}_"
-            f"{end_date}.xlsx"
-        )
+        filename = f"libro_mayor_" f"{account}_" f"{start_date}_" f"{end_date}.xlsx"
 
         return StreamingResponse(
             buffer,
             media_type=(
-                "application/vnd.openxmlformats-"
-                "officedocument.spreadsheetml.sheet"
+                "application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"
             ),
-            headers={
-                "Content-Disposition":
-                f'attachment; filename="{filename}"'
-            }
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     except ValueError as ve:
+
         raise HTTPException(
             status_code=400,
-            detail=str(ve)
+            detail=str(ve),
         )
 
     except Exception as e:
+
         raise HTTPException(
             status_code=500,
-            detail=f"Error exportando Excel: {str(e)}"
+            detail=f"Error exportando Excel: {str(e)}",
+        )
+
+
+def get_service_rule(db=Depends(get_db)):
+    return ReglasGastosService(db)
+
+
+
+@router.get("/rule")
+def get_rules(
+    account: str | None = Query(default=None),
+    current_user=Depends(get_current_user),
+    service: ReglasGastosService = Depends(get_service_rule),
+):
+    try:
+
+        return service.get_all(account=account)
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=400,
+            detail=str(ex),
+        )
+
+
+@router.get("/rule/{rule_id}")
+def get_rule(
+    rule_id: int,
+    current_user=Depends(get_current_user),
+    service: ReglasGastosService = Depends(get_service_rule),
+):
+    try:
+
+        return service.get_by_id(rule_id)
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=404,
+            detail=str(ex),
+        )
+
+
+@router.post("/rule")
+def create_rule(
+    data: ReglaGastoCreate,
+    current_user=Depends(get_current_user),
+    service: ReglasGastosService = Depends(get_service_rule),
+):
+    try:
+
+        return service.create(
+            data=data,
+            user_id=str(current_user.id),
+        )
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=400,
+            detail=str(ex),
+        )
+
+
+@router.put("/rule/{rule_id}")
+def update_rule(
+    rule_id: int,
+    data: ReglaGastoUpdate,
+    current_user=Depends(get_current_user),
+    service: ReglasGastosService = Depends(get_service_rule),
+):
+    try:
+
+        return service.update(
+            rule_id=rule_id,
+            data=data,
+            user_id=str(current_user.id),
+        )
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=400,
+            detail=str(ex),
+        )
+
+
+@router.delete("/rule/{rule_id}")
+def delete_rule(
+    rule_id: int,
+    current_user=Depends(get_current_user),
+    service: ReglasGastosService = Depends(get_service_rule),
+):
+    try:
+
+        return service.delete(
+            rule_id=rule_id,
+            user_id=str(current_user.id),
+        )
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=400,
+            detail=str(ex),
         )

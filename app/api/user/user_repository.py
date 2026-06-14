@@ -31,7 +31,9 @@ class UserRepository:
 
     def update_profile(self, profile: Information, data: dict):
         for key, value in data.items():
-            if value is not None:
-                setattr(profile, key, value)
+            setattr(profile, key, value)
+
         self.db.commit()
+        self.db.refresh(profile)
+
         return profile

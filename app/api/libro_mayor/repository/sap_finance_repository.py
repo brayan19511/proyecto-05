@@ -24,6 +24,9 @@ class SapRepository:
             WHERE "fecha_contabilizacion" BETWEEN :start_date AND :end_date
               AND "cuenta_asociada" LIKE :account
         """)
+        
+        print("======get_libro_mayor_by_accountc=====")
+        print(sql)
         result = self.db.execute(
             sql, 
             {"start_date": start_date, "end_date": end_date, "account": f"{account}%"}
@@ -62,4 +65,5 @@ class SapRepository:
         """)
         
         result = self.db.execute(sql, params)
+        
         return result.mappings().all()
