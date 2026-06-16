@@ -1,10 +1,10 @@
 # app\api\libro_mayor\repository\libro_mayor_repository.py
 from datetime import date
 import math
-
 import numpy as np
 import pandas as pd
 
+from sqlalchemy import extract, func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -360,3 +360,202 @@ class LibroMayorRepository:
         df["nmes"] = df["mes"].map(meses)
 
         return df
+
+    def to_export_dataframe(
+        self,
+        registros,
+    ) -> pd.DataFrame:
+
+        df = self.to_dataframe_date(registros)
+
+        if df.empty:
+            return df
+
+        column_order = [
+            "tiene_regla",
+            "id_regla",
+            "nombre_cuenta",
+            "código",
+            "subcódigo",
+            "anio",
+            "mes",
+            "nmes",
+            "fecha_contabilizacion",
+            "fecha_documento",
+            "numero_documento",
+            "transaccion_id",
+            "folio",
+            "tipo_documento",
+            "linea",
+            "cuenta_asociada",
+            "nombre_cuenta_asociada",
+            "proveedor",
+            "descripción",
+            "comentario_linea",
+            "cuenta_contrapartida",
+            "nombre_contrapartida",
+            "referencia_1",
+            "referencia_2",
+            "referencia_3",
+            "cargo_abono_ml",
+            "cargo_abono_me",
+            "centro_costo",
+            "centro_area",
+            "nombre_area",
+        ]
+
+        df = df.reindex(columns=[c for c in column_order if c in df.columns])
+
+        df = df.rename(
+            columns={
+            "tiene_regla":"Tiene Regla",
+            "id_regla":"Id Regla",
+            "nombre_cuenta":"Nombre de Cuenta",
+            "código":"Código",
+            "subcódigo":"Subcódigo",
+            "anio":"Año",
+            "mes":"Mes",
+            "nmes":"Mes Nombre",
+            "fecha_contabilizacion":"Fecha Contabilizacion",
+            "fecha_documento":"Fecha Documento",
+            "numero_documento":"Numero documento",
+            "transaccion_id":"Transaccion Id",
+            "folio":"Folio",
+            "tipo_documento":"Tipo Documento",
+            "linea":"Linea",
+            "cuenta_asociada":"Cuenta Asociada",
+            "nombre_cuenta_asociada":"Nombre Cuenta Asociada",
+            "proveedor":"Proveedor",
+            "descripción":"Descripción",
+            "comentario_linea":"Comentario Linea",
+            "cuenta_contrapartida":"Cuenta Contrapartida",
+            "nombre_contrapartida":"Nombre Contrapartida",
+            "referencia_1":"Referencia 1",
+            "referencia_2":"Referencia 2",
+            "referencia_3":"Referencia 3",
+            "cargo_abono_ml":"Importe Soles",
+            "cargo_abono_me":"Importe Dolares",
+            "centro_costo":"Centro Costo",
+            "centro_area":"Centro Area",
+            "nombre_area":"Nombre Area",
+            }
+        )
+
+        return df
+    # =====================================================
+    # DATAFRAME
+    # =====================================================
+    def get_resumen(
+        self,
+        start_date,
+        end_date,
+        account,
+    ):
+
+        return (
+            self.db.query(
+                func.extract(
+                    "year",
+                    LibroMayor.fecha_contabilizacion,
+                ).label("anio"),
+
+                func.extract(
+                    "month",
+                    LibroMayor.fecha_contabilizacion,
+                ).label("mes"),
+
+                LibroMayor.codigo,
+                LibroMayor.subcodigo,
+                LibroMayor.nombre_cuenta,
+                LibroMayor.proveedor,
+
+                func.count().label(
+                    "cantidad_registros"
+                ),
+
+                func.sum(
+                    LibroMayor.cargo_abono_ml
+                ).label(
+                    "importe_soles"
+                ),
+
+                func.sum(
+                    LibroMayor.cargo_abono_me
+                ).label(
+                    "importe_dolares"
+                ),
+            )
+            .filter(
+                LibroMayor.tipo_cuenta == account,
+                LibroMayor.fecha_contabilizacion.between(
+                    start_date,
+                    end_date,
+                ),
+            )
+            .group_by(
+                func.extract(
+                    "year",
+                    LibroMayor.fecha_contabilizacion,
+                ),
+
+                func.extract(
+                    "month",
+                    LibroMayor.fecha_contabilizacion,
+                ),
+
+                LibroMayor.codigo,
+                LibroMayor.subcodigo,
+                LibroMayor.nombre_cuenta,
+                LibroMayor.proveedor,
+            )
+            .order_by(
+                "anio",
+                "mes",
+                LibroMayor.codigo,
+            )
+            .all()
+        ) 
+    def get_resumen_detalle(
+        self,
+        start_date,
+        end_date,
+        account,
+        codigo: str | None = None,
+        subcodigo: str | None = None,
+        proveedor: str | None = None,
+    ):
+
+        query = (
+            self.db.query(LibroMayor)
+            .filter(
+                LibroMayor.tipo_cuenta == account,
+                LibroMayor.fecha_contabilizacion.between(
+                    start_date,
+                    end_date,
+                ),
+            )
+        )
+
+        if codigo:
+            query = query.filter(
+                LibroMayor.codigo == codigo
+            )
+
+        if subcodigo:
+            query = query.filter(
+                LibroMayor.subcodigo == subcodigo
+            )
+
+        if proveedor:
+            query = query.filter(
+                LibroMayor.proveedor == proveedor
+            )
+
+
+        return (
+            query.order_by(
+                LibroMayor.fecha_contabilizacion.asc(),
+                LibroMayor.numero_documento.asc(),
+            )
+            .all()
+        )

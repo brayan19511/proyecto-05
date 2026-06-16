@@ -26,6 +26,9 @@ from app.api.libro_mayor.service.libro_mayor_reproces_service import (
     LibroMayorReprocessService,
 )
 
+from app.api.libro_mayor.service.libro_mayor_resumen_service import (
+    LibroMayorResumenService,
+)
 from app.api.libro_mayor.service.reglas_gastos_servive import ReglasGastosService
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
@@ -58,6 +61,14 @@ def get_reprocess_service(
     db_local=Depends(get_db),
 ) -> LibroMayorReprocessService:
     return LibroMayorReprocessService(
+        db_local=db_local,
+    )
+
+
+def get_resumen_service(
+    db_local=Depends(get_db),
+) -> LibroMayorReprocessService:
+    return LibroMayorResumenService(
         db_local=db_local,
     )
 
@@ -463,3 +474,46 @@ def delete_rule(
             status_code=400,
             detail=str(ex),
         )
+
+
+# summary
+
+
+@router.get("/summary")
+def get_summary(
+    start_date: date,
+    end_date: date,
+    account: str,
+    service: LibroMayorResumenService = Depends(get_resumen_service),
+):
+
+    return service.get_resumen(
+        start_date=start_date,
+        end_date=end_date,
+        account=account,
+    )
+
+
+@router.get(
+    "/summary-detail",
+    response_model=list[LibroMayorResponse],
+    response_model_by_alias=False,
+)
+def get_summary(
+    start_date: date,
+    end_date: date,
+    account: str,
+    codigo: str | None = None,
+    subcodigo: str | None = None,
+    proveedor: str | None = None,
+    service: LibroMayorResumenService = Depends(get_resumen_service),
+):
+
+    return service.get_detalle(
+        start_date=start_date,
+        end_date=end_date,
+        account=account,
+        codigo=codigo,
+        subcodigo=subcodigo,
+        proveedor=proveedor,
+    )

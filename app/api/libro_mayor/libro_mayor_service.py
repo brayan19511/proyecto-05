@@ -212,4 +212,4 @@ class LibroMayorService:
             account,
         )
 
-        return self.libro_mayor_repository.to_dataframe_date(registros)
+        return self.libro_mayor_repository.to_export_dataframe(registros)

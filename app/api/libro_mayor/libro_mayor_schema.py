@@ -231,3 +231,19 @@ class ReglaGastoUpdate(BaseModel):
     monto_max: float | None = None
 
     activo: bool | None = None
+    
+    
+# libro_mayor_schema.py
+
+class LibroMayorResumenResponse(BaseModel):
+    anio: int
+    mes: int
+    codigo: str | None
+    subcodigo: str | None
+    nombre_cuenta: str | None
+    proveedor: str | None
+
+    cantidad_registros: int
+
+    importe_soles: float
+    importe_dolares: float

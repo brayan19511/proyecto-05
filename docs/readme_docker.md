@@ -53,3 +53,10 @@ docker build -t  brayan1951/backend-finance:v1.0.0 .
 docker push  brayan1951/backend-finance:v1.0.0 
 ```
 
+
+```
+docker compose pull api
+```
+```
+docker compose up -d api
+```
