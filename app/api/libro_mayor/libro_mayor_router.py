@@ -484,6 +484,7 @@ def get_summary(
     start_date: date,
     end_date: date,
     account: str,
+    current_user=Depends(get_current_user),
     service: LibroMayorResumenService = Depends(get_resumen_service),
 ):
 
@@ -499,13 +500,16 @@ def get_summary(
     response_model=list[LibroMayorResponse],
     response_model_by_alias=False,
 )
-def get_summary(
+def get_summary_detail(
     start_date: date,
     end_date: date,
     account: str,
     codigo: str | None = None,
     subcodigo: str | None = None,
     proveedor: str | None = None,
+    anio: int | None = None,
+    mes: int | None = None,
+    current_user=Depends(get_current_user),
     service: LibroMayorResumenService = Depends(get_resumen_service),
 ):
 
@@ -516,4 +520,6 @@ def get_summary(
         codigo=codigo,
         subcodigo=subcodigo,
         proveedor=proveedor,
+        anio=anio,
+        mes=mes,
     )

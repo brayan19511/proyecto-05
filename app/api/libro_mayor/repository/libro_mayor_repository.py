@@ -408,40 +408,41 @@ class LibroMayorRepository:
 
         df = df.rename(
             columns={
-            "tiene_regla":"Tiene Regla",
-            "id_regla":"Id Regla",
-            "nombre_cuenta":"Nombre de Cuenta",
-            "código":"Código",
-            "subcódigo":"Subcódigo",
-            "anio":"Año",
-            "mes":"Mes",
-            "nmes":"Mes Nombre",
-            "fecha_contabilizacion":"Fecha Contabilizacion",
-            "fecha_documento":"Fecha Documento",
-            "numero_documento":"Numero documento",
-            "transaccion_id":"Transaccion Id",
-            "folio":"Folio",
-            "tipo_documento":"Tipo Documento",
-            "linea":"Linea",
-            "cuenta_asociada":"Cuenta Asociada",
-            "nombre_cuenta_asociada":"Nombre Cuenta Asociada",
-            "proveedor":"Proveedor",
-            "descripción":"Descripción",
-            "comentario_linea":"Comentario Linea",
-            "cuenta_contrapartida":"Cuenta Contrapartida",
-            "nombre_contrapartida":"Nombre Contrapartida",
-            "referencia_1":"Referencia 1",
-            "referencia_2":"Referencia 2",
-            "referencia_3":"Referencia 3",
-            "cargo_abono_ml":"Importe Soles",
-            "cargo_abono_me":"Importe Dolares",
-            "centro_costo":"Centro Costo",
-            "centro_area":"Centro Area",
-            "nombre_area":"Nombre Area",
+                "tiene_regla": "Tiene Regla",
+                "id_regla": "Id Regla",
+                "nombre_cuenta": "Nombre de Cuenta",
+                "código": "Código",
+                "subcódigo": "Subcódigo",
+                "anio": "Año",
+                "mes": "Mes",
+                "nmes": "Mes Nombre",
+                "fecha_contabilizacion": "Fecha Contabilizacion",
+                "fecha_documento": "Fecha Documento",
+                "numero_documento": "Numero documento",
+                "transaccion_id": "Transaccion Id",
+                "folio": "Folio",
+                "tipo_documento": "Tipo Documento",
+                "linea": "Linea",
+                "cuenta_asociada": "Cuenta Asociada",
+                "nombre_cuenta_asociada": "Nombre Cuenta Asociada",
+                "proveedor": "Proveedor",
+                "descripción": "Descripción",
+                "comentario_linea": "Comentario Linea",
+                "cuenta_contrapartida": "Cuenta Contrapartida",
+                "nombre_contrapartida": "Nombre Contrapartida",
+                "referencia_1": "Referencia 1",
+                "referencia_2": "Referencia 2",
+                "referencia_3": "Referencia 3",
+                "cargo_abono_ml": "Importe Soles",
+                "cargo_abono_me": "Importe Dolares",
+                "centro_costo": "Centro Costo",
+                "centro_area": "Centro Area",
+                "nombre_area": "Nombre Area",
             }
         )
 
         return df
+
     # =====================================================
     # DATAFRAME
     # =====================================================
@@ -458,32 +459,17 @@ class LibroMayorRepository:
                     "year",
                     LibroMayor.fecha_contabilizacion,
                 ).label("anio"),
-
                 func.extract(
                     "month",
                     LibroMayor.fecha_contabilizacion,
                 ).label("mes"),
-
                 LibroMayor.codigo,
                 LibroMayor.subcodigo,
                 LibroMayor.nombre_cuenta,
                 LibroMayor.proveedor,
-
-                func.count().label(
-                    "cantidad_registros"
-                ),
-
-                func.sum(
-                    LibroMayor.cargo_abono_ml
-                ).label(
-                    "importe_soles"
-                ),
-
-                func.sum(
-                    LibroMayor.cargo_abono_me
-                ).label(
-                    "importe_dolares"
-                ),
+                func.count().label("cantidad_registros"),
+                func.sum(LibroMayor.cargo_abono_ml).label("importe_soles"),
+                func.sum(LibroMayor.cargo_abono_me).label("importe_dolares"),
             )
             .filter(
                 LibroMayor.tipo_cuenta == account,
@@ -497,12 +483,10 @@ class LibroMayorRepository:
                     "year",
                     LibroMayor.fecha_contabilizacion,
                 ),
-
                 func.extract(
                     "month",
                     LibroMayor.fecha_contabilizacion,
                 ),
-
                 LibroMayor.codigo,
                 LibroMayor.subcodigo,
                 LibroMayor.nombre_cuenta,
@@ -514,7 +498,8 @@ class LibroMayorRepository:
                 LibroMayor.codigo,
             )
             .all()
-        ) 
+        )
+
     def get_resumen_detalle(
         self,
         start_date,
@@ -523,39 +508,44 @@ class LibroMayorRepository:
         codigo: str | None = None,
         subcodigo: str | None = None,
         proveedor: str | None = None,
+        anio: int | None = None,
+        mes: int | None = None,
     ):
 
-        query = (
-            self.db.query(LibroMayor)
-            .filter(
-                LibroMayor.tipo_cuenta == account,
-                LibroMayor.fecha_contabilizacion.between(
-                    start_date,
-                    end_date,
-                ),
-            )
+        query = self.db.query(LibroMayor).filter(
+            LibroMayor.tipo_cuenta == account,
+            LibroMayor.fecha_contabilizacion.between(
+                start_date,
+                end_date,
+            ),
         )
 
         if codigo:
-            query = query.filter(
-                LibroMayor.codigo == codigo
-            )
+            query = query.filter(LibroMayor.codigo == codigo)
 
         if subcodigo:
-            query = query.filter(
-                LibroMayor.subcodigo == subcodigo
-            )
+            query = query.filter(LibroMayor.subcodigo == subcodigo)
 
         if proveedor:
+            query = query.filter(LibroMayor.proveedor == proveedor)
+            
+        if anio:
             query = query.filter(
-                LibroMayor.proveedor == proveedor
+                extract(
+                    "year",
+                    LibroMayor.fecha_contabilizacion
+                ) == anio
             )
 
-
-        return (
-            query.order_by(
-                LibroMayor.fecha_contabilizacion.asc(),
-                LibroMayor.numero_documento.asc(),
+        if mes:
+            query = query.filter(
+                extract(
+                    "month",
+                    LibroMayor.fecha_contabilizacion
+                ) == mes
             )
-            .all()
-        )
+
+        return query.order_by(
+            LibroMayor.fecha_contabilizacion.asc(),
+            LibroMayor.numero_documento.asc(),
+        ).all()

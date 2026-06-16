@@ -40,13 +40,7 @@ class LibroMayorResumenService:
         ]
 
     def get_detalle(
-        self,
-        start_date,
-        end_date,
-        account,
-        codigo,
-        subcodigo,
-        proveedor,
+        self, start_date, end_date, account, codigo, subcodigo, proveedor, anio, mes
     ):
 
         return self.repository.get_resumen_detalle(
@@ -55,5 +49,5 @@ class LibroMayorResumenService:
             account=account,
             codigo=codigo,
             subcodigo=subcodigo,
-            proveedor=proveedor,
+            proveedor=proveedor, anio=anio, mes= mes
         )
