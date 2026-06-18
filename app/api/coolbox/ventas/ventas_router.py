@@ -1,6 +1,6 @@
 # app/api/coolbox/ventas/ventas_router.py
 from fastapi import APIRouter, Depends, status
-from datetime import date
+from datetime import date, timedelta
 from app.api.coolbox.ventas.service.productos_service import ProductosService
 from app.api.coolbox.ventas.service.ventas_service import VentasService
 from app.core.db.db_coolbox import get_db_coolbox
@@ -9,6 +9,7 @@ from app.core.db.db_postgres import get_db # Asegúrate de tener este generator
 router = APIRouter(
     tags=["Procesamiento Ventas"],
 )
+
 
 @router.get("/procesar-ventas", status_code=status.HTTP_201_CREATED)
 async def procesar_ventas_por_fecha(
@@ -19,6 +20,22 @@ async def procesar_ventas_por_fecha(
     # Pasamos ambas conexiones al servicio
     service = VentasService(db_fuente=db_fuente, db_destino=db_destino)
     resultado = service.ejecutar_etl_ventas(fecha)
+    return resultado
+@router.post("/procesar-ventas-delta", status_code=status.HTTP_201_CREATED)
+async def procesar_ventas_automatico(
+    dias_reproceso: int = 2,
+    db_fuente=Depends(get_db_coolbox),
+    db_destino=Depends(get_db),
+):
+    service = VentasService(
+        db_fuente=db_fuente,
+        db_destino=db_destino,
+    )
+
+    resultado = service.ejecutar_etl_ventas_automatico(
+        dias_reproceso=dias_reproceso,
+    )
+
     return resultado
 @router.get("/procesar-ventas-rango", status_code=status.HTTP_201_CREATED)
 async def procesar_ventas_por_rango(
