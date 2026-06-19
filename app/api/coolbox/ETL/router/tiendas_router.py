@@ -2,13 +2,12 @@
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.coolbox.ventas.service.tiendas_service import TiendasService
+from app.api.coolbox.ETL.service.tiendas_service import TiendasService
 from app.core.db.db_postgres import get_db
 from app.core.db.db_coolbox import get_db_coolbox
 
 
 router = APIRouter(
-    prefix="/coolbox/tiendas",
     tags=["Coolbox - Tiendas"],
 )
 

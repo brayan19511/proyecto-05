@@ -1,8 +1,8 @@
 import pandas as pd
 from fastapi import HTTPException, status
 
-from app.api.coolbox.ventas.repository.icg_repository import IcgRepository
-from app.api.coolbox.ventas.repository.productos_dest_repository import (
+from app.api.coolbox.ETL.repository.icg_repository import IcgRepository
+from app.api.coolbox.ETL.repository.productos_dest_repository import (
     ProductosDestRepository,
 )
 

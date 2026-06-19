@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from fastapi import HTTPException, status
 
-from app.api.coolbox.ventas.repository.icg_repository import IcgRepository
-from app.api.coolbox.ventas.repository.ventas_dest_repository import VentasDestRepository
+from app.api.coolbox.ETL.repository.icg_repository import IcgRepository
+from app.api.coolbox.ETL.repository.ventas_dest_repository import VentasDestRepository
 
 
 class VentasService:

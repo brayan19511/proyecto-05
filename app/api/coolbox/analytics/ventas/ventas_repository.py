@@ -1,4 +1,5 @@
 from datetime import date
+
 from sqlalchemy import text
 
 
@@ -15,20 +16,24 @@ class AnalyticsVentasRepository:
     ):
         sql = text("""
             SELECT
-                COALESCE(SUM(v.total), 0) AS venta_total,
-                COUNT(DISTINCT v.documento) AS cantidad_documentos,
-                COALESCE(SUM(v.cantidad), 0) AS unidades_vendidas,
-                COALESCE(SUM(v.descuento), 0) AS descuento_total,
-                COUNT(DISTINCT v.cliente) AS clientes_unicos,
-                CASE 
-                    WHEN COUNT(DISTINCT v.documento) = 0 THEN 0
-                    ELSE COALESCE(SUM(v.total), 0) / COUNT(DISTINCT v.documento)
+                COALESCE(SUM(f.total), 0) AS venta_total,
+                COUNT(DISTINCT f.documento) AS cantidad_documentos,
+                COALESCE(SUM(f.cantidad), 0) AS unidades_vendidas,
+                COALESCE(SUM(f.descuento), 0) AS descuento_total,
+                COUNT(DISTINCT f.cliente_id) AS clientes_unicos,
+                CASE
+                    WHEN COUNT(DISTINCT f.documento) = 0 THEN 0
+                    ELSE COALESCE(SUM(f.total), 0) / COUNT(DISTINCT f.documento)
                 END AS ticket_promedio
-            FROM coolbox.ventas v
-            WHERE v.fecha >= :fecha_inicio
-            AND v.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR v.canal = :canal)
-            AND (:tienda IS NULL OR v.tienda = :tienda)
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            WHERE f.fecha >= :fecha_inicio
+            AND f.fecha < (:fecha_fin + INTERVAL '1 day')
+            AND (:canal IS NULL OR c.codigo = :canal)
+            AND (:tienda IS NULL OR t.codigo = :tienda)
         """)
 
         return self.db.execute(
@@ -50,20 +55,24 @@ class AnalyticsVentasRepository:
     ):
         sql = text("""
             SELECT
-                CAST(v.fecha AS DATE) AS fecha,
-                COALESCE(SUM(v.total), 0) AS venta_total,
-                COUNT(DISTINCT v.documento) AS cantidad_documentos,
-                COALESCE(SUM(v.cantidad), 0) AS unidades_vendidas,
-                CASE 
-                    WHEN COUNT(DISTINCT v.documento) = 0 THEN 0
-                    ELSE COALESCE(SUM(v.total), 0) / COUNT(DISTINCT v.documento)
+                CAST(f.fecha AS DATE) AS fecha,
+                COALESCE(SUM(f.total), 0) AS venta_total,
+                COUNT(DISTINCT f.documento) AS cantidad_documentos,
+                COALESCE(SUM(f.cantidad), 0) AS unidades_vendidas,
+                CASE
+                    WHEN COUNT(DISTINCT f.documento) = 0 THEN 0
+                    ELSE COALESCE(SUM(f.total), 0) / COUNT(DISTINCT f.documento)
                 END AS ticket_promedio
-            FROM coolbox.ventas v
-            WHERE v.fecha >= :fecha_inicio
-            AND v.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR v.canal = :canal)
-            AND (:tienda IS NULL OR v.tienda = :tienda)
-            GROUP BY CAST(v.fecha AS DATE)
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            WHERE f.fecha >= :fecha_inicio
+            AND f.fecha < (:fecha_fin + INTERVAL '1 day')
+            AND (:canal IS NULL OR c.codigo = :canal)
+            AND (:tienda IS NULL OR t.codigo = :tienda)
+            GROUP BY CAST(f.fecha AS DATE)
             ORDER BY fecha
         """)
 
@@ -86,15 +95,20 @@ class AnalyticsVentasRepository:
         sql = text("""
             WITH base AS (
                 SELECT
-                    COALESCE(v.canal, 'SIN CANAL') AS canal,
-                    COALESCE(SUM(v.total), 0) AS venta_total,
-                    COUNT(DISTINCT v.documento) AS cantidad_documentos,
-                    COALESCE(SUM(v.cantidad), 0) AS unidades_vendidas
-                FROM coolbox.ventas v
-                WHERE v.fecha >= :fecha_inicio
-                AND v.fecha < (:fecha_fin + INTERVAL '1 day')
-                AND (:tienda IS NULL OR v.tienda = :tienda)
-                GROUP BY COALESCE(v.canal, 'SIN CANAL')
+                    c.codigo AS canal,
+                    c.nombre AS canal_nombre,
+                    COALESCE(SUM(f.total), 0) AS venta_total,
+                    COUNT(DISTINCT f.documento) AS cantidad_documentos,
+                    COALESCE(SUM(f.cantidad), 0) AS unidades_vendidas
+                FROM coolbox.fact_ventas f
+                INNER JOIN coolbox.dim_canal c
+                    ON c.id = f.canal_id
+                INNER JOIN coolbox.dim_tienda t
+                    ON t.id = f.tienda_id
+                WHERE f.fecha >= :fecha_inicio
+                AND f.fecha < (:fecha_fin + INTERVAL '1 day')
+                AND (:tienda IS NULL OR t.codigo = :tienda)
+                GROUP BY c.codigo, c.nombre
             ),
             total AS (
                 SELECT COALESCE(SUM(venta_total), 0) AS total_general
@@ -102,6 +116,7 @@ class AnalyticsVentasRepository:
             )
             SELECT
                 b.canal,
+                b.canal_nombre,
                 b.venta_total,
                 b.cantidad_documentos,
                 b.unidades_vendidas,
@@ -131,19 +146,24 @@ class AnalyticsVentasRepository:
     ):
         sql = text("""
             SELECT
-                COALESCE(v.tienda, 'SIN TIENDA') AS tienda,
-                COALESCE(SUM(v.total), 0) AS venta_total,
-                COUNT(DISTINCT v.documento) AS cantidad_documentos,
-                COALESCE(SUM(v.cantidad), 0) AS unidades_vendidas,
-                CASE 
-                    WHEN COUNT(DISTINCT v.documento) = 0 THEN 0
-                    ELSE COALESCE(SUM(v.total), 0) / COUNT(DISTINCT v.documento)
+                t.codigo AS tienda,
+                t.nombre AS tienda_nombre,
+                COALESCE(SUM(f.total), 0) AS venta_total,
+                COUNT(DISTINCT f.documento) AS cantidad_documentos,
+                COALESCE(SUM(f.cantidad), 0) AS unidades_vendidas,
+                CASE
+                    WHEN COUNT(DISTINCT f.documento) = 0 THEN 0
+                    ELSE COALESCE(SUM(f.total), 0) / COUNT(DISTINCT f.documento)
                 END AS ticket_promedio
-            FROM coolbox.ventas v
-            WHERE v.fecha >= :fecha_inicio
-            AND v.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR v.canal = :canal)
-            GROUP BY COALESCE(v.tienda, 'SIN TIENDA')
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            WHERE f.fecha >= :fecha_inicio
+            AND f.fecha < (:fecha_fin + INTERVAL '1 day')
+            AND (:canal IS NULL OR c.codigo = :canal)
+            GROUP BY t.codigo, t.nombre
             ORDER BY venta_total DESC
         """)
 
@@ -166,19 +186,31 @@ class AnalyticsVentasRepository:
     ):
         sql = text("""
             SELECT
-                v.producto,
-                MAX(p.descripcion) AS descripcion,
-                COALESCE(SUM(v.total), 0) AS venta_total,
-                COALESCE(SUM(v.cantidad), 0) AS unidades_vendidas,
-                COUNT(DISTINCT v.documento) AS cantidad_documentos
-            FROM coolbox.ventas v
-            LEFT JOIN coolbox.productos p
-                ON p.codigo = v.producto
-            WHERE v.fecha >= :fecha_inicio
-            AND v.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR v.canal = :canal)
-            AND (:tienda IS NULL OR v.tienda = :tienda)
-            GROUP BY v.producto
+                p.codigo AS producto,
+                p.descripcion,
+                p.marca,
+                p.rubro,
+                p.familia,
+                COALESCE(SUM(f.total), 0) AS venta_total,
+                COALESCE(SUM(f.cantidad), 0) AS unidades_vendidas,
+                COUNT(DISTINCT f.documento) AS cantidad_documentos
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_producto p
+                ON p.id = f.producto_id
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            WHERE f.fecha >= :fecha_inicio
+            AND f.fecha < (:fecha_fin + INTERVAL '1 day')
+            AND (:canal IS NULL OR c.codigo = :canal)
+            AND (:tienda IS NULL OR t.codigo = :tienda)
+            GROUP BY
+                p.codigo,
+                p.descripcion,
+                p.marca,
+                p.rubro,
+                p.familia
             ORDER BY venta_total DESC
             LIMIT :limit
         """)
@@ -193,3 +225,30 @@ class AnalyticsVentasRepository:
                 "limit": limit,
             },
         ).mappings().all()
+
+    def get_filtros(self):
+        canales_sql = text("""
+            SELECT
+                codigo,
+                nombre
+            FROM coolbox.dim_canal
+            WHERE activo = TRUE
+            ORDER BY nombre
+        """)
+
+        tiendas_sql = text("""
+            SELECT
+                codigo,
+                nombre
+            FROM coolbox.dim_tienda
+            WHERE activo = TRUE
+            ORDER BY nombre
+        """)
+
+        canales = self.db.execute(canales_sql).mappings().all()
+        tiendas = self.db.execute(tiendas_sql).mappings().all()
+
+        return {
+            "canales": canales,
+            "tiendas": tiendas,
+        }

@@ -9,8 +9,11 @@ from app.api.coolbox.analytics.ventas.ventas_schemas import (
     VentasPorCanalItem,
     VentasPorTiendaItem,
     TopProductoItem,
+    VentasFiltrosResponse,
 )
-from app.api.coolbox.analytics.ventas.ventas_service import AnalyticsVentasService
+from app.api.coolbox.analytics.ventas.ventas_service import (
+    AnalyticsVentasService,
+)
 from app.core.db.db_postgres import get_db
 
 
@@ -125,3 +128,15 @@ async def get_top_productos_ventas(
         tienda=tienda,
         limit=limit,
     )
+
+
+@router.get(
+    "/filtros",
+    response_model=VentasFiltrosResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_filtros_ventas(
+    db=Depends(get_db),
+):
+    service = AnalyticsVentasService(db)
+    return service.get_filtros()

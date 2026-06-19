@@ -31,6 +31,7 @@ class VentasEvolucionItem(BaseModel):
 
 class VentasPorCanalItem(BaseModel):
     canal: str
+    canal_nombre: Optional[str] = None
     venta_total: Decimal
     cantidad_documentos: int
     unidades_vendidas: int
@@ -39,6 +40,7 @@ class VentasPorCanalItem(BaseModel):
 
 class VentasPorTiendaItem(BaseModel):
     tienda: str
+    tienda_nombre: Optional[str] = None
     venta_total: Decimal
     cantidad_documentos: int
     unidades_vendidas: int
@@ -48,6 +50,24 @@ class VentasPorTiendaItem(BaseModel):
 class TopProductoItem(BaseModel):
     producto: str
     descripcion: Optional[str] = None
+    marca: Optional[str] = None
+    rubro: Optional[str] = None
+    familia: Optional[str] = None
     venta_total: Decimal
     unidades_vendidas: int
     cantidad_documentos: int
+
+
+class FiltroCanalItem(BaseModel):
+    codigo: str
+    nombre: str
+
+
+class FiltroTiendaItem(BaseModel):
+    codigo: str
+    nombre: str
+
+
+class VentasFiltrosResponse(BaseModel):
+    canales: list[FiltroCanalItem]
+    tiendas: list[FiltroTiendaItem]

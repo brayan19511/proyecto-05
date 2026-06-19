@@ -2,8 +2,9 @@ from datetime import date
 
 from fastapi import HTTPException, status
 
-from app.api.coolbox.analytics.ventas.ventas_repository import AnalyticsVentasRepository
-
+from app.api.coolbox.analytics.ventas.ventas_repository import (
+    AnalyticsVentasRepository,
+)
 
 
 class AnalyticsVentasService:
@@ -106,3 +107,6 @@ class AnalyticsVentasService:
             tienda=tienda,
             limit=limit,
         )
+
+    def get_filtros(self):
+        return self.repo.get_filtros()

@@ -1,8 +1,8 @@
 # app/api/coolbox/ventas/ventas_router.py
 from fastapi import APIRouter, Depends, status
 from datetime import date, timedelta
-from app.api.coolbox.ventas.service.productos_service import ProductosService
-from app.api.coolbox.ventas.service.ventas_service import VentasService
+from app.api.coolbox.ETL.service.productos_service import ProductosService
+from app.api.coolbox.ETL.service.ventas_service import VentasService
 from app.core.db.db_coolbox import get_db_coolbox
 from app.core.db.db_postgres import get_db # Asegúrate de tener este generator
 
