@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 
 class AnalyticsVentasRepository:
@@ -12,9 +12,11 @@ class AnalyticsVentasRepository:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
     ):
-        sql = text("""
+        tiendas_filter = self._tiendas_filter_sql(tiendas)
+
+        sql = text(f"""
             SELECT
                 COALESCE(SUM(f.total), 0) AS venta_total,
                 COUNT(DISTINCT f.documento) AS cantidad_documentos,
@@ -33,27 +35,31 @@ class AnalyticsVentasRepository:
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
             AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
+            {tiendas_filter}
         """)
 
-        return self.db.execute(
-            sql,
-            {
-                "fecha_inicio": fecha_inicio,
-                "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
-            },
-        ).mappings().one()
+        if tiendas:
+            sql = sql.bindparams(bindparam("tiendas", expanding=True))
+
+        params = {
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "canal": canal,
+            **self._tiendas_params(tiendas),
+        }
+
+        return self.db.execute(sql, params).mappings().one()
 
     def get_evolucion(
         self,
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
     ):
-        sql = text("""
+        tiendas_filter = self._tiendas_filter_sql(tiendas)
+
+        sql = text(f"""
             SELECT
                 CAST(f.fecha AS DATE) AS fecha,
                 COALESCE(SUM(f.total), 0) AS venta_total,
@@ -71,28 +77,32 @@ class AnalyticsVentasRepository:
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
             AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
+            {tiendas_filter}
             GROUP BY CAST(f.fecha AS DATE)
             ORDER BY fecha
         """)
 
-        return self.db.execute(
-            sql,
-            {
-                "fecha_inicio": fecha_inicio,
-                "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
-            },
-        ).mappings().all()
+        if tiendas:
+            sql = sql.bindparams(bindparam("tiendas", expanding=True))
+
+        params = {
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "canal": canal,
+            **self._tiendas_params(tiendas),
+        }
+
+        return self.db.execute(sql, params).mappings().all()
 
     def get_por_canal(
         self,
         fecha_inicio: date,
         fecha_fin: date,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
     ):
-        sql = text("""
+        tiendas_filter = self._tiendas_filter_sql(tiendas)
+
+        sql = text(f"""
             WITH base AS (
                 SELECT
                     c.codigo AS canal,
@@ -107,7 +117,7 @@ class AnalyticsVentasRepository:
                     ON t.id = f.tienda_id
                 WHERE f.fecha >= :fecha_inicio
                 AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-                AND (:tienda IS NULL OR t.codigo = :tienda)
+                {tiendas_filter}
                 GROUP BY c.codigo, c.nombre
             ),
             total AS (
@@ -129,20 +139,23 @@ class AnalyticsVentasRepository:
             ORDER BY b.venta_total DESC
         """)
 
-        return self.db.execute(
-            sql,
-            {
-                "fecha_inicio": fecha_inicio,
-                "fecha_fin": fecha_fin,
-                "tienda": tienda,
-            },
-        ).mappings().all()
+        if tiendas:
+            sql = sql.bindparams(bindparam("tiendas", expanding=True))
+
+        params = {
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            **self._tiendas_params(tiendas),
+        }
+
+        return self.db.execute(sql, params).mappings().all()
 
     def get_por_tienda(
         self,
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
+        limit: int | None = 10,
     ):
         sql = text("""
             SELECT
@@ -165,6 +178,7 @@ class AnalyticsVentasRepository:
             AND (:canal IS NULL OR c.codigo = :canal)
             GROUP BY t.codigo, t.nombre
             ORDER BY venta_total DESC
+            LIMIT :limit
         """)
 
         return self.db.execute(
@@ -173,6 +187,7 @@ class AnalyticsVentasRepository:
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
                 "canal": canal,
+                "limit": limit or 10,
             },
         ).mappings().all()
 
@@ -181,10 +196,12 @@ class AnalyticsVentasRepository:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
         limit: int = 10,
     ):
-        sql = text("""
+        tiendas_filter = self._tiendas_filter_sql(tiendas)
+
+        sql = text(f"""
             SELECT
                 p.codigo AS producto,
                 p.descripcion,
@@ -204,7 +221,7 @@ class AnalyticsVentasRepository:
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
             AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
+            {tiendas_filter}
             GROUP BY
                 p.codigo,
                 p.descripcion,
@@ -215,34 +232,40 @@ class AnalyticsVentasRepository:
             LIMIT :limit
         """)
 
-        return self.db.execute(
-            sql,
-            {
-                "fecha_inicio": fecha_inicio,
-                "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
-                "limit": limit,
-            },
-        ).mappings().all()
+        if tiendas:
+            sql = sql.bindparams(bindparam("tiendas", expanding=True))
+
+        params = {
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "canal": canal,
+            "limit": limit,
+            **self._tiendas_params(tiendas),
+        }
+
+        return self.db.execute(sql, params).mappings().all()
 
     def get_filtros(self):
         canales_sql = text("""
-            SELECT
-                codigo,
-                nombre
-            FROM coolbox.dim_canal
-            WHERE activo = TRUE
-            ORDER BY nombre
+            SELECT DISTINCT
+                c.codigo,
+                c.nombre
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            WHERE c.activo = TRUE
+            ORDER BY c.nombre
         """)
 
         tiendas_sql = text("""
-            SELECT
-                codigo,
-                nombre
-            FROM coolbox.dim_tienda
-            WHERE activo = TRUE
-            ORDER BY nombre
+            SELECT DISTINCT
+                t.codigo,
+                t.nombre
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            WHERE t.activo = TRUE
+            ORDER BY t.nombre
         """)
 
         canales = self.db.execute(canales_sql).mappings().all()
@@ -252,3 +275,14 @@ class AnalyticsVentasRepository:
             "canales": canales,
             "tiendas": tiendas,
         }
+    def _tiendas_filter_sql(self, tiendas: list[str] | None):
+        if tiendas:
+            return "AND t.codigo IN :tiendas"
+
+        return ""
+
+    def _tiendas_params(self, tiendas: list[str] | None):
+        if tiendas:
+            return {"tiendas": tiendas}
+
+        return {}

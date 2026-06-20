@@ -64,6 +64,45 @@ class VentasDestRepository:
 
         if registros:
             self.db.bulk_insert_mappings(StgVenta, registros)
+    def insertar_productos_no_mapeados_desde_stg(self, fecha):
+        sql = text("""
+            INSERT INTO coolbox.dim_producto (
+                id,
+                codigo,
+                descripcion,
+                marca,
+                rubro,
+                familia,
+                subfamilia,
+                tipo,
+                descatalogado,
+                activo
+            )
+            SELECT
+                gen_random_uuid(),
+                s.producto_codigo,
+                'PRODUCTO NO ENCONTRADO EN MAESTRO',
+                'SIN MARCA',
+                'SIN RUBRO',
+                'SIN FAMILIA',
+                'SIN SUBFAMILIA',
+                'NO HOMOLOGADO',
+                FALSE,
+                FALSE
+            FROM (
+                SELECT DISTINCT producto_codigo
+                FROM coolbox.stg_ventas
+                WHERE fecha >= :fecha
+                AND fecha < (:fecha + INTERVAL '1 day')
+                AND producto_codigo IS NOT NULL
+                AND TRIM(producto_codigo) <> ''
+            ) s
+            LEFT JOIN coolbox.dim_producto p
+                ON p.codigo = s.producto_codigo
+            WHERE p.id IS NULL
+        """)
+
+        self.db.execute(sql, {"fecha": fecha})
 
     # ============================================================
     # DIM PRODUCTO

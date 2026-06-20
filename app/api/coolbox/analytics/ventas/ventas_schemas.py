@@ -9,7 +9,7 @@ class VentasFiltros(BaseModel):
     fecha_inicio: date
     fecha_fin: date
     canal: Optional[str] = None
-    tienda: Optional[str] = None
+    tiendas: Optional[list[str]] = None
 
 
 class VentasKpisResponse(BaseModel):

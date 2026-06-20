@@ -18,12 +18,24 @@ class AnalyticsVentasService:
                 detail="La fecha de inicio no puede ser mayor a la fecha fin.",
             )
 
+    def _normalizar_tiendas(self, tiendas: list[str] | None):
+        if not tiendas:
+            return None
+
+        tiendas_limpias = [
+            tienda.strip()
+            for tienda in tiendas
+            if tienda and tienda.strip()
+        ]
+
+        return tiendas_limpias or None
+
     def get_kpis(
         self,
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
 
@@ -31,7 +43,7 @@ class AnalyticsVentasService:
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             canal=canal,
-            tienda=tienda,
+            tiendas=self._normalizar_tiendas(tiendas),
         )
 
     def get_evolucion(
@@ -39,7 +51,7 @@ class AnalyticsVentasService:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
 
@@ -47,21 +59,21 @@ class AnalyticsVentasService:
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             canal=canal,
-            tienda=tienda,
+            tiendas=self._normalizar_tiendas(tiendas),
         )
 
     def get_por_canal(
         self,
         fecha_inicio: date,
         fecha_fin: date,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
 
         return self.repo.get_por_canal(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            tienda=tienda,
+            tiendas=self._normalizar_tiendas(tiendas),
         )
 
     def get_por_tienda(
@@ -69,13 +81,27 @@ class AnalyticsVentasService:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
+        limit: int = 10,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
+
+        if limit <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El límite debe ser mayor a cero.",
+            )
+
+        if limit > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El límite máximo permitido es 100.",
+            )
 
         return self.repo.get_por_tienda(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             canal=canal,
+            limit=limit,
         )
 
     def get_top_productos(
@@ -83,7 +109,7 @@ class AnalyticsVentasService:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
-        tienda: str | None = None,
+        tiendas: list[str] | None = None,
         limit: int = 10,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
@@ -104,7 +130,7 @@ class AnalyticsVentasService:
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             canal=canal,
-            tienda=tienda,
+            tiendas=self._normalizar_tiendas(tiendas),
             limit=limit,
         )
 

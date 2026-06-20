@@ -37,11 +37,7 @@ class VentasService:
         abono_doc = (
             df["ABONODE_NUMSERIE"].fillna("").astype(str)
             + "-"
-            + df["ABONODE_NUMALBARAN"]
-            .fillna(0)
-            .astype(int)
-            .astype(str)
-            .str.zfill(10)
+            + df["ABONODE_NUMALBARAN"].fillna(0).astype(int).astype(str).str.zfill(10)
         )
 
         condicion_360_compleja = (
@@ -67,14 +63,14 @@ class VentasService:
             + df["NUMALBARAN"].astype(str).str.zfill(10)
         )
 
-        df["MONTO_DESCUENTO"] = (
-            df["UNIDADESTOTAL"] * df["PRECIO"]
-        ) * (df["DTO"].fillna(0) / 100.0)
+        df["MONTO_DESCUENTO"] = (df["UNIDADESTOTAL"] * df["PRECIO"]) * (
+            df["DTO"].fillna(0) / 100.0
+        )
 
         df["TIPODOC"] = df["TIPODOC"].apply(
-            lambda x: "FACTURA"
-            if x in [5, 38]
-            else ("BOLETA" if x in [13, 37] else "OTRO")
+            lambda x: (
+                "FACTURA" if x in [5, 38] else ("BOLETA" if x in [13, 37] else "OTRO")
+            )
         )
 
         df_agrupado = df.groupby(
@@ -123,16 +119,35 @@ class VentasService:
 
         df_agrupado = self.transformar_ventas(df)
 
-        # 1. Cargar staging
+        # 1. CARGAR STAGING Y CONFIRMARLO
         self.repo_destino.eliminar_stg_ventas_por_fecha(fecha)
         self.repo_destino.guardar_stg_ventas_bulk(df_agrupado)
 
-        # 2. Asegurar dimensiones base
+        self.db_destino.commit()
+
+        # 2. VALIDAR FUENTE VS STAGING
+        totales_stg = self.repo_destino.obtener_totales_control_stg(fecha)
+
+        diferencia_fuente_stg = abs(
+            float(totales_fuente["suma_total"] or 0)
+            - float(totales_stg["suma_total"] or 0)
+        )
+
+        if diferencia_fuente_stg > 0.10:
+            raise ValueError(
+                f"Error de calidad FUENTE vs STG. "
+                f"Fuente suma: {totales_fuente['suma_total']}, "
+                f"STG suma: {totales_stg['suma_total']}. "
+                f"STG quedó guardado para revisión."
+            )
+
+        # 3. ASEGURAR DIMENSIONES
         self.repo_destino.asegurar_dim_canales_base()
         self.repo_destino.insertar_canales_no_mapeados_desde_stg(fecha)
         self.repo_destino.insertar_clientes_desde_stg(fecha)
+        self.repo_destino.insertar_productos_no_mapeados_desde_stg(fecha)
 
-        # 3. Validar dimensiones obligatorias
+        # 4. VALIDAR DIMENSIONES
         faltantes = self.repo_destino.obtener_registros_stg_sin_dimension(fecha)
 
         if (
@@ -144,32 +159,48 @@ class VentasService:
                 "Existen registros sin dimensión. "
                 f"Productos faltantes: {faltantes['productos_sin_dimension']}, "
                 f"Tiendas faltantes: {faltantes['tiendas_sin_dimension']}, "
-                f"Canales faltantes: {faltantes['canales_sin_dimension']}"
+                f"Canales faltantes: {faltantes['canales_sin_dimension']}. "
+                f"STG quedó guardado para revisión."
             )
 
-        # 4. Cargar fact
+        # 5. CARGAR FACT
         self.repo_destino.eliminar_fact_ventas_por_fecha(fecha)
         self.repo_destino.insertar_fact_ventas_desde_stg(fecha)
 
-        # 5. Validar totales
+        # 6. VALIDAR STG VS FACT
         totales_fact = self.repo_destino.obtener_totales_control_fact(fecha)
 
-        diferencia_dinero = abs(
-            float(totales_fuente["suma_total"] or 0)
+        diferencia_stg_fact = abs(
+            float(totales_stg["suma_total"] or 0)
             - float(totales_fact["suma_total"] or 0)
         )
 
-        if diferencia_dinero > 0.10:
+        if diferencia_stg_fact > 0.10:
             raise ValueError(
-                f"Error de calidad de datos. "
-                f"Fuente suma: {totales_fuente['suma_total']}, "
-                f"Fact suma: {totales_fact['suma_total']}"
+                f"Error de calidad STG vs FACT. "
+                f"STG suma: {totales_stg['suma_total']}, "
+                f"Fact suma: {totales_fact['suma_total']}. "
+                f"STG quedó guardado para revisión."
+            )
+
+        diferencia_cantidad_stg_fact = abs(
+            float(totales_stg["suma_cantidad"] or 0)
+            - float(totales_fact["suma_cantidad"] or 0)
+        )
+
+        if diferencia_cantidad_stg_fact > 0:
+            raise ValueError(
+                f"Error de cantidad STG vs FACT. "
+                f"STG cantidad: {totales_stg['suma_cantidad']}, "
+                f"Fact cantidad: {totales_fact['suma_cantidad']}. "
+                f"STG quedó guardado para revisión."
             )
 
         return {
             "fecha": str(fecha),
             "status": "Exitoso",
             "filas_origen": int(totales_fuente["total_filas"]),
+            "filas_stg": int(totales_stg["total_filas"]),
             "filas_fact": int(totales_fact["total_filas"]),
             "monto": float(totales_fact["suma_total"]),
         }
@@ -200,10 +231,7 @@ class VentasService:
             )
 
         total_dias = (fecha_fin - fecha_inicio).days + 1
-        dias_a_procesar = [
-            fecha_inicio + timedelta(days=x)
-            for x in range(total_dias)
-        ]
+        dias_a_procesar = [fecha_inicio + timedelta(days=x) for x in range(total_dias)]
 
         reporte_procesamiento = []
         dias_exitosos = 0
@@ -226,11 +254,13 @@ class VentasService:
                 self.db_destino.rollback()
                 dias_fallidos += 1
 
-                reporte_procesamiento.append({
-                    "fecha": str(fecha),
-                    "status": "Fallido",
-                    "error": str(e),
-                })
+                reporte_procesamiento.append(
+                    {
+                        "fecha": str(fecha),
+                        "status": "Fallido",
+                        "error": str(e),
+                    }
+                )
 
         return {
             "resumen": {
@@ -244,13 +274,9 @@ class VentasService:
         }
 
     def ejecutar_etl_ventas_automatico(self, dias_reproceso: int = 2):
-        fecha_fin = datetime.now(
-            ZoneInfo("America/Lima")
-        ).date()
+        fecha_fin = datetime.now(ZoneInfo("America/Lima")).date()
 
-        fecha_inicio = fecha_fin - timedelta(
-            days=dias_reproceso - 1
-        )
+        fecha_inicio = fecha_fin - timedelta(days=dias_reproceso - 1)
 
         return self.ejecutar_etl_ventas_rango(
             fecha_inicio=fecha_inicio,

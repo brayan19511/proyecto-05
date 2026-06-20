@@ -31,7 +31,7 @@ async def get_kpis_ventas(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
-    tienda: Optional[str] = Query(default=None),
+    tiendas: list[str] | None = Query(default=None),
     db=Depends(get_db),
 ):
     service = AnalyticsVentasService(db)
@@ -40,7 +40,7 @@ async def get_kpis_ventas(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         canal=canal,
-        tienda=tienda,
+        tiendas=tiendas,
     )
 
 
@@ -53,7 +53,7 @@ async def get_evolucion_ventas(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
-    tienda: Optional[str] = Query(default=None),
+    tiendas: list[str] | None = Query(default=None),
     db=Depends(get_db),
 ):
     service = AnalyticsVentasService(db)
@@ -62,7 +62,7 @@ async def get_evolucion_ventas(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         canal=canal,
-        tienda=tienda,
+        tiendas=tiendas,
     )
 
 
@@ -74,7 +74,7 @@ async def get_evolucion_ventas(
 async def get_ventas_por_canal(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
-    tienda: Optional[str] = Query(default=None),
+    tiendas: list[str] | None = Query(default=None),
     db=Depends(get_db),
 ):
     service = AnalyticsVentasService(db)
@@ -82,7 +82,7 @@ async def get_ventas_por_canal(
     return service.get_por_canal(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        tienda=tienda,
+        tiendas=tiendas,
     )
 
 
@@ -95,6 +95,7 @@ async def get_ventas_por_tienda(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=100),
     db=Depends(get_db),
 ):
     service = AnalyticsVentasService(db)
@@ -103,6 +104,7 @@ async def get_ventas_por_tienda(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         canal=canal,
+        limit=limit,
     )
 
 
@@ -115,7 +117,7 @@ async def get_top_productos_ventas(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
-    tienda: Optional[str] = Query(default=None),
+    tiendas: list[str] | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=100),
     db=Depends(get_db),
 ):
@@ -125,7 +127,7 @@ async def get_top_productos_ventas(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         canal=canal,
-        tienda=tienda,
+        tiendas=tiendas,
         limit=limit,
     )
 

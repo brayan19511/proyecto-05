@@ -133,7 +133,7 @@ class IcgRepository:
 
         return self.db_icg.execute(sql).mappings().all()
 
-    def obtener_totales_control_fuente(self, fecha: date):
+    def obtener_totales_control_fuente(self, fecha):
         fecha_fin = fecha + timedelta(days=1)
 
         sql = text("""
@@ -145,6 +145,16 @@ class IcgRepository:
             INNER JOIN albventalin t2
                 ON t1.NUMSERIE = t2.NUMSERIE
                 AND t1.NUMALBARAN = t2.NUMALBARAN
+            INNER JOIN FACTURASVENTACAMPOSLIBRES t3
+                ON t1.NUMSERIE = t3.NUMSERIE
+                AND t1.NUMFAC = t3.NUMFACTURA
+            LEFT JOIN ALBVENTACAMPOSLIBRES t4 WITH(NOLOCK)
+                ON t4.NUMSERIE = t1.NUMSERIE
+                AND t4.NUMALBARAN = t1.NUMALBARAN
+            LEFT JOIN TESORERIA t5
+                ON t5.SERIE = t1.NUMSERIE
+                AND t5.NUMERO = t1.NUMFAC
+                AND t5.CODFORMAPAGO = 15
             WHERE t1.FECHA >= :fecha_inicio
             AND t1.FECHA < :fecha_fin
             AND t2.UNIDADESTOTAL <> 0
@@ -152,14 +162,10 @@ class IcgRepository:
             AND t1.TIPODOC IN (5, 13, 37, 38)
         """)
 
-        return (
-            self.db_icg.execute(
-                sql,
-                {
-                    "fecha_inicio": fecha,
-                    "fecha_fin": fecha_fin,
-                },
-            )
-            .mappings()
-            .one()
-        )
+        return self.db_icg.execute(
+            sql,
+            {
+                "fecha_inicio": fecha,
+                "fecha_fin": fecha_fin,
+            },
+        ).mappings().one()

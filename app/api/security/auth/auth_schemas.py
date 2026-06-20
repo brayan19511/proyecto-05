@@ -8,10 +8,15 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class UserTokenResponse(BaseModel):
+    user_id: UUID
+    email: EmailStr
+    roles: Optional[list[str]] = []
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user_id: UUID
+    # user: UserTokenResponse
 
 # Para mostrar información básica del usuario en el token o respuesta
 class UserAuthSchema(BaseModel):
@@ -28,3 +33,10 @@ class UserRegisterSchema(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=4)
+    
+class CurrentUserResponse(BaseModel):
+    id: UUID
+    email: str
+    active: bool
+    roles: list[str]
+    permissions: list[str]
