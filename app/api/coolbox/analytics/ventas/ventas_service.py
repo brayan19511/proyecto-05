@@ -81,6 +81,7 @@ class AnalyticsVentasService:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
+        tiendas: list[str] | None = None,
         limit: int = 10,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
@@ -101,6 +102,7 @@ class AnalyticsVentasService:
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
             canal=canal,
+            tiendas=self._normalizar_tiendas(tiendas),
             limit=limit,
         )
 

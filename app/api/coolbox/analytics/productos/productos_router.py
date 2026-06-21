@@ -33,6 +33,7 @@ async def get_productos_abc(
     tienda: Optional[str] = Query(default=None),
     rubro: Optional[str] = Query(default=None),
     familia: Optional[str] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
     db=Depends(get_db),
 ):
     service = AnalyticsProductosService(db)
@@ -44,6 +45,7 @@ async def get_productos_abc(
         tienda=tienda,
         rubro=rubro,
         familia=familia,
+        limit=limit,
     )
 
 

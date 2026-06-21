@@ -50,7 +50,19 @@ class ProductoFiltroItem(BaseModel):
     valor: str
 
 
+class ProductoFiltroCanalItem(BaseModel):
+    codigo: str
+    nombre: str
+
+
+class ProductoFiltroTiendaItem(BaseModel):
+    codigo: str
+    nombre: str
+
+
 class ProductosFiltrosResponse(BaseModel):
+    canales: list[ProductoFiltroCanalItem]
+    tiendas: list[ProductoFiltroTiendaItem]
     rubros: list[ProductoFiltroItem]
     familias: list[ProductoFiltroItem]
     marcas: list[ProductoFiltroItem]

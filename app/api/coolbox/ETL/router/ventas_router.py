@@ -1,6 +1,6 @@
 # app/api/coolbox/ventas/ventas_router.py
-from fastapi import APIRouter, Depends, status
-from datetime import date, timedelta
+from fastapi import APIRouter, Depends, Query, status
+from datetime import date
 from app.api.coolbox.ETL.service.productos_service import ProductosService
 from app.api.coolbox.ETL.service.ventas_service import VentasService
 from app.core.db.db_coolbox import get_db_coolbox
@@ -23,7 +23,7 @@ async def procesar_ventas_por_fecha(
     return resultado
 @router.post("/procesar-ventas-delta", status_code=status.HTTP_201_CREATED)
 async def procesar_ventas_automatico(
-    dias_reproceso: int = 2,
+    dias_reproceso: int = Query(default=2, ge=1, le=31),
     db_fuente=Depends(get_db_coolbox),
     db_destino=Depends(get_db),
 ):

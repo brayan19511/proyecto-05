@@ -14,6 +14,7 @@ class AnalyticsVentasRepository:
         canal: str | None = None,
         tiendas: list[str] | None = None,
     ):
+        canal_filter = self._canal_filter_sql(canal)
         tiendas_filter = self._tiendas_filter_sql(tiendas)
 
         sql = text(f"""
@@ -34,7 +35,7 @@ class AnalyticsVentasRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
+            {canal_filter}
             {tiendas_filter}
         """)
 
@@ -44,7 +45,7 @@ class AnalyticsVentasRepository:
         params = {
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
-            "canal": canal,
+            **self._canal_params(canal),
             **self._tiendas_params(tiendas),
         }
 
@@ -57,6 +58,7 @@ class AnalyticsVentasRepository:
         canal: str | None = None,
         tiendas: list[str] | None = None,
     ):
+        canal_filter = self._canal_filter_sql(canal)
         tiendas_filter = self._tiendas_filter_sql(tiendas)
 
         sql = text(f"""
@@ -76,7 +78,7 @@ class AnalyticsVentasRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
+            {canal_filter}
             {tiendas_filter}
             GROUP BY CAST(f.fecha AS DATE)
             ORDER BY fecha
@@ -88,7 +90,7 @@ class AnalyticsVentasRepository:
         params = {
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
-            "canal": canal,
+            **self._canal_params(canal),
             **self._tiendas_params(tiendas),
         }
 
@@ -155,9 +157,13 @@ class AnalyticsVentasRepository:
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
+        tiendas: list[str] | None = None,
         limit: int | None = 10,
     ):
-        sql = text("""
+        canal_filter = self._canal_filter_sql(canal)
+        tiendas_filter = self._tiendas_filter_sql(tiendas)
+
+        sql = text(f"""
             SELECT
                 t.codigo AS tienda,
                 t.nombre AS tienda_nombre,
@@ -175,19 +181,24 @@ class AnalyticsVentasRepository:
                 ON c.id = f.canal_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
+            {canal_filter}
+            {tiendas_filter}
             GROUP BY t.codigo, t.nombre
             ORDER BY venta_total DESC
             LIMIT :limit
         """)
+
+        if tiendas:
+            sql = sql.bindparams(bindparam("tiendas", expanding=True))
 
         return self.db.execute(
             sql,
             {
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
-                "canal": canal,
+                **self._canal_params(canal),
                 "limit": limit or 10,
+                **self._tiendas_params(tiendas),
             },
         ).mappings().all()
 
@@ -199,6 +210,7 @@ class AnalyticsVentasRepository:
         tiendas: list[str] | None = None,
         limit: int = 10,
     ):
+        canal_filter = self._canal_filter_sql(canal)
         tiendas_filter = self._tiendas_filter_sql(tiendas)
 
         sql = text(f"""
@@ -220,7 +232,7 @@ class AnalyticsVentasRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
+            {canal_filter}
             {tiendas_filter}
             GROUP BY
                 p.codigo,
@@ -238,7 +250,7 @@ class AnalyticsVentasRepository:
         params = {
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
-            "canal": canal,
+            **self._canal_params(canal),
             "limit": limit,
             **self._tiendas_params(tiendas),
         }
@@ -275,6 +287,19 @@ class AnalyticsVentasRepository:
             "canales": canales,
             "tiendas": tiendas,
         }
+
+    def _canal_filter_sql(self, canal: str | None):
+        if canal:
+            return "AND c.codigo = :canal"
+
+        return ""
+
+    def _canal_params(self, canal: str | None):
+        if canal:
+            return {"canal": canal}
+
+        return {}
+
     def _tiendas_filter_sql(self, tiendas: list[str] | None):
         if tiendas:
             return "AND t.codigo IN :tiendas"

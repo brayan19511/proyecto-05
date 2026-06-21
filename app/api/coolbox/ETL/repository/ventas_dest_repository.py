@@ -33,37 +33,42 @@ class VentasDestRepository:
 
         self.db.execute(sql, {"fecha": fecha})
 
-    def guardar_stg_ventas_bulk(self, df_limpio: pd.DataFrame):
+    def guardar_stg_ventas_bulk(self, df_limpio: pd.DataFrame, batch_size: int = 5000):
         registros = []
 
-        for row in df_limpio.to_dict("records"):
+        for row in df_limpio.itertuples(index=False):
             registros.append(
                 {
                     "id": uuid4(),
-                    "fecha": pd.to_datetime(row["FECHA"]),
-                    "documento": row["DOCUMENTO"],
-                    "tipo_documento": row["TIPODOC"],
-                    "tienda_codigo": str(row["CODALMACEN"]),
-                    "producto_codigo": str(row["CODARTICULO"]),
-                    "canal_codigo": str(row["CANAL"]),
+                    "fecha": pd.to_datetime(row.FECHA),
+                    "documento": row.DOCUMENTO,
+                    "tipo_documento": row.TIPODOC,
+                    "tienda_codigo": str(row.CODALMACEN),
+                    "producto_codigo": str(row.CODARTICULO),
+                    "canal_codigo": str(row.CANAL),
                     "cliente_codigo": (
-                        str(row["CODCLIENTE"]) if pd.notna(row["CODCLIENTE"]) else None
+                        str(row.CODCLIENTE) if pd.notna(row.CODCLIENTE) else None
                     ),
                     "vendedor_codigo": (
-                        str(row["CODVENDEDOR"])
-                        if pd.notna(row["CODVENDEDOR"])
+                        str(row.CODVENDEDOR)
+                        if pd.notna(row.CODVENDEDOR)
                         else None
                     ),
-                    "cantidad": int(row["UNIDADESTOTAL"]),
-                    "precio": float(row["PRECIO"]),
-                    "descuento": float(row["MONTO_DESCUENTO"]),
-                    "total": float(row["TOTAL"]),
-                    "iva": (float(row["IVA"]) if pd.notna(row["IVA"]) else None),
+                    "cantidad": int(row.UNIDADESTOTAL),
+                    "precio": float(row.PRECIO),
+                    "descuento": float(row.MONTO_DESCUENTO),
+                    "total": float(row.TOTAL),
+                    "iva": (float(row.IVA) if pd.notna(row.IVA) else None),
                 }
             )
 
+            if len(registros) >= batch_size:
+                self.db.bulk_insert_mappings(StgVenta, registros)
+                registros.clear()
+
         if registros:
             self.db.bulk_insert_mappings(StgVenta, registros)
+
     def insertar_productos_no_mapeados_desde_stg(self, fecha):
         sql = text("""
             INSERT INTO coolbox.dim_producto (

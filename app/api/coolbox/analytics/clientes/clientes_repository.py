@@ -13,8 +13,11 @@ class AnalyticsClientesRepository:
         fecha_fin: date,
         canal: str | None = None,
         tienda: str | None = None,
+        limit: int = 100,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(canal=canal, tienda=tienda)
+
+        sql = text(f"""
             WITH base AS (
                 SELECT
                     cl.codigo AS cliente,
@@ -32,8 +35,7 @@ class AnalyticsClientesRepository:
                 WHERE f.fecha >= :fecha_inicio
                 AND f.fecha < (:fecha_fin + INTERVAL '1 day')
                 AND f.cliente_id IS NOT NULL
-                AND (:canal IS NULL OR c.codigo = :canal)
-                AND (:tienda IS NULL OR t.codigo = :tienda)
+                {filters_sql}
                 GROUP BY cl.codigo
             ),
             scored AS (
@@ -80,6 +82,7 @@ class AnalyticsClientesRepository:
                 END AS segmento
             FROM scored
             ORDER BY monetario DESC
+            LIMIT :limit
         """)
 
         return self.db.execute(
@@ -87,8 +90,8 @@ class AnalyticsClientesRepository:
             {
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
+                "limit": limit,
+                **self._filters_params(canal=canal, tienda=tienda),
             },
         ).mappings().all()
 
@@ -99,7 +102,9 @@ class AnalyticsClientesRepository:
         canal: str | None = None,
         tienda: str | None = None,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(canal=canal, tienda=tienda)
+
+        sql = text(f"""
             WITH rfm AS (
                 WITH base AS (
                     SELECT
@@ -117,8 +122,7 @@ class AnalyticsClientesRepository:
                     WHERE f.fecha >= :fecha_inicio
                     AND f.fecha < (:fecha_fin + INTERVAL '1 day')
                     AND f.cliente_id IS NOT NULL
-                    AND (:canal IS NULL OR c.codigo = :canal)
-                    AND (:tienda IS NULL OR t.codigo = :tienda)
+                    {filters_sql}
                     GROUP BY cl.codigo
                 ),
                 scored AS (
@@ -177,8 +181,7 @@ class AnalyticsClientesRepository:
             {
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
+                **self._filters_params(canal=canal, tienda=tienda),
             },
         ).mappings().all()
 
@@ -190,7 +193,9 @@ class AnalyticsClientesRepository:
         tienda: str | None = None,
         limit: int = 10,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(canal=canal, tienda=tienda)
+
+        sql = text(f"""
             SELECT
                 cl.codigo AS cliente,
                 COALESCE(SUM(f.total), 0) AS venta_total,
@@ -206,8 +211,7 @@ class AnalyticsClientesRepository:
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
             AND f.cliente_id IS NOT NULL
-            AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
+            {filters_sql}
             GROUP BY cl.codigo
             ORDER BY venta_total DESC
             LIMIT :limit
@@ -218,11 +222,40 @@ class AnalyticsClientesRepository:
             {
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
                 "limit": limit,
+                **self._filters_params(canal=canal, tienda=tienda),
             },
         ).mappings().all()
+
+    def _filters_sql(
+        self,
+        canal: str | None = None,
+        tienda: str | None = None,
+    ):
+        filters = []
+
+        if canal:
+            filters.append("AND c.codigo = :canal")
+
+        if tienda:
+            filters.append("AND t.codigo = :tienda")
+
+        return "\n                ".join(filters)
+
+    def _filters_params(
+        self,
+        canal: str | None = None,
+        tienda: str | None = None,
+    ):
+        params = {}
+
+        if canal:
+            params["canal"] = canal
+
+        if tienda:
+            params["tienda"] = tienda
+
+        return params
 
     def get_frecuencia_compra(
         self,
@@ -232,7 +265,9 @@ class AnalyticsClientesRepository:
         tienda: str | None = None,
         limit: int = 10,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(canal=canal, tienda=tienda)
+
+        sql = text(f"""
             SELECT
                 cl.codigo AS cliente,
                 COUNT(DISTINCT f.documento) AS cantidad_documentos,
@@ -257,8 +292,7 @@ class AnalyticsClientesRepository:
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
             AND f.cliente_id IS NOT NULL
-            AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
+            {filters_sql}
             GROUP BY cl.codigo
             ORDER BY cantidad_documentos DESC
             LIMIT :limit
@@ -269,8 +303,35 @@ class AnalyticsClientesRepository:
             {
                 "fecha_inicio": fecha_inicio,
                 "fecha_fin": fecha_fin,
-                "canal": canal,
-                "tienda": tienda,
                 "limit": limit,
+                **self._filters_params(canal=canal, tienda=tienda),
             },
         ).mappings().all()
+
+    def get_filtros(self):
+        canales_sql = text("""
+            SELECT DISTINCT
+                c.codigo,
+                c.nombre
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            WHERE c.activo = TRUE
+            ORDER BY c.nombre
+        """)
+
+        tiendas_sql = text("""
+            SELECT DISTINCT
+                t.codigo,
+                t.nombre
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            WHERE t.activo = TRUE
+            ORDER BY t.nombre
+        """)
+
+        return {
+            "canales": self.db.execute(canales_sql).mappings().all(),
+            "tiendas": self.db.execute(tiendas_sql).mappings().all(),
+        }

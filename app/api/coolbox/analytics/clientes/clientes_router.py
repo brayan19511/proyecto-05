@@ -8,6 +8,7 @@ from app.api.coolbox.analytics.clientes.clientes_schemas import (
     ClienteSegmentoItem,
     ClienteTopItem,
     ClienteFrecuenciaCompraItem,
+    ClientesFiltrosResponse,
 )
 from app.api.coolbox.analytics.clientes.clientes_service import (
     AnalyticsClientesService,
@@ -30,6 +31,7 @@ async def get_clientes_rfm(
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
     tienda: Optional[str] = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
     db=Depends(get_db),
 ):
     service = AnalyticsClientesService(db)
@@ -39,6 +41,7 @@ async def get_clientes_rfm(
         fecha_fin=fecha_fin,
         canal=canal,
         tienda=tienda,
+        limit=limit,
     )
 
 
@@ -110,3 +113,15 @@ async def get_clientes_frecuencia_compra(
         tienda=tienda,
         limit=limit,
     )
+
+
+@router.get(
+    "/filtros",
+    response_model=ClientesFiltrosResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_filtros_clientes(
+    db=Depends(get_db),
+):
+    service = AnalyticsClientesService(db)
+    return service.get_filtros()

@@ -38,3 +38,18 @@ class ClienteFrecuenciaCompraItem(BaseModel):
     primera_compra: date
     ultima_compra: date
     dias_entre_compras: Optional[Decimal] = None
+
+
+class ClienteFiltroCanalItem(BaseModel):
+    codigo: str
+    nombre: str
+
+
+class ClienteFiltroTiendaItem(BaseModel):
+    codigo: str
+    nombre: str
+
+
+class ClientesFiltrosResponse(BaseModel):
+    canales: list[ClienteFiltroCanalItem]
+    tiendas: list[ClienteFiltroTiendaItem]

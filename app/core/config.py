@@ -37,17 +37,23 @@ class Settings(BaseSettings):
     # 3. Propiedad de Python pura (Sin computed_field para evitar el AttributeError)
     @property
     def ASYNC_DATABASE_URL(self) -> str:
-        # Si ya tenemos la URL completa (Caso Nube)
         if self.DATABASE_URL:
-            # Corregir prefijo de Render/Heroku si es necesario
             url = self.DATABASE_URL.replace("postgres://", "postgresql://", 1)
-            # Asegurar que use el driver psycopg2 (o el que prefieras)
-            if "postgresql+psycopg2://" not in url:
+
+            if url.startswith("postgresql://"):
                 url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+            if "ssl=" not in url and "sslmode=" not in url:
+                separator = "&" if "?" in url else "?"
+                url = f"{url}{separator}ssl=require"
+
             return url
 
-        # Caso Local: Construcción manual
-        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"
+        return (
+            f"postgresql+psycopg2://{self.POSTGRES_USER}:"
+            f"{self.POSTGRES_PASSWORD}@{self.DB_HOST}:"
+            f"{self.DB_PORT}/{self.POSTGRES_DB}?sslmode=require"
+        )
 
     model_config = SettingsConfigDict(
         env_file=".env",

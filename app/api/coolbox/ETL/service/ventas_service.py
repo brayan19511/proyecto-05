@@ -16,8 +16,6 @@ class VentasService:
         self.repo_destino = VentasDestRepository(db_destino)
 
     def transformar_ventas(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df.copy()
-
         df["CANAL_VENTA"] = df["CANAL_VENTA"].fillna("")
         df["CODFORMAPAGO"] = df["CODFORMAPAGO"].fillna("").astype(str)
 
@@ -87,6 +85,7 @@ class VentasService:
                 "CODVENDEDOR",
             ],
             as_index=False,
+            dropna=False,
         ).agg(
             {
                 "UNIDADESTOTAL": "sum",
@@ -274,6 +273,18 @@ class VentasService:
         }
 
     def ejecutar_etl_ventas_automatico(self, dias_reproceso: int = 2):
+        if dias_reproceso <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Los dias de reproceso deben ser mayores a cero.",
+            )
+
+        if dias_reproceso > 31:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El maximo permitido para reproceso automatico es 31 dias.",
+            )
+
         fecha_fin = datetime.now(ZoneInfo("America/Lima")).date()
 
         fecha_inicio = fecha_fin - timedelta(days=dias_reproceso - 1)

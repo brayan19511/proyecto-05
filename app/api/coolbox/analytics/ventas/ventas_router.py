@@ -95,6 +95,7 @@ async def get_ventas_por_tienda(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
+    tiendas: list[str] | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=100),
     db=Depends(get_db),
 ):
@@ -104,6 +105,7 @@ async def get_ventas_por_tienda(
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         canal=canal,
+        tiendas=tiendas,
         limit=limit,
     )
 

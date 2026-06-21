@@ -31,6 +31,26 @@ class AnalyticsProductosService:
                 detail="El límite máximo permitido es 100.",
             )
 
+    def _validar_limit_detalle(self, limit: int):
+        if limit <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El limite debe ser mayor a cero.",
+            )
+
+        if limit > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El limite maximo permitido para detalle es 500.",
+            )
+
+    def _normalizar_filtro(self, valor: str | None):
+        if not valor:
+            return None
+
+        valor = valor.strip()
+        return valor or None
+
     def get_abc(
         self,
         fecha_inicio: date,
@@ -39,16 +59,19 @@ class AnalyticsProductosService:
         tienda: str | None = None,
         rubro: str | None = None,
         familia: str | None = None,
+        limit: int = 100,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
+        self._validar_limit_detalle(limit)
 
         return self.repo.get_abc(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
-            rubro=rubro,
-            familia=familia,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
+            rubro=self._normalizar_filtro(rubro),
+            familia=self._normalizar_filtro(familia),
+            limit=limit,
         )
 
     def get_top_productos(
@@ -67,10 +90,10 @@ class AnalyticsProductosService:
         return self.repo.get_top_productos(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
-            rubro=rubro,
-            familia=familia,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
+            rubro=self._normalizar_filtro(rubro),
+            familia=self._normalizar_filtro(familia),
             limit=limit,
         )
 
@@ -90,10 +113,10 @@ class AnalyticsProductosService:
         return self.repo.get_bajo_movimiento(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
-            rubro=rubro,
-            familia=familia,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
+            rubro=self._normalizar_filtro(rubro),
+            familia=self._normalizar_filtro(familia),
             limit=limit,
         )
 
@@ -109,8 +132,8 @@ class AnalyticsProductosService:
         return self.repo.get_por_rubro(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
         )
 
     def get_por_familia(
@@ -126,9 +149,9 @@ class AnalyticsProductosService:
         return self.repo.get_por_familia(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
-            rubro=rubro,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
+            rubro=self._normalizar_filtro(rubro),
         )
     def get_filtros(self):
         return self.repo.get_filtros()

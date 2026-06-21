@@ -95,6 +95,8 @@ class DimProducto(Base):
     __table_args__ = (
         UniqueConstraint("codigo", name="uq_dim_producto_codigo"),
         Index("ix_dim_producto_codigo", "codigo"),
+        Index("ix_dim_producto_rubro", "rubro"),
+        Index("ix_dim_producto_familia", "familia"),
         {"schema": "coolbox"},
     )
 
@@ -256,6 +258,10 @@ class FactVenta(Base):
         Index("ix_fact_ventas_tienda_id", "tienda_id"),
         Index("ix_fact_ventas_canal_id", "canal_id"),
         Index("ix_fact_ventas_cliente_id", "cliente_id"),
+        Index("ix_fact_ventas_tienda_fecha", "tienda_id", "fecha"),
+        Index("ix_fact_ventas_canal_fecha", "canal_id", "fecha"),
+        Index("ix_fact_ventas_fecha_producto", "fecha", "producto_id"),
+        Index("ix_fact_ventas_fecha_cliente", "fecha", "cliente_id"),
         {"schema": "coolbox"},
     )
 

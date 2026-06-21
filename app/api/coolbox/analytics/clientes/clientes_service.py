@@ -31,20 +31,43 @@ class AnalyticsClientesService:
                 detail="El límite máximo permitido es 100.",
             )
 
+    def _validar_limit_detalle(self, limit: int):
+        if limit <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El limite debe ser mayor a cero.",
+            )
+
+        if limit > 500:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El limite maximo permitido para detalle es 500.",
+            )
+
+    def _normalizar_filtro(self, valor: str | None):
+        if not valor:
+            return None
+
+        valor = valor.strip()
+        return valor or None
+
     def get_rfm(
         self,
         fecha_inicio: date,
         fecha_fin: date,
         canal: str | None = None,
         tienda: str | None = None,
+        limit: int = 100,
     ):
         self._validar_fechas(fecha_inicio, fecha_fin)
+        self._validar_limit_detalle(limit)
 
         return self.repo.get_rfm(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
+            limit=limit,
         )
 
     def get_segmentos(
@@ -59,8 +82,8 @@ class AnalyticsClientesService:
         return self.repo.get_segmentos(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
         )
 
     def get_top_clientes(
@@ -77,8 +100,8 @@ class AnalyticsClientesService:
         return self.repo.get_top_clientes(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
             limit=limit,
         )
 
@@ -96,7 +119,10 @@ class AnalyticsClientesService:
         return self.repo.get_frecuencia_compra(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=canal,
-            tienda=tienda,
+            canal=self._normalizar_filtro(canal),
+            tienda=self._normalizar_filtro(tienda),
             limit=limit,
         )
+
+    def get_filtros(self):
+        return self.repo.get_filtros()

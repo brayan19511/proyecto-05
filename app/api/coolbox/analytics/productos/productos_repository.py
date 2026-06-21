@@ -15,8 +15,16 @@ class AnalyticsProductosRepository:
         tienda: str | None = None,
         rubro: str | None = None,
         familia: str | None = None,
+        limit: int = 100,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(
+            canal=canal,
+            tienda=tienda,
+            rubro=rubro,
+            familia=familia,
+        )
+
+        sql = text(f"""
             WITH ventas_producto AS (
                 SELECT
                     p.codigo AS producto,
@@ -35,10 +43,7 @@ class AnalyticsProductosRepository:
                     ON t.id = f.tienda_id
                 WHERE f.fecha >= :fecha_inicio
                 AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-                AND (:canal IS NULL OR c.codigo = :canal)
-                AND (:tienda IS NULL OR t.codigo = :tienda)
-                AND (:rubro IS NULL OR p.rubro = :rubro)
-                AND (:familia IS NULL OR p.familia = :familia)
+                {filters_sql}
                 GROUP BY
                     p.codigo,
                     p.descripcion,
@@ -83,6 +88,7 @@ class AnalyticsProductosRepository:
                 END AS clasificacion_abc
             FROM calculado
             ORDER BY venta_total DESC
+            LIMIT :limit
         """)
 
         return (
@@ -91,10 +97,13 @@ class AnalyticsProductosRepository:
                 {
                     "fecha_inicio": fecha_inicio,
                     "fecha_fin": fecha_fin,
-                    "canal": canal,
-                    "tienda": tienda,
-                    "rubro": rubro,
-                    "familia": familia,
+                    "limit": limit,
+                    **self._filters_params(
+                        canal=canal,
+                        tienda=tienda,
+                        rubro=rubro,
+                        familia=familia,
+                    ),
                 },
             )
             .mappings()
@@ -111,7 +120,14 @@ class AnalyticsProductosRepository:
         familia: str | None = None,
         limit: int = 10,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(
+            canal=canal,
+            tienda=tienda,
+            rubro=rubro,
+            familia=familia,
+        )
+
+        sql = text(f"""
             SELECT
                 p.codigo AS producto,
                 p.descripcion,
@@ -130,10 +146,7 @@ class AnalyticsProductosRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
-            AND (:rubro IS NULL OR p.rubro = :rubro)
-            AND (:familia IS NULL OR p.familia = :familia)
+            {filters_sql}
             GROUP BY
                 p.codigo,
                 p.descripcion,
@@ -150,11 +163,13 @@ class AnalyticsProductosRepository:
                 {
                     "fecha_inicio": fecha_inicio,
                     "fecha_fin": fecha_fin,
-                    "canal": canal,
-                    "tienda": tienda,
-                    "rubro": rubro,
-                    "familia": familia,
                     "limit": limit,
+                    **self._filters_params(
+                        canal=canal,
+                        tienda=tienda,
+                        rubro=rubro,
+                        familia=familia,
+                    ),
                 },
             )
             .mappings()
@@ -171,7 +186,14 @@ class AnalyticsProductosRepository:
         familia: str | None = None,
         limit: int = 10,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(
+            canal=canal,
+            tienda=tienda,
+            rubro=rubro,
+            familia=familia,
+        )
+
+        sql = text(f"""
             SELECT
                 p.codigo AS producto,
                 p.descripcion,
@@ -190,10 +212,7 @@ class AnalyticsProductosRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
-            AND (:rubro IS NULL OR p.rubro = :rubro)
-            AND (:familia IS NULL OR p.familia = :familia)
+            {filters_sql}
             GROUP BY
                 p.codigo,
                 p.descripcion,
@@ -211,11 +230,13 @@ class AnalyticsProductosRepository:
                 {
                     "fecha_inicio": fecha_inicio,
                     "fecha_fin": fecha_fin,
-                    "canal": canal,
-                    "tienda": tienda,
-                    "rubro": rubro,
-                    "familia": familia,
                     "limit": limit,
+                    **self._filters_params(
+                        canal=canal,
+                        tienda=tienda,
+                        rubro=rubro,
+                        familia=familia,
+                    ),
                 },
             )
             .mappings()
@@ -229,7 +250,9 @@ class AnalyticsProductosRepository:
         canal: str | None = None,
         tienda: str | None = None,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(canal=canal, tienda=tienda)
+
+        sql = text(f"""
             SELECT
                 COALESCE(p.rubro, 'SIN RUBRO') AS categoria,
                 COALESCE(SUM(f.total), 0) AS venta_total,
@@ -244,8 +267,7 @@ class AnalyticsProductosRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
+            {filters_sql}
             GROUP BY COALESCE(p.rubro, 'SIN RUBRO')
             ORDER BY venta_total DESC
         """)
@@ -256,8 +278,7 @@ class AnalyticsProductosRepository:
                 {
                     "fecha_inicio": fecha_inicio,
                     "fecha_fin": fecha_fin,
-                    "canal": canal,
-                    "tienda": tienda,
+                    **self._filters_params(canal=canal, tienda=tienda),
                 },
             )
             .mappings()
@@ -272,7 +293,9 @@ class AnalyticsProductosRepository:
         tienda: str | None = None,
         rubro: str | None = None,
     ):
-        sql = text("""
+        filters_sql = self._filters_sql(canal=canal, tienda=tienda, rubro=rubro)
+
+        sql = text(f"""
             SELECT
                 COALESCE(p.familia, 'SIN FAMILIA') AS categoria,
                 COALESCE(SUM(f.total), 0) AS venta_total,
@@ -287,9 +310,7 @@ class AnalyticsProductosRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
-            AND (:canal IS NULL OR c.codigo = :canal)
-            AND (:tienda IS NULL OR t.codigo = :tienda)
-            AND (:rubro IS NULL OR p.rubro = :rubro)
+            {filters_sql}
             GROUP BY COALESCE(p.familia, 'SIN FAMILIA')
             ORDER BY venta_total DESC
         """)
@@ -300,15 +321,35 @@ class AnalyticsProductosRepository:
                 {
                     "fecha_inicio": fecha_inicio,
                     "fecha_fin": fecha_fin,
-                    "canal": canal,
-                    "tienda": tienda,
-                    "rubro": rubro,
+                    **self._filters_params(canal=canal, tienda=tienda, rubro=rubro),
                 },
             )
             .mappings()
             .all()
         )
     def get_filtros(self):
+        canales_sql = text("""
+            SELECT DISTINCT
+                c.codigo,
+                c.nombre
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_canal c
+                ON c.id = f.canal_id
+            WHERE c.activo = TRUE
+            ORDER BY c.nombre
+        """)
+
+        tiendas_sql = text("""
+            SELECT DISTINCT
+                t.codigo,
+                t.nombre
+            FROM coolbox.fact_ventas f
+            INNER JOIN coolbox.dim_tienda t
+                ON t.id = f.tienda_id
+            WHERE t.activo = TRUE
+            ORDER BY t.nombre
+        """)
+
         rubros_sql = text("""
             SELECT DISTINCT rubro AS valor
             FROM coolbox.dim_producto
@@ -342,8 +383,56 @@ class AnalyticsProductosRepository:
         """)
 
         return {
+            "canales": self.db.execute(canales_sql).mappings().all(),
+            "tiendas": self.db.execute(tiendas_sql).mappings().all(),
             "rubros": self.db.execute(rubros_sql).mappings().all(),
             "familias": self.db.execute(familias_sql).mappings().all(),
             "marcas": self.db.execute(marcas_sql).mappings().all(),
             "subfamilias": self.db.execute(subfamilias_sql).mappings().all(),
         }
+
+    def _filters_sql(
+        self,
+        canal: str | None = None,
+        tienda: str | None = None,
+        rubro: str | None = None,
+        familia: str | None = None,
+    ):
+        filters = []
+
+        if canal:
+            filters.append("AND c.codigo = :canal")
+
+        if tienda:
+            filters.append("AND t.codigo = :tienda")
+
+        if rubro:
+            filters.append("AND p.rubro = :rubro")
+
+        if familia:
+            filters.append("AND p.familia = :familia")
+
+        return "\n                ".join(filters)
+
+    def _filters_params(
+        self,
+        canal: str | None = None,
+        tienda: str | None = None,
+        rubro: str | None = None,
+        familia: str | None = None,
+    ):
+        params = {}
+
+        if canal:
+            params["canal"] = canal
+
+        if tienda:
+            params["tienda"] = tienda
+
+        if rubro:
+            params["rubro"] = rubro
+
+        if familia:
+            params["familia"] = familia
+
+        return params
