@@ -26,6 +26,12 @@ class AttachmentRepository:
             .all()
         )
 
+    def create(self, attachment: Attachment):
+        self.db.add(attachment)
+        self.db.commit()
+        self.db.refresh(attachment)
+        return attachment
+
     def update(self, attachment: Attachment, data: dict):
         for key, value in data.items():
             setattr(attachment, key, value)
@@ -37,3 +43,16 @@ class AttachmentRepository:
     def delete(self, attachment: Attachment):
         self.db.delete(attachment)
         self.db.commit()
+
+    def delete_by_entity(
+        self,
+        entity_type: str,
+        entity_id: UUID,
+    ):
+        attachments = self.get_by_entity(entity_type, entity_id)
+
+        for attachment in attachments:
+            self.db.delete(attachment)
+
+        self.db.commit()
+        return len(attachments)

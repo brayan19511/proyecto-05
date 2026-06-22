@@ -20,6 +20,13 @@ class RoleService:
     def get_role(self, role_id):
         return self.role_repository.get_role_by_id(role_id)
 
+    def get_role_permissions(self, role_id: int):
+        role = self.role_repository.get_role_by_id(role_id)
+        if not role:
+            raise ValueError(f"Role with ID {role_id} not found.")
+
+        return role.permissions
+
     def update_role(self, role_id, role_data: RoleRequest):
         role=self.role_repository.get_role_by_id(role_id)
         if not role:

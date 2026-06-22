@@ -4,10 +4,12 @@ from sqlalchemy import (
     Index,
     String,
     Boolean,
+    Numeric,
     Text,
 )
 from app.core.db.db_postgres import Base
 
+from decimal import Decimal
 from uuid import uuid4
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from uuid import UUID
@@ -53,6 +55,12 @@ class Currency(Base, AuditMixin):
     code: Mapped[str] = mapped_column(String(3), unique=True)
     name: Mapped[str] = mapped_column(String(50))
     symbol: Mapped[str] = mapped_column(String(10))
+    exchange_rate_to_base: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6),
+        default=Decimal("1"),
+        nullable=False,
+    )
+    is_base_currency: Mapped[bool] = mapped_column(Boolean, default=False)
 
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     

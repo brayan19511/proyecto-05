@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 
 from app.models.finance.provision_model import (
@@ -94,7 +94,10 @@ class ProvisionRepository:
         review_queue: bool = False,
     ):
 
-        query = self.db.query(Provision)
+        query = self.db.query(Provision).options(
+            selectinload(Provision.currency),
+            selectinload(Provision.documents).selectinload(ProvisionDocument.currency),
+        )
 
         if search:
             query = query.filter(
@@ -146,6 +149,13 @@ class ProvisionRepository:
 
         return (
             self.db.query(Provision)
+            .options(
+                selectinload(Provision.currency),
+                selectinload(Provision.documents).selectinload(
+                    ProvisionDocument.currency,
+                ),
+                selectinload(Provision.access_grants),
+            )
             .filter(Provision.id == provision_id)
             .first()
         )
@@ -189,6 +199,12 @@ class ProvisionRepository:
 
         return (
             self.db.query(ProvisionDocument)
+            .options(
+                selectinload(ProvisionDocument.currency),
+                selectinload(ProvisionDocument.provision).selectinload(
+                    Provision.currency,
+                ),
+            )
             .filter(ProvisionDocument.id == document_id)
             .first()
         )
@@ -206,6 +222,14 @@ class ProvisionRepository:
         document: ProvisionDocument,
     ):
 
+        (
+            self.db.query(Attachment)
+            .filter(
+                Attachment.entity_type == "provision_document",
+                Attachment.entity_id == document.id,
+            )
+            .delete(synchronize_session=False)
+        )
         self.db.delete(document)
         self.db.flush()
 

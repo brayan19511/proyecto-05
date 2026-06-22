@@ -1,4 +1,4 @@
-# app/api/master/master_service.py
+from decimal import Decimal
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -117,6 +117,18 @@ class MasterService:
     # ==========================================
     # CURRENCY
     # ==========================================
+    def _normalize_currency_data(self, data: dict):
+        if data.get("is_base_currency"):
+            data["exchange_rate_to_base"] = Decimal("1")
+
+        exchange_rate = data.get("exchange_rate_to_base")
+        if exchange_rate is not None and exchange_rate <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Currency exchange rate must be greater than zero",
+            )
+
+        return data
 
     def get_currencies(self, search: str | None = None):
         return self.repository.get_currencies(search)
@@ -138,7 +150,8 @@ class MasterService:
 
         try:
 
-            currency = Currency(**request.model_dump(), created_by=current_user_id)
+            data = self._normalize_currency_data(request.model_dump())
+            currency = Currency(**data, created_by=current_user_id)
 
             self.repository.create_currency(currency)
 
@@ -163,7 +176,9 @@ class MasterService:
         if not currency:
             raise HTTPException(status_code=404, detail="Currency not found")
 
-        for key, value in request.model_dump(exclude_unset=True).items():
+        data = self._normalize_currency_data(request.model_dump(exclude_unset=True))
+
+        for key, value in data.items():
             setattr(currency, key, value)
 
         currency.updated_by = current_user_id

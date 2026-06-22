@@ -1,6 +1,6 @@
 # provision_service.py
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -30,6 +30,8 @@ APPROVED_STATUS = "APPROVED"
 REJECTED_EDIT_STATUS = "REJECTED_FOR_EDIT"
 REJECTED_FINAL_STATUS = "REJECTED_FINAL"
 CANCELLED_STATUS = "CANCELLED"
+BASE_CURRENCY_CODE = "PEN"
+MONEY_QUANTIZER = Decimal("0.01")
 
 
 class ProvisionService:
@@ -163,7 +165,7 @@ class ProvisionService:
         self._create_document_attachments([request], [document], user_id)
         self.repository.commit()
 
-        return document
+        return self._document_response(document)
 
     def update_document(
         self,
@@ -190,7 +192,7 @@ class ProvisionService:
         self.repository.update_provision_document(document)
         self.repository.commit()
 
-        return document
+        return self._document_response(document)
 
     def delete_document(
         self,
@@ -240,6 +242,23 @@ class ProvisionService:
     # =====================================================
     # QUERIES
     # =====================================================
+    def get_document(
+        self,
+        document_id: UUID,
+        user_id: UUID,
+        can_view_all: bool = False,
+    ):
+        document = self._get_document_or_404(document_id)
+        provision = document.provision
+
+        if not can_view_all and not self._can_view(provision, user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes acceso a este documento",
+            )
+
+        return self._document_response(document)
+
     def get_provision(
         self,
         provision_id: UUID,
@@ -629,13 +648,62 @@ class ProvisionService:
         return self.to_detail_response(provision)
 
     def _actual_amount(self, provision: Provision) -> Decimal:
-        return sum(
-            (
-                document.amount or Decimal("0")
-                for document in provision.documents
-            ),
-            Decimal("0"),
+        actual_base = self._actual_amount_base(provision)
+        provision_rate = self._exchange_rate_to_base(provision.currency)
+
+        return self._money(actual_base / provision_rate)
+
+    def _expected_amount_base(self, provision: Provision) -> Decimal:
+        return self._money(
+            (provision.amount or Decimal("0"))
+            * self._exchange_rate_to_base(provision.currency)
         )
+
+    def _actual_amount_base(self, provision: Provision) -> Decimal:
+        return self._money(
+            sum(
+                (
+                    (document.amount or Decimal("0"))
+                    * self._exchange_rate_to_base(document.currency)
+                    for document in provision.documents
+                ),
+                Decimal("0"),
+            )
+        )
+
+    def _document_amount_base(self, document: ProvisionDocument) -> Decimal:
+        return self._money(
+            (document.amount or Decimal("0"))
+            * self._exchange_rate_to_base(document.currency)
+        )
+
+    def _exchange_rate_to_base(self, currency) -> Decimal:
+        if not currency or currency.exchange_rate_to_base is None:
+            return Decimal("1")
+
+        rate = Decimal(str(currency.exchange_rate_to_base))
+        if rate <= 0:
+            return Decimal("1")
+
+        return rate
+
+    def _money(self, value: Decimal) -> Decimal:
+        return Decimal(value).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
+
+    def _document_response(self, document: ProvisionDocument) -> dict:
+        return {
+            "id": document.id,
+            "document_type": document.document_type,
+            "document_number": document.document_number,
+            "document_date": document.document_date,
+            "description": document.description,
+            "supplier_tax_id": document.supplier_tax_id,
+            "supplier_name": document.supplier_name,
+            "amount": document.amount,
+            "currency_id": document.currency_id,
+            "exchange_rate_to_base": self._exchange_rate_to_base(document.currency),
+            "amount_base": self._document_amount_base(document),
+        }
 
     def _variance_status(
         self,
@@ -643,17 +711,20 @@ class ProvisionService:
         actual_amount: Decimal,
     ) -> str:
         if actual_amount > expected_amount:
-            return "EXCEEDED"
+            return "EXCEDENTE"
 
         if actual_amount < expected_amount:
-            return "LOWER"
+            return "INFERIOR"
 
-        return "MATCHED"
+        return "EXACTO"
 
     def to_summary_response(self, provision: Provision) -> dict:
-        expected_amount = provision.amount or Decimal("0")
+        expected_amount = self._money(provision.amount or Decimal("0"))
         actual_amount = self._actual_amount(provision)
         variance_amount = actual_amount - expected_amount
+        expected_amount_base = self._expected_amount_base(provision)
+        actual_amount_base = self._actual_amount_base(provision)
+        variance_amount_base = actual_amount_base - expected_amount_base
 
         return {
             "id": provision.id,
@@ -665,11 +736,19 @@ class ProvisionService:
             "concept_id": provision.concept_id,
             "area_id": provision.area_id,
             "currency_id": provision.currency_id,
+            "currency_code": provision.currency.code if provision.currency else None,
+            "base_currency_code": BASE_CURRENCY_CODE,
             "company_id": provision.company_id,
             "expected_amount": expected_amount,
             "actual_amount": actual_amount,
-            "variance_amount": variance_amount,
-            "variance_status": self._variance_status(expected_amount, actual_amount),
+            "variance_amount": self._money(variance_amount),
+            "expected_amount_base": expected_amount_base,
+            "actual_amount_base": actual_amount_base,
+            "variance_amount_base": self._money(variance_amount_base),
+            "variance_status": self._variance_status(
+                expected_amount_base,
+                actual_amount_base,
+            ),
             "provision_date": provision.provision_date,
             "observations": provision.observations,
             "submitted_at": provision.submitted_at,
@@ -679,7 +758,10 @@ class ProvisionService:
 
     def to_detail_response(self, provision: Provision) -> dict:
         data = self.to_summary_response(provision)
-        data["documents"] = provision.documents
+        data["documents"] = [
+            self._document_response(document)
+            for document in provision.documents
+        ]
         data["access"] = [
             access for access in provision.access_grants if access.active
         ]

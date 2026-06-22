@@ -8,6 +8,7 @@ from fastapi import (
     Depends,
     HTTPException,
     Query,
+    status,
 )
 from fastapi.responses import StreamingResponse
 
@@ -34,7 +35,6 @@ from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
 from app.core.security import (
     get_current_user,
-    PermissionChecker,
 )
 
 router = APIRouter(
@@ -74,6 +74,34 @@ def get_resumen_service(
     )
 
 
+def get_permission_codes(user) -> set[str]:
+    return {permission.code for permission in user.permissions}
+
+
+def get_role_names(user) -> set[str]:
+    return {
+        link.role.name
+        for link in user.user_roles_links
+        if link.active
+    }
+
+
+def require_any_permission(*permission_codes: str):
+    def checker(current_user=Depends(get_current_user)):
+        if "Admin" in get_role_names(current_user):
+            return current_user
+
+        if get_permission_codes(current_user).intersection(permission_codes):
+            return current_user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"No tienes permisos suficientes: {', '.join(permission_codes)}",
+        )
+
+    return checker
+
+
 # ==========================================================
 # SINCRONIZACION
 # ==========================================================
@@ -83,7 +111,7 @@ def get_resumen_service(
 def sync_libro_mayor(
     data: SyncRequest,
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(PermissionChecker("sap.execute")),
+    current_user=Depends(require_any_permission("ledger.sync", "sap.execute")),
 ):
     try:
         libro_mayor_service.user_id = str(current_user.id)
@@ -113,7 +141,7 @@ def sync_libro_mayor(
 def sync_delta_libro_mayor(
     data: SyncDeltaRequest,
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(PermissionChecker("sap.execute")),
+    current_user=Depends(require_any_permission("ledger.sync", "sap.execute")),
 ):
     try:
         libro_mayor_service.user_id = str(current_user.id)
@@ -142,7 +170,7 @@ def sync_delta_libro_mayor(
 @router.post("/sync-delta-all")
 def sync_delta_all(
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(PermissionChecker("sap.execute")),
+    current_user=Depends(require_any_permission("ledger.sync", "sap.execute")),
 ):
 
     try:
@@ -186,7 +214,7 @@ def sync_delta_all(
 def reprocess_rule(
     rule_id: int,
     libro_mayor_reprocess: LibroMayorReprocessService = Depends(get_reprocess_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.sync", "expenses.edit")),
 ):
     try:
 
@@ -213,7 +241,7 @@ def reprocess_rule(
 def reprocess_date_range(
     data: ReprocessDateRangeRequest,
     libro_mayor_reprocess: LibroMayorReprocessService = Depends(get_reprocess_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.sync", "expenses.edit")),
 ):
     try:
 
@@ -255,7 +283,7 @@ def get_libro_mayor(
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.view", "sap.read")),
 ):
     try:
 
@@ -290,7 +318,7 @@ def get_libro_mayor_sap(
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.view", "sap.read")),
 ):
     try:
 
@@ -326,7 +354,7 @@ def export_excel(
     end_date: date = Query(...),
     account: str = Query(...),
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.export", "ledger.view")),
 ):
     try:
 
@@ -390,7 +418,7 @@ def get_service_rule(db=Depends(get_db)):
 @router.get("/rule")
 def get_rules(
     account: str | None = Query(default=None),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("expenses.view", "ledger.view")),
     service: ReglasGastosService = Depends(get_service_rule),
 ):
     try:
@@ -407,7 +435,7 @@ def get_rules(
 @router.get("/rule/{rule_id}")
 def get_rule(
     rule_id: int,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("expenses.view", "ledger.view")),
     service: ReglasGastosService = Depends(get_service_rule),
 ):
     try:
@@ -424,7 +452,7 @@ def get_rule(
 @router.post("/rule")
 def create_rule(
     data: ReglaGastoCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("expenses.edit", "expenses.edit_all")),
     service: ReglasGastosService = Depends(get_service_rule),
 ):
     try:
@@ -445,7 +473,7 @@ def create_rule(
 def update_rule(
     rule_id: int,
     data: ReglaGastoUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("expenses.edit", "expenses.edit_all")),
     service: ReglasGastosService = Depends(get_service_rule),
 ):
     try:
@@ -466,7 +494,7 @@ def update_rule(
 @router.delete("/rule/{rule_id}")
 def delete_rule(
     rule_id: int,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("expenses.edit", "expenses.edit_all")),
     service: ReglasGastosService = Depends(get_service_rule),
 ):
     try:
@@ -491,7 +519,7 @@ def get_summary(
     start_date: date,
     end_date: date,
     account: str,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.view", "expenses.view")),
     service: LibroMayorResumenService = Depends(get_resumen_service),
 ):
 
@@ -516,7 +544,7 @@ def get_summary_detail(
     proveedor: str | None = None,
     anio: int | None = None,
     mes: int | None = None,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_any_permission("ledger.view", "expenses.view")),
     service: LibroMayorResumenService = Depends(get_resumen_service),
 ):
 

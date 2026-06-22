@@ -1,12 +1,11 @@
 # app/api/master/master_router.py
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.db.db_postgres import get_db
 
 from app.core.security import (
     get_current_user,
-    PermissionChecker,
 )
 
 from app.api.master.master_service import (
@@ -29,11 +28,41 @@ def get_master_service(db=Depends(get_db)) -> MasterService:
     return MasterService(db)
 
 
+def get_permission_codes(user) -> set[str]:
+    return {permission.code for permission in user.permissions}
+
+
+def get_role_names(user) -> set[str]:
+    return {
+        link.role.name
+        for link in user.user_roles_links
+        if link.active
+    }
+
+
+def require_any_permission(*permission_codes: str):
+    def checker(current_user=Depends(get_current_user)):
+        if "Admin" in get_role_names(current_user):
+            return current_user
+
+        if get_permission_codes(current_user).intersection(permission_codes):
+            return current_user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"No tienes permisos suficientes: {', '.join(permission_codes)}",
+        )
+
+    return checker
+
+
 @router.get("/company")
 def get_companies(
     search: str | None = None,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(
+        require_any_permission("master.company.view", "master.data.edit"),
+    ),
 ):
 
     return service.get_companies(search)
@@ -43,7 +72,9 @@ def get_companies(
 def get_company_by_id(
     company_id: int,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(
+        require_any_permission("master.company.view", "master.data.edit"),
+    ),
 ):
 
     return service.get_company_by_id(company_id)
@@ -53,7 +84,9 @@ def get_company_by_id(
 def create_company(
     request: CompanyCreateRequest,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.company.edit", "master.data.edit"),
+    ),
 ):
 
     return service.create_company(request, current_user.id)
@@ -64,7 +97,9 @@ def update_company(
     company_id: int,
     request: CompanyUpdateRequest,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.company.edit", "master.data.edit"),
+    ),
 ):
 
     return service.update_company(company_id, request, current_user.id)
@@ -74,7 +109,9 @@ def update_company(
 def delete_company(
     company_id: int,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.company.edit", "master.data.edit"),
+    ),
 ):
 
     return service.delete_company(company_id, current_user.id)
@@ -84,14 +121,20 @@ def delete_company(
 def get_currency(
     search: str | None = None,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(
+        require_any_permission("master.currency.view", "master.data.edit"),
+    ),
 ):
     return service.get_currencies(search)
 
 
 @router.get("/currency/{currency_id}")
 def get_currency_by_id(
-    currency_id: int, service: MasterService = Depends(get_master_service), current_user=Depends(get_current_user),
+    currency_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.currency.view", "master.data.edit"),
+    ),
 ):
     return service.get_currency_by_id(currency_id)
 
@@ -100,7 +143,9 @@ def get_currency_by_id(
 def create_currency(
     currency: CurrencyCreateRequest,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.currency.edit", "master.data.edit"),
+    ),
 ):
     return service.create_currency(currency, current_user.id)
 
@@ -112,7 +157,9 @@ def update_currency(
     currency_id: int,
     currency: CurrencyUpdateRequest,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.currency.edit", "master.data.edit"),
+    ),
 ):
     return service.update_currency(currency_id, currency, current_user.id)
 
@@ -121,7 +168,9 @@ def update_currency(
 def delete_currency(
     currency_id: int,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.currency.edit", "master.data.edit"),
+    ),
 ):
     return service.delete_currency(currency_id, current_user.id)
 
@@ -130,7 +179,9 @@ def delete_currency(
 def get_areas(
     search: str | None = None,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(
+        require_any_permission("master.area.view", "master.data.edit"),
+    ),
 ):
     return service.get_areas(search)
 
@@ -139,7 +190,9 @@ def get_areas(
 def get_area_by_id(
     area_id: int,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(get_current_user),
+    current_user=Depends(
+        require_any_permission("master.area.view", "master.data.edit"),
+    ),
 ):
     return service.get_area_by_id(area_id)
 
@@ -148,7 +201,9 @@ def get_area_by_id(
 def create_area(
     area: AreaCreateRequest,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.area.edit", "master.data.edit"),
+    ),
 ):
     return service.create_area(area, current_user.id)
 
@@ -158,7 +213,9 @@ def update_area(
     area_id: int,
     area: AreaUpdateRequest,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.area.edit", "master.data.edit"),
+    ),
 ):
     return service.update_area(area_id, area, current_user.id)
 
@@ -167,6 +224,8 @@ def update_area(
 def delete_area(
     area_id: int,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(PermissionChecker("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.area.edit", "master.data.edit"),
+    ),
 ):
     return service.delete_area(area_id, current_user.id)

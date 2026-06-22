@@ -60,6 +60,8 @@ class ProvisionDocumentResponse(BaseModel):
     supplier_name: str | None = None
     amount: Decimal
     currency_id: int
+    exchange_rate_to_base: Decimal | None = None
+    amount_base: Decimal | None = None
 
     model_config = {"from_attributes": True}
 
@@ -120,10 +122,15 @@ class ProvisionSummaryResponse(BaseModel):
     concept_id: int
     area_id: int
     currency_id: int
+    currency_code: str | None = None
+    base_currency_code: str = "PEN"
     company_id: int
     expected_amount: Decimal
     actual_amount: Decimal
     variance_amount: Decimal
+    expected_amount_base: Decimal
+    actual_amount_base: Decimal
+    variance_amount_base: Decimal
     variance_status: str
     provision_date: date
     observations: str | None = None

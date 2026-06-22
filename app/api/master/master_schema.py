@@ -1,8 +1,8 @@
 
-
+from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # Company Schemas
 class CompanyCreateRequest(BaseModel):
@@ -35,13 +35,18 @@ class CurrencyCreateRequest(BaseModel):
     code: str=Field(..., max_length=3) 
     name: str=Field(..., max_length=50)
     symbol: str=Field(..., max_length=10)
+    exchange_rate_to_base: Decimal = Decimal("1")
+    is_base_currency: bool = False
     active: Optional[bool] = True
 
 class CurrencyUpdateRequest(BaseModel):
     code: Optional[str] = None
     name: Optional[str] = None
     symbol: Optional[str] = None
+    exchange_rate_to_base: Optional[Decimal] = None
+    is_base_currency: Optional[bool] = None
     active: Optional[bool] = None
 
 class CurrencyResponse(CurrencyCreateRequest):
     id: int
+    model_config = ConfigDict(from_attributes=True)

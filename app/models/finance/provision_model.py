@@ -156,6 +156,8 @@ class Provision(Base, AuditMixin):
 
     status: Mapped["ProvisionStatus"] = relationship(back_populates="provisions")
 
+    currency: Mapped["Currency"] = relationship()
+
     documents: Mapped[list["ProvisionDocument"]] = relationship(
         back_populates="provision", cascade="all, delete-orphan"
     )
@@ -208,6 +210,7 @@ class ProvisionDocument(Base, AuditMixin):
 
     # Relaciones
     provision: Mapped["Provision"] = relationship(back_populates="documents")
+    currency: Mapped["Currency"] = relationship()
 
 
 # =========================================================

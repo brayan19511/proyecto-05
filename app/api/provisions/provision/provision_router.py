@@ -84,6 +84,7 @@ def require_provision_edit(current_user=Depends(get_current_user)):
         {
             "provisions.edit",
             "provisions.edit_all",
+            "provisions.documents.edit",
         }
     ):
         return current_user
@@ -91,6 +92,24 @@ def require_provision_edit(current_user=Depends(get_current_user)):
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="No tienes permisos para editar provisiones",
+    )
+
+
+def require_provision_access_edit(current_user=Depends(get_current_user)):
+    permissions = get_permission_codes(current_user)
+
+    if is_admin(current_user) or permissions.intersection(
+        {
+            "provisions.edit",
+            "provisions.edit_all",
+            "provisions.access.edit",
+        }
+    ):
+        return current_user
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="No tienes permisos para administrar accesos de provisiones",
     )
 
 
@@ -136,6 +155,19 @@ def get_review_queue(
     return service.get_review_queue(
         area_id=area_id,
         company_id=company_id,
+    )
+
+
+@router.get("/documents/{document_id}", response_model=ProvisionDocumentResponse)
+def get_document(
+    document_id: UUID,
+    service: ProvisionService = Depends(get_service),
+    current_user=Depends(require_provision_view),
+):
+    return service.get_document(
+        document_id=document_id,
+        user_id=current_user.id,
+        can_view_all=can_view_all_provisions(current_user),
     )
 
 
@@ -219,7 +251,7 @@ def grant_access(
     provision_id: UUID,
     request: ProvisionAccessRequest,
     service: ProvisionService = Depends(get_service),
-    current_user=Depends(require_provision_edit),
+    current_user=Depends(require_provision_access_edit),
 ):
     access = service.grant_access(
         provision_id=provision_id,

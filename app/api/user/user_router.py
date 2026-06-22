@@ -15,7 +15,31 @@ from app.core.security import get_current_user
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def can_manage_users(current_user) -> bool:
+def get_role_names(current_user) -> set[str]:
+    return {
+        link.role.name
+        for link in current_user.user_roles_links
+        if link.active
+    }
+
+
+def get_permission_codes(current_user) -> set[str]:
+    return {permission.code for permission in current_user.permissions}
+
+
+def can_view_users(current_user) -> bool:
+    roles = get_role_names(current_user)
+    permissions = get_permission_codes(current_user)
+
+    return (
+        "Admin" in roles
+        or "security.roles.edit" in permissions
+        or "security.users.view" in permissions
+        or "security.users.edit" in permissions
+    )
+
+
+def can_edit_users(current_user) -> bool:
     roles = {
         link.role.name
         for link in current_user.user_roles_links
@@ -26,15 +50,23 @@ def can_manage_users(current_user) -> bool:
     return (
         "Admin" in roles
         or "security.roles.edit" in permissions
-        or "security.users.view" in permissions
+        or "security.users.edit" in permissions
     )
 
 
-def ensure_self_or_user_admin(user_id: UUID, current_user):
+def ensure_self_or_user_admin(
+    user_id: UUID,
+    current_user,
+    *,
+    write: bool = False,
+):
     if user_id == current_user.id:
         return
 
-    if can_manage_users(current_user):
+    if write and can_edit_users(current_user):
+        return
+
+    if not write and can_view_users(current_user):
         return
 
     raise HTTPException(
@@ -51,7 +83,7 @@ async def get_users(
     db=Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    if not can_manage_users(current_user):
+    if not can_view_users(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos para listar usuarios",
@@ -103,7 +135,7 @@ async def create_user(
     db=Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    ensure_self_or_user_admin(user_id, current_user)
+    ensure_self_or_user_admin(user_id, current_user, write=True)
 
     user_service = UserService(db)
     return user_service.create_user_profile(user_id, user_create)
@@ -116,7 +148,7 @@ async def update_user(
     db=Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    ensure_self_or_user_admin(user_id, current_user)
+    ensure_self_or_user_admin(user_id, current_user, write=True)
 
     user_service = UserService(db)
     return user_service.update_profile(user_id, user_update)
