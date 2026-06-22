@@ -1,10 +1,11 @@
 # app\api\libro_mayor\repository\libro_mayor_repository.py
+from calendar import monthrange
 from datetime import date
 import math
 import numpy as np
 import pandas as pd
 
-from sqlalchemy import extract, func
+from sqlalchemy import extract, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,35 @@ from app.models.finance.libro_mayor_model import (
 class LibroMayorRepository:
 
     BATCH_SIZE = 5000
+    EXPORT_COLUMNS = [
+        "tiene_regla",
+        "id_regla",
+        "nombre_cuenta",
+        "codigo",
+        "subcodigo",
+        "fecha_contabilizacion",
+        "fecha_documento",
+        "numero_documento",
+        "transaccion_id",
+        "folio",
+        "tipo_documento",
+        "linea",
+        "cuenta_asociada",
+        "nombre_cuenta_asociada",
+        "proveedor",
+        "descripcion",
+        "comentario_linea",
+        "cuenta_contrapartida",
+        "nombre_contrapartida",
+        "referencia_1",
+        "referencia_2",
+        "referencia_3",
+        "cargo_abono_ml",
+        "cargo_abono_me",
+        "centro_costo",
+        "centro_area",
+        "nombre_area",
+    ]
 
     def __init__(self, db: Session):
         self.db = db
@@ -115,6 +145,35 @@ class LibroMayorRepository:
             )
             .all()
         )
+
+    def get_export_rows_by_account(
+        self,
+        start_date: date,
+        end_date: date,
+        account: str,
+    ):
+        columns = [getattr(LibroMayor, column) for column in self.EXPORT_COLUMNS]
+
+        stmt = (
+            select(
+                *columns,
+                extract("year", LibroMayor.fecha_contabilizacion).label("anio"),
+                extract("month", LibroMayor.fecha_contabilizacion).label("mes"),
+            )
+            .where(
+                LibroMayor.fecha_contabilizacion.between(
+                    start_date,
+                    end_date,
+                ),
+                LibroMayor.tipo_cuenta == account,
+            )
+            .order_by(
+                LibroMayor.fecha_contabilizacion.asc(),
+                LibroMayor.numero_documento.asc(),
+            )
+        )
+
+        return self.db.execute(stmt).mappings().all()
 
     def get_last_libro_mayor(
         self,
@@ -390,7 +449,7 @@ class LibroMayorRepository:
             "cuenta_asociada",
             "nombre_cuenta_asociada",
             "proveedor",
-            "descripción",
+            "descripcion",
             "comentario_linea",
             "cuenta_contrapartida",
             "nombre_contrapartida",
@@ -426,7 +485,7 @@ class LibroMayorRepository:
                 "cuenta_asociada": "Cuenta Asociada",
                 "nombre_cuenta_asociada": "Nombre Cuenta Asociada",
                 "proveedor": "Proveedor",
-                "descripción": "Descripción",
+                "descripcion": "Descripcion",
                 "comentario_linea": "Comentario Linea",
                 "cuenta_contrapartida": "Cuenta Contrapartida",
                 "nombre_contrapartida": "Nombre Contrapartida",
@@ -442,6 +501,118 @@ class LibroMayorRepository:
         )
 
         return df
+
+    def to_export_dataframe_from_rows(
+        self,
+        rows,
+    ) -> pd.DataFrame:
+        if not rows:
+            return pd.DataFrame()
+
+        df = pd.DataFrame([dict(row) for row in rows])
+
+        meses = {
+            1: "Enero",
+            2: "Febrero",
+            3: "Marzo",
+            4: "Abril",
+            5: "Mayo",
+            6: "Junio",
+            7: "Julio",
+            8: "Agosto",
+            9: "Septiembre",
+            10: "Octubre",
+            11: "Noviembre",
+            12: "Diciembre",
+        }
+
+        df["anio"] = df["anio"].astype(int)
+        df["mes"] = df["mes"].astype(int)
+        df["nmes"] = df["mes"].map(meses)
+
+        column_order = [
+            "tiene_regla",
+            "id_regla",
+            "nombre_cuenta",
+            "codigo",
+            "subcodigo",
+            "anio",
+            "mes",
+            "nmes",
+            "fecha_contabilizacion",
+            "fecha_documento",
+            "numero_documento",
+            "transaccion_id",
+            "folio",
+            "tipo_documento",
+            "linea",
+            "cuenta_asociada",
+            "nombre_cuenta_asociada",
+            "proveedor",
+            "descripcion",
+            "comentario_linea",
+            "cuenta_contrapartida",
+            "nombre_contrapartida",
+            "referencia_1",
+            "referencia_2",
+            "referencia_3",
+            "cargo_abono_ml",
+            "cargo_abono_me",
+            "centro_costo",
+            "centro_area",
+            "nombre_area",
+        ]
+
+        df = df.reindex(columns=[c for c in column_order if c in df.columns])
+
+        return df.rename(
+            columns={
+                "tiene_regla": "Tiene Regla",
+                "id_regla": "Id Regla",
+                "nombre_cuenta": "Nombre de Cuenta",
+                "codigo": "Codigo",
+                "subcodigo": "Subcodigo",
+                "anio": "Anio",
+                "mes": "Mes",
+                "nmes": "Mes Nombre",
+                "fecha_contabilizacion": "Fecha Contabilizacion",
+                "fecha_documento": "Fecha Documento",
+                "numero_documento": "Numero documento",
+                "transaccion_id": "Transaccion Id",
+                "folio": "Folio",
+                "tipo_documento": "Tipo Documento",
+                "linea": "Linea",
+                "cuenta_asociada": "Cuenta Asociada",
+                "nombre_cuenta_asociada": "Nombre Cuenta Asociada",
+                "proveedor": "Proveedor",
+                "descripcion": "Descripcion",
+                "comentario_linea": "Comentario Linea",
+                "cuenta_contrapartida": "Cuenta Contrapartida",
+                "nombre_contrapartida": "Nombre Contrapartida",
+                "referencia_1": "Referencia 1",
+                "referencia_2": "Referencia 2",
+                "referencia_3": "Referencia 3",
+                "cargo_abono_ml": "Importe Soles",
+                "cargo_abono_me": "Importe Dolares",
+                "centro_costo": "Centro Costo",
+                "centro_area": "Centro Area",
+                "nombre_area": "Nombre Area",
+            }
+        )
+
+    def export_dataframe_by_account(
+        self,
+        start_date: date,
+        end_date: date,
+        account: str,
+    ) -> pd.DataFrame:
+        rows = self.get_export_rows_by_account(
+            start_date=start_date,
+            end_date=end_date,
+            account=account,
+        )
+
+        return self.to_export_dataframe_from_rows(rows)
 
     # =====================================================
     # DATAFRAME
@@ -512,6 +683,12 @@ class LibroMayorRepository:
         mes: int | None = None,
     ):
 
+        if anio and mes:
+            month_start = date(anio, mes, 1)
+            month_end = date(anio, mes, monthrange(anio, mes)[1])
+            start_date = max(start_date, month_start)
+            end_date = min(end_date, month_end)
+
         query = self.db.query(LibroMayor).filter(
             LibroMayor.tipo_cuenta == account,
             LibroMayor.fecha_contabilizacion.between(
@@ -529,7 +706,7 @@ class LibroMayorRepository:
         if proveedor:
             query = query.filter(LibroMayor.proveedor == proveedor)
             
-        if anio:
+        if anio and not mes:
             query = query.filter(
                 extract(
                     "year",
@@ -537,7 +714,7 @@ class LibroMayorRepository:
                 ) == anio
             )
 
-        if mes:
+        if mes and not anio:
             query = query.filter(
                 extract(
                     "month",

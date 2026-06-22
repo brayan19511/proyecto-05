@@ -96,6 +96,8 @@ class Provision(Base, AuditMixin):
     __table_args__ = (
         UniqueConstraint("company_id", "ticket_code"),
         Index("ix_provision_company_status", "company_id", "status_id"),
+        Index("ix_provision_area_status", "area_id", "status_id"),
+        Index("ix_provision_created_by", "created_by"),
         {"schema": "finance"},
     )
 
@@ -103,6 +105,9 @@ class Provision(Base, AuditMixin):
 
     ticket_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    supplier_tax_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     
     status_id: Mapped[int] = mapped_column(
         ForeignKey("finance.provision_statuses.id"), nullable=False, index=True
@@ -126,6 +131,15 @@ class Provision(Base, AuditMixin):
     provision_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     observations: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("security.auth.id"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Estado actual SAP
     sap_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -154,6 +168,10 @@ class Provision(Base, AuditMixin):
         back_populates="provision", cascade="all, delete-orphan"
     )
 
+    access_grants: Mapped[list["ProvisionAccess"]] = relationship(
+        back_populates="provision", cascade="all, delete-orphan"
+    )
+
 
 # =========================================================
 # PROVISION DOCUMENT
@@ -176,6 +194,8 @@ class ProvisionDocument(Base, AuditMixin):
 
     document_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     document_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    document_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     supplier_tax_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
     supplier_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -188,6 +208,37 @@ class ProvisionDocument(Base, AuditMixin):
 
     # Relaciones
     provision: Mapped["Provision"] = relationship(back_populates="documents")
+
+
+# =========================================================
+# PROVISION ACCESS
+# =========================================================
+
+
+class ProvisionAccess(Base, AuditMixin):
+    __tablename__ = "provision_access"
+
+    __table_args__ = (
+        UniqueConstraint("provision_id", "user_id", name="uq_provision_access_user"),
+        Index("ix_provision_access_user", "user_id"),
+        {"schema": "finance"},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    provision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("finance.provisions.id"), nullable=False
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("security.auth.id"), nullable=False
+    )
+
+    access_type: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    provision: Mapped["Provision"] = relationship(back_populates="access_grants")
 
 
 # =========================================================
@@ -213,7 +264,7 @@ class ProvisionStatusHistory(Base, AuditMixin):
         ForeignKey("finance.provision_statuses.id"), nullable=False
     )
 
-    changed_by_user_id: Mapped[int | None] = mapped_column(
+    changed_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("security.auth.id"), nullable=True
     )
 

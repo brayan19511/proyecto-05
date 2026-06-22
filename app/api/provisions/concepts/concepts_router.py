@@ -18,7 +18,7 @@ router = APIRouter(
 async def get_concepts(
     search: str | None = None,
     db=Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(PermissionChecker("provisions.concepts.view")),
 ):
     concepts_service = ConceptsService(db)
     return concepts_service.get_concepts(search=search)
@@ -38,7 +38,7 @@ async def create_concept(
 async def get_concept(
     concept_id: int,
     db=Depends(get_db),
-    current_user=Depends(PermissionChecker("provisions.concepts.edit")),
+    current_user=Depends(PermissionChecker("provisions.concepts.view")),
 ):
     concepts_service = ConceptsService(db)
     return concepts_service.get_concept_by_id(concept_id)

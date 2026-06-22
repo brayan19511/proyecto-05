@@ -34,6 +34,7 @@ from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
 from app.core.security import (
     get_current_user,
+    PermissionChecker,
 )
 
 router = APIRouter(
@@ -82,8 +83,10 @@ def get_resumen_service(
 def sync_libro_mayor(
     data: SyncRequest,
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    current_user=Depends(PermissionChecker("sap.execute")),
 ):
     try:
+        libro_mayor_service.user_id = str(current_user.id)
 
         return libro_mayor_service.sync(
             start_date=data.start_date,
@@ -98,11 +101,11 @@ def sync_libro_mayor(
             detail=str(ve),
         )
 
-    except Exception as e:
+    except Exception:
 
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="Error sincronizando libro mayor",
         )
 
 
@@ -110,8 +113,10 @@ def sync_libro_mayor(
 def sync_delta_libro_mayor(
     data: SyncDeltaRequest,
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    current_user=Depends(PermissionChecker("sap.execute")),
 ):
     try:
+        libro_mayor_service.user_id = str(current_user.id)
 
         return libro_mayor_service.sync_delta(
             start_date=data.start_date,
@@ -126,20 +131,22 @@ def sync_delta_libro_mayor(
             detail=str(ve),
         )
 
-    except Exception as e:
+    except Exception:
 
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="Error sincronizando delta de libro mayor",
         )
 
 
 @router.post("/sync-delta-all")
 def sync_delta_all(
     libro_mayor_service: LibroMayorService = Depends(get_libro_mayor_service),
+    current_user=Depends(PermissionChecker("sap.execute")),
 ):
 
     try:
+        libro_mayor_service.user_id = str(current_user.id)
 
         resultados = []
 
@@ -162,11 +169,11 @@ def sync_delta_all(
             detail=str(ve),
         )
 
-    except Exception as e:
+    except Exception:
 
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="Error sincronizando delta de libro mayor",
         )
 
 

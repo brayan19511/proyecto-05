@@ -31,6 +31,13 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALG: ${JWT_ALG}
       JWT_EXPIRES_MIN: ${JWT_EXPIRES_MIN}
+      DB_SAP_USER: ${DB_SAP_USER}
+      DB_SAP_PASSWORD: ${DB_SAP_PASSWORD}
+      DB_SAP_HOST: ${DB_SAP_HOST}
+      DB_SAP_PORT: ${DB_SAP_PORT}
+      SAP_URL: ${SAP_URL}
+      ENV: ${ENV}
+      PROJECT_NAME: ${PROJECT_NAME}
     ports:
       - "${API_PORT}:8000"
     depends_on:

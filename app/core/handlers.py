@@ -2,6 +2,7 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.exceptions import (
     NotFoundError,
     ValidationError,
@@ -27,26 +28,15 @@ def register_exception_handlers(app):
     async def unhandled_exception_handler(request: Request, exc: Exception):
         trace_id = getattr(request.state, "trace_id", None)
 
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": "Error interno del servidor",
-                "trace_id": trace_id,
-            },
-        )
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception):
-        trace_id = getattr(request.state, "trace_id", None)
-        # con ub if debug DEBUG = os.getenv("ENV", "dev") == "dev"
-        # if DEBUG:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "detail": str(exc),
-                "type": type(exc).__name__,
-                "trace_id": trace_id,
-            },
-        )
+        if settings.ENV == "dev":
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "detail": str(exc),
+                    "type": type(exc).__name__,
+                    "trace_id": trace_id,
+                },
+            )
 
         return JSONResponse(
             status_code=500,

@@ -15,7 +15,7 @@ async def seed(db:Session=Depends(get_db)):
         return result
 
     except Exception as e:
-        return HTTPException(status_code=500, detail={"message": "Verification failed", "error": str(e)})   
+        raise HTTPException(status_code=500, detail={"message": "Verification failed", "error": str(e)})
     
 @router.get("/debug-ip")
 def debug_ip(request: Request):

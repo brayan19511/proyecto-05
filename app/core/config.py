@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # 3. Propiedad de Python pura (Sin computed_field para evitar el AttributeError)
     @property
-    def ASYNC_DATABASE_URL(self) -> str:
+    def DATABASE_URL_POSTGRES(self) -> str:
         # Si ya tenemos la URL completa (Caso Nube)
         if self.DATABASE_URL:
             # Corregir prefijo de Render/Heroku si es necesario
@@ -52,6 +52,10 @@ class Settings(BaseSettings):
 
         # Caso Local: Construcción manual
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        return self.DATABASE_URL_POSTGRES
 
     model_config = SettingsConfigDict(
         env_file=".env",

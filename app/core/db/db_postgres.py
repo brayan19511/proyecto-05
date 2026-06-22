@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
 from app.core.config import settings
 
 # Usamos la URL calculada de nuestros settings
-engine = create_engine(settings.ASYNC_DATABASE_URL, echo=False)
+engine = create_engine(settings.DATABASE_URL_POSTGRES, echo=False)
 
 SessionLocal = sessionmaker(
     bind=engine, 

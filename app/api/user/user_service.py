@@ -11,8 +11,17 @@ from .user_schemas import UserProfileUpdate
 class UserService:
     def __init__(self, db: Session):
         self.repository = UserRepository(db)
-    def get_users(self):
-        return self.repository.get_users()
+    def get_users(
+        self,
+        search: str | None = None,
+        email: str | None = None,
+        active: bool | None = None,
+    ):
+        return self.repository.get_users(
+            search=search,
+            email=email,
+            active=active,
+        )
     def get_user_profile(self, user_id: UUID):
         profile = self.repository.get_profile_by_id(user_id)
         if not profile:
@@ -23,7 +32,10 @@ class UserService:
         if self.repository.get_profile_by_id(user_id):
             raise HTTPException(status_code=400, detail="El usuario ya tiene un perfil creado")
         if data.document_number:
-            if self.repository.exists_by_document(data.document_type, data.document_number):
+            if self.repository.exists_by_document(
+                data.document_type,
+                data.document_number,
+            ):
                 raise HTTPException(status_code=400, detail="Documento ya registrado en otro perfil")
             
         new_profile = Information(
@@ -41,7 +53,11 @@ class UserService:
                         )
             return self.repository.add_profile(new_profile)
         if data.document_number and data.document_number != profile.document_number:
-            if self.repository.exists_by_document(data.document_type, data.document_number):
+            if self.repository.exists_by_document(
+                data.document_type,
+                data.document_number,
+                exclude_user_id=user_id,
+            ):
                 raise HTTPException(status_code=400, detail="Documento ya registrado en otro perfil")
         # Convertimos el schema a dict excluyendo lo que no se envió
         try:

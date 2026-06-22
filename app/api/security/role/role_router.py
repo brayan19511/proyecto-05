@@ -47,5 +47,21 @@ async def assign_role_to_user(role_request: AssingnRoleToUserRequest, db: Sessio
     - **role_id**: The ID of the role to be assigned.
     """
     role_service = RoleService(db)
-    role_service.assign_role_to_user(role_request.user_id, role_request.role_id)
-    return {"message": f"Role with ID {role_request.role_id} assigned to user with ID {role_request.user_id}."}
+    return role_service.assign_role_to_user(role_request.user_id, role_request.role_id)
+
+
+@router.delete("/assign-role")
+async def remove_role_from_user(
+    role_request: AssingnRoleToUserRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(PermissionChecker("security.roles.edit")),
+):
+    role_service = RoleService(db)
+
+    try:
+        return role_service.remove_role_from_user(
+            role_request.user_id,
+            role_request.role_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

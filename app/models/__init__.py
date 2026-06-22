@@ -2,7 +2,7 @@
 from app.core.db.db_postgres import Base # Importas tu Base
 from .auth import Auth, Role, UserRole, Information, Permission, RolePermission
 from .audit import AuditLog, AuditLogDetail, AuditStep
-from .finance import Provision, ProvisionConcept, ProvisionDocument, ProvisionStatus
+from .finance import Provision, ProvisionAccess, ProvisionConcept, ProvisionDocument, ProvisionStatus
 from .finance import LibroMayor, ReglasGastos
 from .master import Currency, Area, Attachment
 from .tickets import Tickets
@@ -11,7 +11,7 @@ __all__ = [
     "Base", 
     "Auth", "Role", "UserRole", "Information",
     "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission" , 
-    "Provision", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus", "Currency", "Area", "Attachment",
+    "Provision", "ProvisionAccess", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus", "Currency", "Area", "Attachment",
     "LibroMayor", "ReglasGastos",
     "Tickets"
     ]

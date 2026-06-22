@@ -1,67 +1,137 @@
 # app/api/provisions/provision/provision_schema.py
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
-from pydantic import BaseModel
 from uuid import UUID
 
+from pydantic import BaseModel, Field
 
-# Status Provision
+
 class ProvisionStatusReq(BaseModel):
     code: str
     name: str | None = None
     active: bool | None = None
 
+
 class ProvisionStatusResponse(ProvisionStatusReq):
     id: int
-# Attachment
+
+
 class AttachmentRequest(BaseModel):
-    entity_type: str
+    entity_type: str | None = None
     file_name: str
     file_extension: str
     mime_type: str
-
     storage_type: str | None = None
     file_size: int | None = None
-
     file_path: str | None = None
     file_base64: str | None = None
 
-# Provision Document
 
 class ProvisionDocumentRequest(BaseModel):
-    provision_id: UUID
     document_type: str | None = None
     document_number: str | None = None
-
+    document_date: date | None = None
+    description: str | None = None
     supplier_tax_id: str | None = None
     supplier_name: str | None = None
-
     amount: Decimal
     currency_id: int
-    attachments: list[AttachmentRequest] = []
-    
-class ProvisionDocumentResponse(ProvisionDocumentRequest):
+    attachments: list[AttachmentRequest] = Field(default_factory=list)
+
+
+class ProvisionDocumentUpdateRequest(BaseModel):
+    document_type: str | None = None
+    document_number: str | None = None
+    document_date: date | None = None
+    description: str | None = None
+    supplier_tax_id: str | None = None
+    supplier_name: str | None = None
+    amount: Decimal | None = None
+    currency_id: int | None = None
+
+
+class ProvisionDocumentResponse(BaseModel):
+    id: UUID
+    document_type: str | None = None
+    document_number: str | None = None
+    document_date: date | None = None
+    description: str | None = None
+    supplier_tax_id: str | None = None
+    supplier_name: str | None = None
+    amount: Decimal
+    currency_id: int
+
+    model_config = {"from_attributes": True}
+
+
+class ProvisionAccessRequest(BaseModel):
+    user_id: UUID
+    access_type: str = "viewer"
+
+
+class ProvisionAccessResponse(BaseModel):
     id: int
+    user_id: UUID
+    access_type: str
+    active: bool
+
+    model_config = {"from_attributes": True}
 
 
-# Provision
 class ProvisionCreateRequest(BaseModel):
     ticket_code: str
     description: str | None = None
-
+    supplier_tax_id: str | None = None
+    supplier_name: str | None = None
     concept_id: int
-    status_id: int
     area_id: int
     currency_id: int
     company_id: int
-
     amount: Decimal
     provision_date: date
-
     observations: str | None = None
-    
-    documents: list[ProvisionDocumentRequest] = []
+    access: list[ProvisionAccessRequest] = Field(default_factory=list)
+    documents: list[ProvisionDocumentRequest] = Field(default_factory=list)
 
-class ProvisionResponse(ProvisionCreateRequest):
+
+class ProvisionUpdateRequest(BaseModel):
+    description: str | None = None
+    supplier_tax_id: str | None = None
+    supplier_name: str | None = None
+    concept_id: int | None = None
+    area_id: int | None = None
+    currency_id: int | None = None
+    amount: Decimal | None = None
+    provision_date: date | None = None
+    observations: str | None = None
+
+
+class ProvisionActionRequest(BaseModel):
+    comments: str | None = None
+
+
+class ProvisionSummaryResponse(BaseModel):
     id: UUID
+    ticket_code: str
+    description: str | None = None
+    supplier_tax_id: str | None = None
+    supplier_name: str | None = None
+    status_id: int
+    concept_id: int
+    area_id: int
+    currency_id: int
+    company_id: int
+    expected_amount: Decimal
+    actual_amount: Decimal
+    variance_amount: Decimal
+    variance_status: str
+    provision_date: date
+    observations: str | None = None
+    submitted_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    closed_at: datetime | None = None
 
+
+class ProvisionDetailResponse(ProvisionSummaryResponse):
+    documents: list[ProvisionDocumentResponse] = Field(default_factory=list)
+    access: list[ProvisionAccessResponse] = Field(default_factory=list)

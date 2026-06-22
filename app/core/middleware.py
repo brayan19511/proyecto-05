@@ -13,6 +13,62 @@ from app.core.audit_utils import audit_steps_context
 from app.services.audit.audit_service import AuditService
 
 
+SENSITIVE_HEADER_KEYS = {
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "x-api-key",
+}
+
+SENSITIVE_BODY_KEYS = {
+    "password",
+    "token",
+    "access_token",
+    "refresh_token",
+    "secret",
+    "api_key",
+}
+
+FILE_CONTENT_KEYS = {
+    "file_base64",
+    "base64",
+    "content_base64",
+    "file_content",
+}
+
+
+def sanitize_headers(headers: dict) -> dict:
+    return {
+        key: ("[REDACTED]" if key.lower() in SENSITIVE_HEADER_KEYS else value)
+        for key, value in headers.items()
+    }
+
+
+def sanitize_payload(value):
+    if isinstance(value, dict):
+        sanitized = {}
+
+        for key, item in value.items():
+            normalized_key = key.lower()
+
+            if normalized_key in FILE_CONTENT_KEYS:
+                sanitized[key] = "[FILE_CONTENT_OMITTED]"
+                continue
+
+            if normalized_key in SENSITIVE_BODY_KEYS:
+                sanitized[key] = "[REDACTED]"
+                continue
+
+            sanitized[key] = sanitize_payload(item)
+
+        return sanitized
+
+    if isinstance(value, list):
+        return [sanitize_payload(item) for item in value]
+
+    return value
+
+
 class AuditMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
@@ -56,6 +112,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body_bytes = await get_request_body(request)
 
                 req_body = json.loads(body_bytes) if body_bytes else None
+                req_body = sanitize_payload(req_body)
 
             except Exception:
                 req_body = {"error": "Could not parse body"}
@@ -148,6 +205,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
             try:
                 response_body = json.loads(response_body_bytes[0].decode())
+                response_body = sanitize_payload(response_body)
             except Exception:
                 response_body = {"info": "Body no serializable"}
 
@@ -185,7 +243,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 "user_id": getattr(request.state, "user_id", None),
             },
             {
-                "request_headers": dict(request.headers),
+                "request_headers": sanitize_headers(dict(request.headers)),
                 "query_params": query_params,
                 "request_body": req_body,
                 "response_body": response_body,
@@ -200,6 +258,3 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response.background = background_tasks
 
         return response
-
-
-    

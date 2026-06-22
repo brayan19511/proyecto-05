@@ -206,10 +206,8 @@ class LibroMayorService:
         account: str,
     ):
 
-        registros = self.libro_mayor_repository.get_libro_mayor_by_account(
-            start_date,
-            end_date,
-            account,
+        return self.libro_mayor_repository.export_dataframe_by_account(
+            start_date=start_date,
+            end_date=end_date,
+            account=account,
         )
-
-        return self.libro_mayor_repository.to_export_dataframe(registros)

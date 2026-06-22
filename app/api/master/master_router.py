@@ -14,6 +14,8 @@ from app.api.master.master_service import (
 )
 
 from app.api.master.master_schema import (
+    AreaCreateRequest,
+    AreaUpdateRequest,
     CompanyCreateRequest,
     CompanyUpdateRequest,
     CurrencyCreateRequest,
@@ -106,7 +108,7 @@ def create_currency(
 @router.put(
     "/currency/{currency_id}",
 )
-def get_currency_by_id(
+def update_currency(
     currency_id: int,
     currency: CurrencyUpdateRequest,
     service: MasterService = Depends(get_master_service),
@@ -116,9 +118,55 @@ def get_currency_by_id(
 
 
 @router.delete("/currency/{currency_id}")
-def get_currency_by_id(
+def delete_currency(
     currency_id: int,
     service: MasterService = Depends(get_master_service),
     current_user=Depends(PermissionChecker("master.data.edit")),
 ):
     return service.delete_currency(currency_id, current_user.id)
+
+
+@router.get("/area")
+def get_areas(
+    search: str | None = None,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(get_current_user),
+):
+    return service.get_areas(search)
+
+
+@router.get("/area/{area_id}")
+def get_area_by_id(
+    area_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(get_current_user),
+):
+    return service.get_area_by_id(area_id)
+
+
+@router.post("/area")
+def create_area(
+    area: AreaCreateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(PermissionChecker("master.data.edit")),
+):
+    return service.create_area(area, current_user.id)
+
+
+@router.put("/area/{area_id}")
+def update_area(
+    area_id: int,
+    area: AreaUpdateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(PermissionChecker("master.data.edit")),
+):
+    return service.update_area(area_id, area, current_user.id)
+
+
+@router.delete("/area/{area_id}")
+def delete_area(
+    area_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(PermissionChecker("master.data.edit")),
+):
+    return service.delete_area(area_id, current_user.id)

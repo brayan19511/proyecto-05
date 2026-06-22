@@ -11,6 +11,7 @@ from sqlalchemy import (
     Date,
     Numeric,
     UniqueConstraint,
+    Index,
 )
 
 from sqlalchemy.orm import (
@@ -59,6 +60,26 @@ class LibroMayor(Base, AuditMixin):
     __tablename__ = "libro_mayor"
     __table_args__ = (
         UniqueConstraint("transaccion_id", "linea"),
+        Index(
+            "ix_libro_mayor_tipo_fecha",
+            "tipo_cuenta",
+            "fecha_contabilizacion",
+        ),
+        Index(
+            "ix_libro_mayor_tipo_actualizacion",
+            "tipo_cuenta",
+            "fecha_actualizacion",
+        ),
+        Index(
+            "ix_libro_mayor_id_regla",
+            "id_regla",
+        ),
+        Index(
+            "ix_libro_mayor_rule_candidates",
+            "cuenta_asociada",
+            "cuenta_contrapartida",
+            "centro_costo",
+        ),
         {"schema": "finance"},
     )
     transaccion_id: Mapped[int] = mapped_column(BIGINT, primary_key=True)

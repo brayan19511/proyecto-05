@@ -7,6 +7,7 @@ from app.api.master import master_router
 from app.api.provisions import provisions_router
 from app.api.sap import sap_router
 from app.api.security import security_router
+from app.api.storage import attachments_router
 from app.api.user import user_router
 from app.api.verify import verify_router
 from app.api.web import web_router
@@ -51,4 +52,5 @@ app.include_router(prefix="/api", router=provisions_router.router)
 app.include_router(prefix="/api", router=master_router.router)
 app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)
+app.include_router(prefix="/api", router=attachments_router.router)
 app.include_router(prefix="/api", router=user_router.router)

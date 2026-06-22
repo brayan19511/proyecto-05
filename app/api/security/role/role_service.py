@@ -51,8 +51,33 @@ class RoleService:
         user=self.auth_repository.get_by_id(user_id)
         if not user:
             raise ValueError(f"User with ID {user_id} does not exist.")
-        #validate if role is already assigned to user
-        if self.role_repository.is_role_assigned_to_user(user_id, role_id):
-            raise ValueError(f"User with ID {user_id} already has role with ID {role_id}.") 
+        user_role = self.role_repository.get_user_role(user_id, role_id)
+
+        if user_role:
+            if user_role.active:
+                return {
+                    "assigned": False,
+                    "already_exists": True,
+                    "message": "El usuario ya tiene este rol activo",
+                }
+
+            self.role_repository.activate_user_role(user_role)
+            return {
+                "assigned": True,
+                "reactivated": True,
+                "message": "Rol reactivado correctamente",
+            }
+
         self.role_repository.assign_role_to_user(user_id, role_id)
-        
+        return {
+            "assigned": True,
+            "message": "Rol asignado correctamente",
+        }
+
+    def remove_role_from_user(self, user_id: int, role_id: int):
+        removed = self.role_repository.deactivate_user_role(user_id, role_id)
+
+        if not removed:
+            raise ValueError("El usuario no tiene este rol asignado.")
+
+        return {"message": "Rol removido correctamente"}
