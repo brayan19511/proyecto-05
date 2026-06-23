@@ -10,6 +10,7 @@ from app.models.auth.security_model import (
     RolePermission,
     UserRole,
 )
+from app.models.auth.user_model import Information
 from app.models.finance.provision_model import ProvisionStatus
 from app.models.master.master_model import Area, Company, Currency
 
@@ -239,6 +240,7 @@ class SeedService:
             self.ensure_role_permissions(roles["Admin"], permissions.values())
             self.ensure_functional_role_permissions(roles, permissions)
             self.ensure_user_role(admin_user, roles["Admin"])
+            self.ensure_user_profile(admin_user)
             self.ensure_master_data()
             self.ensure_provision_statuses()
 
@@ -335,6 +337,22 @@ class SeedService:
         self.created.append(f"user:{ADMIN_EMAIL}")
 
         return admin_user
+
+    def ensure_user_profile(self, user: Auth):
+        profile = (
+            self.db.query(Information)
+            .filter(Information.user_id == user.id)
+            .first()
+        )
+
+        if profile:
+            self.existing.append(f"user_profile:{user.email}")
+            return profile
+
+        profile = Information(user_id=user.id)
+        self.db.add(profile)
+        self.created.append(f"user_profile:{user.email}")
+        return profile
 
     def ensure_role_permissions(self, role: Role, permissions):
         for permission in permissions:

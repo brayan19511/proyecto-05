@@ -48,8 +48,11 @@ class UserProfileUpdate(UserProfileCreate):
 
 class UserProfileResponse(UserProfileUpdate):
     # Field(alias="id") le dice: "busca 'id' en el objeto Auth"
-    user_id: UUID = Field(alias="id") 
+    user_id: UUID = Field(alias="id")
     email: str
+    active: bool = True
+    role_ids: list[int] = Field(default_factory=list)
+    roles: list[str] = Field(default_factory=list)
     
     model_config = ConfigDict(
         from_attributes=True,

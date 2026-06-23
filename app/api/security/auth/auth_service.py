@@ -6,7 +6,7 @@ from uuid6 import uuid7
 from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, UserRegisterSchema, UserTokenResponse
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.security import create_access_token, hash_password, verify_password
-from app.models import Auth
+from app.models import Auth, Information
 
 
 class AuthService:
@@ -48,9 +48,9 @@ class AuthService:
                 password_hash=hashed_password
             )
             self.authRepository.create_auth(new_auth)
+            self.authRepository.create_information(Information(user_id=user_id))
             self.authRepository.commit()
             return {"message": "Usuario creado exitosamente", "id": user_id}
         except Exception as e:
             self.authRepository.rollback()
             raise HTTPException(status_code=500, detail=f"Error al crear usuario: {str(e)}")
-      

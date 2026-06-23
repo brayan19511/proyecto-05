@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Auth, Information
+from app.models import Auth, Information, UserRole
 
 
 class UserRepository:
@@ -17,7 +17,10 @@ class UserRepository:
         email: str | None = None,
         active: bool | None = None,
     ):
-        stmt = select(Auth).options(selectinload(Auth.profile))
+        stmt = select(Auth).options(
+            selectinload(Auth.profile),
+            selectinload(Auth.user_roles_links).selectinload(UserRole.role),
+        )
 
         if email:
             stmt = stmt.where(Auth.email.ilike(f"%{email}%"))
@@ -38,7 +41,15 @@ class UserRepository:
         return self.db.execute(stmt).scalars().all()
 
     def get_user_by_id(self, user_id: UUID):
-        return self.db.get(Auth, user_id)
+        stmt = (
+            select(Auth)
+            .options(
+                selectinload(Auth.profile),
+                selectinload(Auth.user_roles_links).selectinload(UserRole.role),
+            )
+            .where(Auth.id == user_id)
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
 
     def get_profile_by_id(self, user_id: UUID):
         return self.db.get(Information, user_id)
