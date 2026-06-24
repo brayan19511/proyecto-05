@@ -1,56 +1,88 @@
-# app/api/security/auth/auth_service.py
-from fastapi import HTTPException,status
-from sqlalchemy import UUID
+import logging
+
+from fastapi import HTTPException, status
 from uuid6 import uuid7
 
-from app.api.security.auth.auth_schemas import LoginRequest, TokenResponse, UserRegisterSchema, UserTokenResponse
 from app.api.security.auth.auth_repository import AuthRepository
+from app.api.security.auth.auth_schemas import (
+    LoginRequest,
+    TokenResponse,
+    UserRegisterSchema,
+    UserTokenResponse,
+)
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import Auth, Information
 
 
+logger = logging.getLogger(__name__)
+
+
 class AuthService:
     def __init__(self, db):
-        self.authRepository = AuthRepository(db)
+        self.auth_repository = AuthRepository(db)
 
     def authenticate_user(self, login_data: LoginRequest) -> TokenResponse:
-        # 1. Buscar usuario
-        user = self.authRepository.get_by_email(login_data.email)
+        user = self.auth_repository.get_by_email(login_data.email)
         if not user or not verify_password(login_data.password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email o contraseña incorrectos",
+                detail="Email o contrasena incorrectos",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
         if not user.active:
-            raise HTTPException(status_code=403, detail="Usuario inactivo")
-        token_data={"sub": str(user.id), "email": user.email}
-        token=create_access_token(token_data)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario inactivo",
+            )
+
+        token = create_access_token(
+            {
+                "sub": str(user.id),
+                "email": user.email,
+            }
+        )
         return TokenResponse(
             access_token=token,
             user=UserTokenResponse(
                 user_id=user.id,
                 email=user.email,
-                roles=[role.role.name for role in user.user_roles_links if role.active]
-            )
+                roles=[
+                    link.role.name
+                    for link in user.user_roles_links
+                    if link.active
+                ],
+            ),
         )
+
     def get_by_email(self, email: str):
-        return self.authRepository.get_by_email(email)
-    def register_user(self,data:UserRegisterSchema):
-        if self.authRepository.get_by_email(data.email):
-            raise HTTPException(status_code=400, detail="Email ya registrado")
+        return self.auth_repository.get_by_email(email)
+
+    def register_user(self, data: UserRegisterSchema):
+        if self.auth_repository.get_by_email(data.email):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email ya registrado",
+            )
+
         try:
-            user_id=uuid7()
-            hashed_password = hash_password(data.password)
-            new_auth=Auth(
+            user_id = uuid7()
+            new_auth = Auth(
                 id=user_id,
                 email=data.email,
-                password_hash=hashed_password
+                password_hash=hash_password(data.password),
             )
-            self.authRepository.create_auth(new_auth)
-            self.authRepository.create_information(Information(user_id=user_id))
-            self.authRepository.commit()
-            return {"message": "Usuario creado exitosamente", "id": user_id}
-        except Exception as e:
-            self.authRepository.rollback()
-            raise HTTPException(status_code=500, detail=f"Error al crear usuario: {str(e)}")
+            self.auth_repository.create_auth(new_auth)
+            self.auth_repository.create_information(Information(user_id=user_id))
+            self.auth_repository.commit()
+            return {
+                "message": "Usuario creado exitosamente",
+                "id": user_id,
+            }
+        except Exception as exc:
+            self.auth_repository.rollback()
+            logger.exception("Error al crear usuario")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo crear el usuario",
+            ) from exc

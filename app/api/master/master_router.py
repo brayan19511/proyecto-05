@@ -1,12 +1,9 @@
 # app/api/master/master_router.py
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
+from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
-
-from app.core.security import (
-    get_current_user,
-)
 
 from app.api.master.master_service import (
     MasterService,
@@ -26,34 +23,6 @@ router = APIRouter(prefix="/master", tags=["Master"])
 
 def get_master_service(db=Depends(get_db)) -> MasterService:
     return MasterService(db)
-
-
-def get_permission_codes(user) -> set[str]:
-    return {permission.code for permission in user.permissions}
-
-
-def get_role_names(user) -> set[str]:
-    return {
-        link.role.name
-        for link in user.user_roles_links
-        if link.active
-    }
-
-
-def require_any_permission(*permission_codes: str):
-    def checker(current_user=Depends(get_current_user)):
-        if "Admin" in get_role_names(current_user):
-            return current_user
-
-        if get_permission_codes(current_user).intersection(permission_codes):
-            return current_user
-
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No tienes permisos suficientes: {', '.join(permission_codes)}",
-        )
-
-    return checker
 
 
 @router.get("/company")

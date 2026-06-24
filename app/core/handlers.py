@@ -1,4 +1,6 @@
 # app/core/handlers.py
+import logging
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -7,6 +9,9 @@ from app.core.exceptions import (
     NotFoundError,
     ValidationError,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def register_exception_handlers(app):
@@ -27,6 +32,11 @@ def register_exception_handlers(app):
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
         trace_id = getattr(request.state, "trace_id", None)
+        logger.exception(
+            "Unhandled request error path=%s trace_id=%s",
+            request.url.path,
+            trace_id,
+        )
 
         if settings.ENV == "dev":
             return JSONResponse(

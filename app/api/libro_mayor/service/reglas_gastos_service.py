@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.api.libro_mayor.repository.reglas_gasto_respository import (
-    ReglasGatosRepository,
+from app.api.libro_mayor.repository.reglas_gastos_repository import (
+    ReglasGastosRepository,
 )
 from app.api.libro_mayor.service.libro_mayor_reproces_service import (
     LibroMayorReprocessService,
@@ -15,7 +15,7 @@ class ReglasGastosService:
         self,
         db: Session,
     ):
-        self.repository = ReglasGatosRepository(db)
+        self.repository = ReglasGastosRepository(db)
 
         self.reprocess_service = (
             LibroMayorReprocessService(

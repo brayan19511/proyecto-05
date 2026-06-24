@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.api.libro_mayor.repository.libro_mayor_repository import (
     LibroMayorRepository,
 )
-from app.api.libro_mayor.repository.reglas_gasto_respository import (
-    ReglasGatosRepository,
+from app.api.libro_mayor.repository.reglas_gastos_repository import (
+    ReglasGastosRepository,
 )
 from app.api.libro_mayor.service.libro_mayor_rules_service import (
     LibroMayorRulesService,
@@ -32,7 +32,7 @@ class LibroMayorReprocessService:
         )
 
         self.reglas_repository = (
-            ReglasGatosRepository(db=db_local)
+            ReglasGastosRepository(db=db_local)
         )
 
         self.rules_service = (

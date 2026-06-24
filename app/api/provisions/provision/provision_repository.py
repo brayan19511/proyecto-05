@@ -13,7 +13,8 @@ from app.models.finance.provision_model import (
     ProvisionStatusHistory,
 )
 
-from app.models.master.master_model import Attachment
+from app.api.storage.constants import PROVISION_DOCUMENT_ENTITY_TYPE
+from app.models.storage import Attachment
 
 
 class ProvisionRepository:
@@ -225,7 +226,7 @@ class ProvisionRepository:
         (
             self.db.query(Attachment)
             .filter(
-                Attachment.entity_type == "provision_document",
+                Attachment.entity_type == PROVISION_DOCUMENT_ENTITY_TYPE,
                 Attachment.entity_id == document.id,
             )
             .delete(synchronize_session=False)

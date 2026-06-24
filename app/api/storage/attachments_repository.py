@@ -2,7 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models.master.master_model import Attachment
+from app.models.storage import Attachment
 
 
 class AttachmentRepository:

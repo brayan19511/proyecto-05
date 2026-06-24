@@ -15,7 +15,12 @@ from app.api.provisions.provision.provision_schema import (
     ProvisionSummaryResponse,
     ProvisionUpdateRequest,
 )
+from app.api.provisions.access import (
+    can_edit_all_provisions,
+    can_view_all_provisions,
+)
 from app.api.provisions.provision.provision_service import ProvisionService
+from app.core.access import get_permission_codes, is_admin
 from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker, get_current_user
 
@@ -24,37 +29,6 @@ router = APIRouter(tags=["Provisions"])
 
 def get_service(db: Session = Depends(get_db)):
     return ProvisionService(db)
-
-
-def get_permission_codes(user) -> set[str]:
-    return {permission.code for permission in user.permissions}
-
-
-def get_role_names(user) -> set[str]:
-    return {
-        link.role.name
-        for link in user.user_roles_links
-        if link.active
-    }
-
-
-def is_admin(user) -> bool:
-    return "Admin" in get_role_names(user)
-
-
-def can_view_all_provisions(user) -> bool:
-    permissions = get_permission_codes(user)
-    return (
-        is_admin(user)
-        or "provisions.view_all" in permissions
-        or "provisions.edit_all" in permissions
-        or "provisions.review" in permissions
-    )
-
-
-def can_edit_all_provisions(user) -> bool:
-    permissions = get_permission_codes(user)
-    return is_admin(user) or "provisions.edit_all" in permissions
 
 
 def require_provision_view(current_user=Depends(get_current_user)):

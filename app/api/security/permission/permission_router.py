@@ -8,33 +8,20 @@ from app.api.security.permission.permission_schemas import (
     PermissionUpdateRequest,
 )
 from app.api.security.permission.permission_service import PermissionService
+from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
-from app.core.security import PermissionChecker, get_current_user
+from app.core.security import PermissionChecker
 
 
 router = APIRouter(prefix="/permission", tags=["Permission"])
 
 
-def require_roles_view(current_user=Depends(get_current_user)):
-    role_names = {
-        link.role.name
-        for link in current_user.user_roles_links
-        if link.active
-    }
-    permission_codes = {permission.code for permission in current_user.permissions}
-
-    if "Admin" in role_names or permission_codes.intersection(
-        {"security.roles.view", "security.roles.edit"}
-    ):
-        return current_user
-
-    raise HTTPException(status_code=403, detail="No tienes permisos para ver permisos")
-
-
 @router.get("/getall", response_model=dict[str, list[PermisionResponse]])
 def get_all_permissions(
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles_view),
+    current_user=Depends(
+        require_any_permission("security.roles.view", "security.roles.edit"),
+    ),
 ):
     permission_service = PermissionService(db)
     return {"permissions": permission_service.get_all_permissions()}
@@ -93,7 +80,9 @@ def remove_role_permission(
 def get_permission(
     permission_id: int,
     db: Session = Depends(get_db),
-    current_user=Depends(require_roles_view),
+    current_user=Depends(
+        require_any_permission("security.roles.view", "security.roles.edit"),
+    ),
 ):
     try:
         permission_service = PermissionService(db)

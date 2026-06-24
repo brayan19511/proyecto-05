@@ -9,30 +9,18 @@ from app.api.user import (
     UserProfileUpdate,
     UserService,
 )
+from app.core.access import get_permission_codes, is_admin
 from app.core.db.db_postgres import get_db
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def get_role_names(current_user) -> set[str]:
-    return {
-        link.role.name
-        for link in current_user.user_roles_links
-        if link.active
-    }
-
-
-def get_permission_codes(current_user) -> set[str]:
-    return {permission.code for permission in current_user.permissions}
-
-
 def can_view_users(current_user) -> bool:
-    roles = get_role_names(current_user)
     permissions = get_permission_codes(current_user)
 
     return (
-        "Admin" in roles
+        is_admin(current_user)
         or "security.roles.edit" in permissions
         or "security.users.view" in permissions
         or "security.users.edit" in permissions
@@ -40,15 +28,10 @@ def can_view_users(current_user) -> bool:
 
 
 def can_edit_users(current_user) -> bool:
-    roles = {
-        link.role.name
-        for link in current_user.user_roles_links
-        if link.active
-    }
-    permissions = {permission.code for permission in current_user.permissions}
+    permissions = get_permission_codes(current_user)
 
     return (
-        "Admin" in roles
+        is_admin(current_user)
         or "security.roles.edit" in permissions
         or "security.users.edit" in permissions
     )

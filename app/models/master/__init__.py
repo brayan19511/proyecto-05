@@ -1,4 +1,3 @@
-from .master_model import Currency, Area, Attachment
+from .master_model import Area, Company, Currency
 
-
-__all__ = ["Currency", "Area", "Attachment"]
+__all__ = ["Area", "Company", "Currency"]

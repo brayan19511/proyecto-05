@@ -2,6 +2,14 @@
 from sqlalchemy.orm import Session
 from uuid6 import uuid7
 
+from app.api.provisions.constants import (
+    APPROVED_STATUS,
+    CANCELLED_STATUS,
+    PENDING_DETAIL_STATUS,
+    READY_FOR_REVIEW_STATUS,
+    REJECTED_FINAL_STATUS,
+    REJECTED_FOR_EDIT_STATUS,
+)
 from app.core.security import hash_password
 from app.models.auth.security_model import (
     Auth,
@@ -213,13 +221,13 @@ ROLE_PERMISSIONS = {
 
 PROVISION_STATUSES = [
     {"code": "DRAFT", "name": "Borrador"},
-    {"code": "PENDING_DETAIL", "name": "Pendiente de completar detalle"},
-    {"code": "READY_FOR_REVIEW", "name": "Listo para revision"},
+    {"code": PENDING_DETAIL_STATUS, "name": "Pendiente de completar detalle"},
+    {"code": READY_FOR_REVIEW_STATUS, "name": "Listo para revision"},
     {"code": "REVIEWING", "name": "En revision"},
-    {"code": "APPROVED", "name": "Aprobado"},
-    {"code": "REJECTED_FOR_EDIT", "name": "Observado para corregir"},
-    {"code": "REJECTED_FINAL", "name": "Rechazado definitivo"},
-    {"code": "CANCELLED", "name": "Cancelado"},
+    {"code": APPROVED_STATUS, "name": "Aprobado"},
+    {"code": REJECTED_FOR_EDIT_STATUS, "name": "Observado para corregir"},
+    {"code": REJECTED_FINAL_STATUS, "name": "Rechazado definitivo"},
+    {"code": CANCELLED_STATUS, "name": "Cancelado"},
     {"code": "POSTED_SAP", "name": "Registrado en SAP"},
     {"code": "SAP_ERROR", "name": "Error SAP"},
 ]

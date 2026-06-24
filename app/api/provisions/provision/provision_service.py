@@ -6,6 +6,15 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.provisions.constants import (
+    APPROVED_STATUS,
+    BASE_CURRENCY_CODE,
+    CANCELLED_STATUS,
+    PENDING_DETAIL_STATUS,
+    READY_FOR_REVIEW_STATUS,
+    REJECTED_FINAL_STATUS,
+    REJECTED_FOR_EDIT_STATUS,
+)
 from app.api.provisions.provision.provision_repository import ProvisionRepository
 from app.api.provisions.provision.provision_schema import (
     ProvisionAccessRequest,
@@ -21,16 +30,13 @@ from app.models.finance.provision_model import (
     ProvisionDocument,
     ProvisionStatusHistory,
 )
-from app.models.master.master_model import Attachment
+from app.api.storage.constants import (
+    PROVISION_DOCUMENT_ENTITY_TYPE,
+    PROVISION_ENTITY_TYPE,
+)
+from app.models.storage import Attachment
 
 
-DEFAULT_STATUS = "PENDING_DETAIL"
-READY_STATUS = "READY_FOR_REVIEW"
-APPROVED_STATUS = "APPROVED"
-REJECTED_EDIT_STATUS = "REJECTED_FOR_EDIT"
-REJECTED_FINAL_STATUS = "REJECTED_FINAL"
-CANCELLED_STATUS = "CANCELLED"
-BASE_CURRENCY_CODE = "PEN"
 MONEY_QUANTIZER = Decimal("0.01")
 
 
@@ -68,7 +74,7 @@ class ProvisionService:
         user_id: UUID,
     ):
         try:
-            initial_status = self._get_status_or_500(DEFAULT_STATUS)
+            initial_status = self._get_status_or_500(PENDING_DETAIL_STATUS)
 
             provision = Provision(
                 ticket_code=request.ticket_code,
@@ -299,7 +305,7 @@ class ProvisionService:
         company_id: int | None = None,
     ):
         provisions = self.repository.get_provisions(
-            status_codes=[READY_STATUS],
+            status_codes=[READY_FOR_REVIEW_STATUS],
             area_id=area_id,
             company_id=company_id,
             review_queue=True,
@@ -328,7 +334,7 @@ class ProvisionService:
 
         return self._transition(
             provision=provision,
-            status_code=READY_STATUS,
+            status_code=READY_FOR_REVIEW_STATUS,
             user_id=user_id,
             comments=request.comments or "Provision lista para revision",
             submitted=True,
@@ -356,7 +362,7 @@ class ProvisionService:
     ):
         return self._transition_review(
             provision_id=provision_id,
-            status_code=REJECTED_EDIT_STATUS,
+            status_code=REJECTED_FOR_EDIT_STATUS,
             user_id=user_id,
             comments=request.comments or "Provision observada para correccion",
         )
@@ -439,8 +445,8 @@ class ProvisionService:
 
     def _can_edit(self, provision: Provision) -> bool:
         return provision.status.code in {
-            DEFAULT_STATUS,
-            REJECTED_EDIT_STATUS,
+            PENDING_DETAIL_STATUS,
+            REJECTED_FOR_EDIT_STATUS,
         }
 
     def _can_view(
@@ -494,6 +500,44 @@ class ProvisionService:
             detail="No tienes permisos para editar esta provision",
         )
 
+    def ensure_entity_access(
+        self,
+        entity_type: str,
+        entity_id: UUID,
+        user_id: UUID,
+        *,
+        write: bool = False,
+        can_view_all: bool = False,
+        can_edit_all: bool = False,
+    ) -> None:
+        if entity_type == PROVISION_ENTITY_TYPE:
+            provision = self._get_or_404(entity_id)
+        elif entity_type == PROVISION_DOCUMENT_ENTITY_TYPE:
+            provision = self._get_document_or_404(entity_id).provision
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tipo de entidad no soportado para archivos",
+            )
+
+        if write:
+            self._ensure_can_edit_access(provision, user_id, can_edit_all)
+            if not self._can_edit(provision):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "No se pueden modificar archivos "
+                        "en el estado actual de la provision"
+                    ),
+                )
+            return
+
+        if not can_view_all and not self._can_view(provision, user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para ver esta provision",
+            )
+
     def _build_documents(
         self,
         provision_id: UUID,
@@ -538,7 +582,7 @@ class ProvisionService:
             for attachment_item in item.attachments:
                 attachments.append(
                     Attachment(
-                        entity_type="provision_document",
+                        entity_type=PROVISION_DOCUMENT_ENTITY_TYPE,
                         entity_id=document.id,
                         file_name=attachment_item.file_name,
                         file_extension=attachment_item.file_extension,
@@ -600,7 +644,7 @@ class ProvisionService:
     ):
         provision = self._get_or_404(provision_id)
 
-        if provision.status.code != READY_STATUS:
+        if provision.status.code != READY_FOR_REVIEW_STATUS:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Solo se pueden revisar provisiones listas para revision",

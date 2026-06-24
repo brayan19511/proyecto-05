@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models.finance.libro_mayor_model import ReglasGastos
 
-class ReglasGatosRepository:
+class ReglasGastosRepository:
 
     def __init__(self, db: Session):
         self.db = db

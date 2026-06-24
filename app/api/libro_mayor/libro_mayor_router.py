@@ -30,12 +30,10 @@ from app.api.libro_mayor.service.libro_mayor_reproces_service import (
 from app.api.libro_mayor.service.libro_mayor_resumen_service import (
     LibroMayorResumenService,
 )
-from app.api.libro_mayor.service.reglas_gastos_servive import ReglasGastosService
+from app.api.libro_mayor.service.reglas_gastos_service import ReglasGastosService
+from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
-from app.core.security import (
-    get_current_user,
-)
 
 router = APIRouter(
     prefix="/libro-mayor",
@@ -72,34 +70,6 @@ def get_resumen_service(
     return LibroMayorResumenService(
         db_local=db_local,
     )
-
-
-def get_permission_codes(user) -> set[str]:
-    return {permission.code for permission in user.permissions}
-
-
-def get_role_names(user) -> set[str]:
-    return {
-        link.role.name
-        for link in user.user_roles_links
-        if link.active
-    }
-
-
-def require_any_permission(*permission_codes: str):
-    def checker(current_user=Depends(get_current_user)):
-        if "Admin" in get_role_names(current_user):
-            return current_user
-
-        if get_permission_codes(current_user).intersection(permission_codes):
-            return current_user
-
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No tienes permisos suficientes: {', '.join(permission_codes)}",
-        )
-
-    return checker
 
 
 # ==========================================================
