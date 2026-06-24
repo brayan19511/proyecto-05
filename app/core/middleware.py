@@ -72,6 +72,8 @@ def sanitize_payload(value):
 class AuditMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
+        if request.url.path.startswith("/health"):
+            return await call_next(request)
 
         # =====================================================
         # INICIO DE TRAZA

@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.health import health_router
 from app.api.libro_mayor import libro_mayor_router
 from app.api.master import master_router
 from app.api.provisions import provisions_router
@@ -50,3 +51,4 @@ app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)
 app.include_router(prefix="/api", router=attachments_router.router)
 app.include_router(prefix="/api", router=user_router.router)
+app.include_router(router=health_router.router)

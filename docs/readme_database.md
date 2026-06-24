@@ -1,77 +1,179 @@
-# Guía de Migraciones con Alembic - Proyecto-05
+# Base de datos y migraciones
 
-Esta sección detalla el flujo correcto para gestionar cambios en la base de datos y asegurar que los esquemas personalizados se creen correctamente.
+PostgreSQL se administra mediante SQLAlchemy y Alembic. No se deben crear o
+modificar tablas manualmente en produccion.
 
-## 1. Definición de Modelos
-Todos los modelos deben heredar de la clase `Base` ubicada en `app/core/db_postgres.py`. 
+## Esquemas actuales
 
-> **Nota:** Si la tabla pertenece a un esquema distinto a `public`, es obligatorio especificarlo en `__table_args__`.
+| Esquema | Responsabilidad |
+| --- | --- |
+| `security` | Usuarios de autenticacion, roles, permisos y API keys. |
+| `user` | Informacion personal del usuario. |
+| `master` | Empresas, monedas y areas. |
+| `finance` | Provisiones, libro mayor, conceptos y reglas. |
+| `storage` | Metadata y contenido de adjuntos. |
+| `audit` | Trazas y detalle de auditoria. |
 
-```python
-from app.core.db_postgres import Base
+La lista se encuentra en `SCHEMAS` dentro de `alembic/env.py`.
 
-class MiModelo(Base):
-    __tablename__ = "mi_tabla"
-    __table_args__ = {"schema": "security"}  # Esquema personalizado
-    # ... definición de columnas
-```
-## 2. Registro de Modelos en Alembic
-Para que el comando `--autogenerate` detecte los cambios, los modelos deben estar importados en `alembic/env.py.`
+## Crear o modificar un modelo
 
-```python
-# Ubicación: alembic/env.py
+Los modelos deben:
 
-# 1. Importa la Base
-from app.core.db_postgres import Base
+1. Heredar de `Base`.
+2. Declarar el esquema.
+3. Usar tipos y nulabilidad explicitos.
+4. Definir indices para filtros frecuentes.
+5. Registrarse mediante el paquete `app.models`.
 
-# 2. IMPORTA TODOS TUS MODELOS AQUÍ (Vital para que Alembic los vea)
-from app.models import Auth, Role, Permission, UserRole, RolePermission
-from app.models import Information
-
-# 3. Asigna la metadata
-target_metadata = Base.metadata
-```
-## 3. Configuración de Esquemas en `env.py`
-Dado que Alembic no crea los esquemas automáticamente, debemos forzar su creación en la función `run_migrations_online` dentro de `alembic/env.py:`
+Ejemplo:
 
 ```python
-def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.db.db_postgres import Base
+from app.models.common.mixin_model import AuditMixin
+
+
+class CostCenter(Base, AuditMixin):
+    __tablename__ = "cost_centers"
+    __table_args__ = {"schema": "master"}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(
+        String(30),
+        unique=True,
+        nullable=False,
     )
+```
 
-    with connectable.connect() as connection:
-        # PASO EXTRA: Crear los esquemas manualmente si no existen
-        # "user" va entre comillas dobles por ser palabra reservada en Postgres
-        connection.execute(text('CREATE SCHEMA IF NOT EXISTS "security";'))
-        connection.execute(text('CREATE SCHEMA IF NOT EXISTS "user";'))
-        connection.commit() 
+Exportarlo desde el `__init__.py` de su dominio y desde `app/models/__init__.py`.
+Alembic importa ese paquete para construir `Base.metadata`.
 
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
+## Generar una migracion
 
-        with context.begin_transaction():
-            context.run_migrations()
-```
-## 4. Comandos de Consola
-### A. Generar nueva migración
-Ejecuta esto después de modificar cualquier archivo en la carpeta models/:
-```
-alembic revision --autogenerate -m "Descripción del cambio"
-```
-### B. Aplicar cambios a la Base de Datos
-```
-alembic upgrade head
-```
-## 5. Solución de Problemas Comunes
-Error: "Can't locate revision identified by..."
-Si borraste archivos dentro de `alembic/versions/` manualmente, la base de datos quedará desincronizada. Para solucionarlo, resetea el historial de versiones en PostgreSQL:
+Con los contenedores activos:
 
+```bash
+docker compose exec api alembic heads
+docker compose exec api alembic revision --autogenerate -m "add cost centers"
 ```
--- Ejecutar en pgAdmin o consola SQL
-DROP TABLE IF EXISTS alembic_version;
+
+Una migracion autogenerada es un borrador. Antes de aplicarla:
+
+1. Revisar `upgrade()` y `downgrade()`.
+2. Confirmar nombres de tabla, esquema, constraints e indices.
+3. Revisar que no elimine columnas o tablas accidentalmente.
+4. Confirmar que `down_revision` apunte a la cabeza actual.
+5. Verificar que exista una sola cabeza:
+
+```bash
+docker compose exec api alembic heads
+```
+
+## Aplicar migraciones
+
+```bash
+docker compose exec api alembic current
+docker compose exec api alembic upgrade head
+docker compose exec api alembic current
+```
+
+Consultar historial:
+
+```bash
+docker compose exec api alembic history --verbose
+```
+
+## Agregar un nuevo esquema
+
+Ejemplo para el esquema `purchasing`:
+
+1. Añadirlo a `SCHEMAS` en `alembic/env.py`.
+2. Declararlo en los modelos:
+
+```python
+__table_args__ = {"schema": "purchasing"}
+```
+
+3. Crear una migracion.
+4. Añadir explicitamente la creación del esquema para que la migracion sea
+   autocontenida:
+
+```python
+from alembic import op
+
+
+def upgrade() -> None:
+    op.execute('CREATE SCHEMA IF NOT EXISTS "purchasing"')
+    # Creacion de tablas...
+
+
+def downgrade() -> None:
+    # Eliminar primero las tablas del esquema.
+    op.execute('DROP SCHEMA IF EXISTS "purchasing"')
+```
+
+No eliminar el esquema en `downgrade()` si puede contener objetos administrados
+por otro sistema.
+
+## Migraciones en produccion
+
+Ejecutar una sola vez antes de reemplazar la API:
+
+```bash
+docker compose pull
+docker compose run --rm api alembic upgrade head
+docker compose up -d
+```
+
+No incluir `alembic upgrade head` en el comando de inicio de todas las replicas.
+
+## Cambios destructivos
+
+Para renombrar o eliminar columnas:
+
+- Crear backup.
+- Evaluar compatibilidad con la version anterior de la API.
+- Separar el cambio en varias versiones cuando sea necesario.
+- Migrar datos antes de añadir `NOT NULL`.
+- No automatizar `alembic downgrade`.
+
+Un patron seguro es:
+
+1. Añadir columna nueva nullable.
+2. Desplegar codigo compatible con ambas columnas.
+3. Copiar o transformar datos.
+4. Cambiar lecturas a la columna nueva.
+5. Eliminar la columna anterior en otro despliegue.
+
+## Problemas comunes
+
+### Alembic no detecta el modelo
+
+Verificar que el modelo se exporte desde `app/models/__init__.py`.
+
+### Multiples heads
+
+No seleccionar una al azar. Revisar las ramas y crear un merge:
+
+```bash
+docker compose exec api alembic heads
+docker compose exec api alembic merge heads -m "merge migration heads"
+```
+
+### Revision inexistente
+
+No borrar `alembic_version` ni usar `stamp` sin investigar. Recuperar el archivo
+de migracion faltante desde Git o restaurar la base. `alembic stamp` solo debe
+usarse cuando la estructura ya fue verificada manualmente.
+
+### Base nueva
+
+Crear los servicios y aplicar todas las migraciones:
+
+```bash
+docker compose up -d db-postgres
+docker compose run --rm api alembic upgrade head
 ```
