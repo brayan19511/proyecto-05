@@ -18,16 +18,34 @@ class LibroMayorRulesService:
         for regla in reglas:
             self._aplicar_regla(df, regla)
         # eliminar columna auxiliar
+        # df.drop(
+        #     columns=["_descripcion_lower"],
+        #     inplace=True,
+        #     errors="ignore"
+        # )
         df.drop(
-            columns=["_descripcion_lower"],
+            columns=["_texto_busqueda_lower"],
             inplace=True,
-            errors="ignore"
+            errors="ignore",
         )
 
         return df
 
     def _inicializar_columnas(self, df: pd.DataFrame, user_id: str | None):
-        df["_descripcion_lower"] = df["descripcion"].fillna("").str.lower()
+        # df["_descripcion_lower"] = df["descripcion"].fillna("").str.lower()
+        text_columns = [
+            "descripcion",
+            "referencia_1",
+            "referencia_2",
+            "referencia_3",
+        ]
+        df["_texto_busqueda_lower"] = (
+            df.reindex(columns=text_columns)
+            .fillna("")
+            .astype(str)
+            .agg(" ".join, axis=1)
+            .str.lower()
+        )
 
         df["id_regla"] = None
         df["tiene_regla"] = False
@@ -78,13 +96,15 @@ class LibroMayorRulesService:
 
             texto = regla.filtro_texto.lower()
 
-            mask &= df["_descripcion_lower"].str.contains(texto, regex=False)
+            mask &= df["_texto_busqueda_lower"].str.contains(
+                texto, regex=False)
 
         if regla.texto_excluido:
 
             texto = regla.texto_excluido.lower()
 
-            mask &= ~df["_descripcion_lower"].str.contains(texto, regex=False)
+            mask &= ~df["_texto_busqueda_lower"].str.contains(
+                texto, regex=False)
 
         if regla.monto_min is not None:
             mask &= df["cargo_abono_ml"] >= regla.monto_min
@@ -107,5 +127,11 @@ class LibroMayorRulesService:
 
         for regla in reglas:
             self._aplicar_regla(df, regla)
+
+        df.drop(
+            columns=["_texto_busqueda_lower"],
+            inplace=True,
+            errors="ignore",
+        )
 
         return df
