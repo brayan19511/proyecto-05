@@ -11,7 +11,7 @@ alembic/
 |-- versions/        Historial inmutable de migraciones.
 `-- env.py           Registro de metadata y configuracion de esquemas.
 
-docs/                Documentacion tecnica, funcional y recursos.
+docs/                Guias agrupadas por desarrollo, DB, despliegue y automatizacion.
 Dockerfile           Definicion de la imagen del backend.
 docker-compose.yml   Desarrollo local.
 docker-compose.prod.yml

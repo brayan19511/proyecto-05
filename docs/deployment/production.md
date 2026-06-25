@@ -6,7 +6,7 @@ con una version y hacer que produccion descargue esa imagen.
 ## Versionar la imagen
 
 ```bash
-docker build -t brayan1951/backend-finance:v2.2.0 .
+docker build --target production -t brayan1951/backend-finance:v2.2.0 .
 docker push brayan1951/backend-finance:v2.2.0
 ```
 
@@ -27,9 +27,7 @@ finance-deploy/
 
 No necesita contener el repositorio ni el Dockerfile.
 
-El ejemplo actualizado está en
-`docs/recursos/docker-compose.prod.yml`. También puede copiarse
-`docs/recursos/nginx-default.conf` como `nginx/default.conf`.
+El ejemplo actualizado está en [deployment/example](example/README.md).
 
 ## Variables relevantes
 

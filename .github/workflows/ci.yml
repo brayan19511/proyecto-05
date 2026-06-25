@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - base_provision
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

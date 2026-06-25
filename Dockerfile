@@ -52,3 +52,7 @@ COPY --chown=app:app tests ./tests
 USER app
 
 CMD ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"]
+
+
+# Keep the production image as the default target for plain `docker build`.
+FROM runtime AS production

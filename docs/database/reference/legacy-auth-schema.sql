@@ -1,4 +1,5 @@
-CREATE SCHEMA IF NOT EXISTS security;
+-- Historical reference only. Current schema changes must use Alembic.
+-- CREATE SCHEMA IF NOT EXISTS security;
 
 -- USERS
 CREATE TABLE security.auth (

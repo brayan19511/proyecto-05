@@ -37,7 +37,7 @@ Para acceder, utilizar una VPN o un túnel SSH temporal.
 3. Conservar la etiqueta anterior para rollback.
 
 La publicación de imágenes puede automatizarse con GitHub Actions. Consultar
-`docs/automation_and_queues.md`.
+`../../automation/github-actions.md`.
 
 ## Seguridad
 

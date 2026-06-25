@@ -24,6 +24,16 @@ docker compose build api
 docker compose up -d
 ```
 
+Para publicar manualmente una imagen de producción:
+
+```bash
+docker build --target production -t brayan1951/backend-finance:vX.Y.Z .
+docker push brayan1951/backend-finance:vX.Y.Z
+```
+
+El target `test` ejecuta pruebas y no inicia Uvicorn; no debe publicarse como
+imagen productiva.
+
 Si solo cambio codigo Python, el volumen `.:/app` permite continuar sin reconstruir.
 Reiniciar la API si fuera necesario:
 
