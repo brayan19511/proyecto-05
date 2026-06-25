@@ -9,7 +9,7 @@ class ConceptCreateRequest(BaseModel):
     description: Optional[str] = None
     active: Optional[bool] = True
     code_sap: Optional[str] = None
-    company_id: Optional[int] = Field(default=None, gt=0)
+    company_id: int = Field(gt=0)
     
 class ConceptUpdateRequest(BaseModel):
     code: Optional[str] = None

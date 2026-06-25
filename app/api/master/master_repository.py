@@ -48,8 +48,6 @@ class MasterRepository:
     def create_company(self, company: Company):
 
         self.db.add(company)
-        self.db.flush()
-        self.db.refresh(company)
         return company
 
     # ==========================================
@@ -86,9 +84,6 @@ class MasterRepository:
     def create_area(self, area: Area)->Area:
 
         self.db.add(area)
-        self.db.flush()
-        self.db.refresh(area)
-
         return area
 
     # ==========================================
@@ -125,8 +120,6 @@ class MasterRepository:
     def create_currency(self, currency: Currency):
 
         self.db.add(currency)
-        self.db.flush()
-        self.db.refresh(currency)
         return currency
 
     # ==========================================

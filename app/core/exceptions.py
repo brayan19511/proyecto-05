@@ -8,6 +8,9 @@ class NotFoundError(DomainError):
 class ValidationError(DomainError):
     pass
 
+class ConflictError(DomainError):
+    pass
+
 class BusinessException(DomainError):
     pass
 

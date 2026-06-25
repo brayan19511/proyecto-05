@@ -85,3 +85,6 @@ class PermissionRepository:
         self.db.delete(role_permission)
         self.db.commit()
         return True
+
+    def rollback(self):
+        self.db.rollback()

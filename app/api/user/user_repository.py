@@ -84,3 +84,6 @@ class UserRepository:
         self.db.refresh(profile)
 
         return profile
+
+    def rollback(self):
+        self.db.rollback()

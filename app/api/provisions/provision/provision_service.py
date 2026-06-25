@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.provisions.constants import (
@@ -34,6 +35,8 @@ from app.api.storage.constants import (
     PROVISION_DOCUMENT_ENTITY_TYPE,
     PROVISION_ENTITY_TYPE,
 )
+from app.core.db.integrity import raise_integrity_error
+from app.core.exceptions import ConflictError
 from app.models.storage import Attachment
 
 
@@ -73,11 +76,26 @@ class ProvisionService:
         request: ProvisionCreateRequest,
         user_id: UUID,
     ):
+        ticket_code = request.ticket_code.strip()
+        access_user_ids = [item.user_id for item in request.access]
+        if len(access_user_ids) != len(set(access_user_ids)):
+            raise ConflictError(
+                "No se puede repetir el mismo usuario en los accesos"
+            )
+
+        if self.repository.get_provision_by_ticket(
+            request.company_id,
+            ticket_code,
+        ):
+            raise ConflictError(
+                "Ya existe una provision con este codigo para la empresa"
+            )
+
         try:
             initial_status = self._get_status_or_500(PENDING_DETAIL_STATUS)
 
             provision = Provision(
-                ticket_code=request.ticket_code,
+                ticket_code=ticket_code,
                 description=request.description,
                 supplier_tax_id=request.supplier_tax_id,
                 supplier_name=request.supplier_name,
@@ -118,11 +136,37 @@ class ProvisionService:
         except HTTPException:
             self.repository.rollback()
             raise
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={
+                    "provisions_company_id_ticket_code_key": (
+                        "Ya existe una provision con este codigo para la empresa"
+                    ),
+                    "uq_provision_access_user": (
+                        "Uno de los usuarios ya tiene acceso a la provision"
+                    ),
+                },
+                invalid_references={
+                    "provisions_company_id_fkey": "La empresa indicada no existe",
+                    "provisions_concept_id_fkey": "El concepto indicado no existe",
+                    "provisions_area_id_fkey": "El area indicada no existe",
+                    "provisions_currency_id_fkey": "La moneda indicada no existe",
+                    "provision_access_user_id_fkey": (
+                        "Uno de los usuarios de acceso no existe"
+                    ),
+                    "provision_documents_currency_id_fkey": (
+                        "La moneda de uno de los documentos no existe"
+                    ),
+                },
+                default_message="No se pudo crear la provision",
+            )
         except Exception as exc:
             self.repository.rollback()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error al crear provision: {str(exc)}",
+                detail="No se pudo crear la provision",
             ) from exc
 
     def update_provision(
@@ -145,8 +189,20 @@ class ProvisionService:
             setattr(provision, field, value)
 
         provision.updated_by = user_id
-        self.repository.update_provision(provision)
-        self.repository.commit()
+        try:
+            self.repository.update_provision(provision)
+            self.repository.commit()
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                invalid_references={
+                    "provisions_concept_id_fkey": "El concepto indicado no existe",
+                    "provisions_area_id_fkey": "El area indicada no existe",
+                    "provisions_currency_id_fkey": "La moneda indicada no existe",
+                },
+                default_message="No se pudo actualizar la provision",
+            )
 
         return provision
 
@@ -167,9 +223,21 @@ class ProvisionService:
             )
 
         document = self._build_document(provision.id, request, user_id)
-        self.repository.create_provision_documents([document])
-        self._create_document_attachments([request], [document], user_id)
-        self.repository.commit()
+        try:
+            self.repository.create_provision_documents([document])
+            self._create_document_attachments([request], [document], user_id)
+            self.repository.commit()
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                invalid_references={
+                    "provision_documents_currency_id_fkey": (
+                        "La moneda indicada no existe"
+                    )
+                },
+                default_message="No se pudo agregar el documento",
+            )
 
         return self._document_response(document)
 
@@ -195,8 +263,20 @@ class ProvisionService:
             setattr(document, field, value)
 
         document.updated_by = user_id
-        self.repository.update_provision_document(document)
-        self.repository.commit()
+        try:
+            self.repository.update_provision_document(document)
+            self.repository.commit()
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                invalid_references={
+                    "provision_documents_currency_id_fkey": (
+                        "La moneda indicada no existe"
+                    )
+                },
+                default_message="No se pudo actualizar el documento",
+            )
 
         return self._document_response(document)
 
@@ -232,6 +312,17 @@ class ProvisionService:
         provision = self._get_or_404(provision_id)
         self._ensure_can_edit_access(provision, user_id, can_edit_all)
 
+        existing_access = self.repository.get_provision_access(
+            provision.id,
+            request.user_id,
+        )
+        if existing_access:
+            existing_access.access_type = request.access_type
+            existing_access.active = True
+            existing_access.updated_by = user_id
+            self.repository.commit()
+            return existing_access
+
         access = ProvisionAccess(
             provision_id=provision.id,
             user_id=request.user_id,
@@ -240,8 +331,23 @@ class ProvisionService:
             created_by=user_id,
         )
 
-        self.repository.create_provision_access([access])
-        self.repository.commit()
+        try:
+            self.repository.create_provision_access([access])
+            self.repository.commit()
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={
+                    "uq_provision_access_user": (
+                        "El usuario ya tiene acceso a la provision"
+                    )
+                },
+                invalid_references={
+                    "provision_access_user_id_fkey": "El usuario indicado no existe"
+                },
+                default_message="No se pudo registrar el acceso",
+            )
 
         return access
 

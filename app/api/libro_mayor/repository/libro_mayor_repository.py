@@ -5,10 +5,11 @@ import math
 import numpy as np
 import pandas as pd
 
-from sqlalchemy import extract, func, select
+from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.api.libro_mayor.constants import TEXT_SEARCH_COLUMNS
 from app.models.finance.libro_mayor_model import (
     LibroMayor,
     ReglasGastos,
@@ -203,24 +204,60 @@ class LibroMayorRepository:
         podrían ser afectados por una regla.
         """
 
-        query = self.db.query(LibroMayor)
+        candidate_conditions = []
 
         if regla.cuenta:
-            query = query.filter(LibroMayor.cuenta_asociada == regla.cuenta)
+            candidate_conditions.append(
+                LibroMayor.cuenta_asociada == regla.cuenta
+            )
 
         if regla.cuenta_contrapartida:
-            query = query.filter(
+            candidate_conditions.append(
                 LibroMayor.cuenta_contrapartida == regla.cuenta_contrapartida
             )
 
         if regla.centro_costo:
-            query = query.filter(LibroMayor.centro_costo == regla.centro_costo)
+            candidate_conditions.append(
+                LibroMayor.centro_costo == regla.centro_costo
+            )
 
         if regla.monto_min is not None:
-            query = query.filter(LibroMayor.cargo_abono_ml >= regla.monto_min)
+            candidate_conditions.append(
+                LibroMayor.cargo_abono_ml >= regla.monto_min
+            )
 
         if regla.monto_max is not None:
-            query = query.filter(LibroMayor.cargo_abono_ml <= regla.monto_max)
+            candidate_conditions.append(
+                LibroMayor.cargo_abono_ml <= regla.monto_max
+            )
+
+        if regla.filtro_texto and regla.filtro_texto.strip():
+            searchable_text = func.concat_ws(
+                " ",
+                *[
+                    getattr(LibroMayor, column)
+                    for column in TEXT_SEARCH_COLUMNS
+                ],
+            )
+            candidate_conditions.append(
+                func.lower(searchable_text).contains(
+                    regla.filtro_texto.strip().casefold(),
+                    autoescape=True,
+                )
+            )
+
+        new_candidates = (
+            and_(*candidate_conditions)
+            if candidate_conditions
+            else True
+        )
+
+        query = self.db.query(LibroMayor).filter(
+            or_(
+                LibroMayor.id_regla == regla.id_regla,
+                new_candidates,
+            )
+        )
 
         return query.yield_per(self.BATCH_SIZE).all()
 

@@ -9,13 +9,6 @@ class ApiKeyRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_by_hash(self, key_hash: str):
-        return (
-            self.db.query(ApiKey)
-            .filter(ApiKey.key_hash == key_hash, ApiKey.active == True)
-            .first()
-        )
-
     def create(self, api_key: ApiKey):
         self.db.add(api_key)
         return api_key

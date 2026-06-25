@@ -90,9 +90,11 @@ class LibroMayorReprocessService:
                 "rule_id": rule_id,
             }
 
+        reglas = self._get_active_rules()
+
         df = self.rules_service.reprocesar(
             df=df,
-            reglas=[regla],
+            reglas=reglas,
             user_id=self.user_id,
         )
 

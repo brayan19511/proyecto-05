@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.exceptions import (
+    ConflictError,
     NotFoundError,
     ValidationError,
 )
@@ -26,6 +27,13 @@ def register_exception_handlers(app):
     async def validation_handler(request: Request, exc: ValidationError):
         return JSONResponse(
             status_code=400,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(ConflictError)
+    async def conflict_handler(request: Request, exc: ConflictError):
+        return JSONResponse(
+            status_code=409,
             content={"detail": str(exc)},
         )
 

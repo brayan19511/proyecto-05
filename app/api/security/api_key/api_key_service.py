@@ -4,7 +4,9 @@ import secrets
 from uuid import uuid4
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 
+from app.core.db.integrity import raise_integrity_error
 from app.models.auth.security_model import ApiKey
 from app.api.security.api_key.api_key_repository import ApiKeyRepository
 
@@ -48,12 +50,21 @@ class ApiKeyService:
                 "key_info": api_key,
             }
 
-        except Exception as e:
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                invalid_references={
+                    "api_key_user_id_fkey": "El usuario indicado no existe"
+                },
+                default_message="No se pudo crear la API Key",
+            )
+        except Exception as exc:
             self.repository.rollback()
             raise HTTPException(
                 status_code=500,
-                detail=str(e),
-            )
+                detail="No se pudo crear la API Key",
+            ) from exc
 
     def get_my_keys(self, user_id):
         return self.repository.get_by_user(user_id)

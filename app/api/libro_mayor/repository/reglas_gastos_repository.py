@@ -25,7 +25,10 @@ class ReglasGastosRepository:
         return (
             self.db.query(ReglasGastos)
             .filter(ReglasGastos.activo == True)
-            .order_by(ReglasGastos.prioridad.asc())
+            .order_by(
+                ReglasGastos.prioridad.asc(),
+                ReglasGastos.id_regla.asc(),
+            )
             .all()
         )
 

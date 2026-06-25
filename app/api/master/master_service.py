@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.master.master_model import (
@@ -21,6 +22,8 @@ from app.api.master.master_schema import (
     CurrencyCreateRequest,
     CurrencyUpdateRequest,
 )
+from app.core.db.integrity import raise_integrity_error
+from app.core.exceptions import ConflictError
 
 
 class MasterService:
@@ -28,6 +31,16 @@ class MasterService:
     def __init__(self, db: Session):
 
         self.repository = MasterRepository(db)
+
+    def _commit(self, conflict_constraint: str, conflict_message: str):
+        try:
+            self.repository.commit()
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={conflict_constraint: conflict_message},
+            )
 
     # ==========================================
     # COMPANY
@@ -51,23 +64,15 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        if self.repository.get_company_by_code(request.code):
-            raise HTTPException(status_code=400, detail="Company code already exists")
+        data = request.model_dump()
+        data["code"] = data["code"].strip().upper()
+        if self.repository.get_company_by_code(data["code"]):
+            raise ConflictError("El codigo de empresa ya existe")
 
-        try:
-
-            company = Company(**request.model_dump(), created_by=current_user_id)
-
-            self.repository.create_company(company)
-
-            self.repository.commit()
-
-            return company
-
-        except Exception as e:
-
-            self.repository.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
+        company = Company(**data, created_by=current_user_id)
+        self.repository.create_company(company)
+        self._commit("companies_code_key", "El codigo de empresa ya existe")
+        return company
 
     def update_company(
         self,
@@ -76,25 +81,23 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        try:
+        company = self.repository.get_company_by_id(company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
 
-            company = self.repository.get_company_by_id(company_id)
+        data = request.model_dump(exclude_unset=True)
+        if "code" in data and data["code"] is not None:
+            data["code"] = data["code"].strip().upper()
+            existing = self.repository.get_company_by_code(data["code"])
+            if existing and existing.id != company_id:
+                raise ConflictError("El codigo de empresa ya existe")
 
-            if not company:
-                raise HTTPException(status_code=404, detail="Company not found")
+        for key, value in data.items():
+            setattr(company, key, value)
 
-            for key, value in request.model_dump(exclude_unset=True).items():
-                setattr(company, key, value)
-
-            company.updated_by = current_user_id
-
-            self.repository.commit()
-
-            return company
-
-        except Exception:
-            self.repository.rollback()
-            raise
+        company.updated_by = current_user_id
+        self._commit("companies_code_key", "El codigo de empresa ya existe")
+        return company
 
     def delete_company(
         self,
@@ -145,24 +148,16 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        if self.repository.get_currency_by_code(request.code):
-            raise HTTPException(status_code=400, detail="Currency code already exists")
+        data = request.model_dump()
+        data["code"] = data["code"].strip().upper()
+        if self.repository.get_currency_by_code(data["code"]):
+            raise ConflictError("El codigo de moneda ya existe")
 
-        try:
-
-            data = self._normalize_currency_data(request.model_dump())
-            currency = Currency(**data, created_by=current_user_id)
-
-            self.repository.create_currency(currency)
-
-            self.repository.commit()
-
-            return currency
-
-        except Exception as e:
-
-            self.repository.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
+        data = self._normalize_currency_data(data)
+        currency = Currency(**data, created_by=current_user_id)
+        self.repository.create_currency(currency)
+        self._commit("currencies_code_key", "El codigo de moneda ya existe")
+        return currency
 
     def update_currency(
         self,
@@ -177,13 +172,18 @@ class MasterService:
             raise HTTPException(status_code=404, detail="Currency not found")
 
         data = self._normalize_currency_data(request.model_dump(exclude_unset=True))
+        if "code" in data and data["code"] is not None:
+            data["code"] = data["code"].strip().upper()
+            existing = self.repository.get_currency_by_code(data["code"])
+            if existing and existing.id != currency_id:
+                raise ConflictError("El codigo de moneda ya existe")
 
         for key, value in data.items():
             setattr(currency, key, value)
 
         currency.updated_by = current_user_id
 
-        self.repository.commit()
+        self._commit("currencies_code_key", "El codigo de moneda ya existe")
 
         return currency
 
@@ -224,23 +224,15 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        if self.repository.get_area_by_code(request.code):
-            raise HTTPException(status_code=400, detail="Area code already exists")
+        data = request.model_dump()
+        data["code"] = data["code"].strip().upper()
+        if self.repository.get_area_by_code(data["code"]):
+            raise ConflictError("El codigo de area ya existe")
 
-        try:
-
-            area = Area(**request.model_dump(), created_by=current_user_id)
-
-            self.repository.create_area(area)
-
-            self.repository.commit()
-
-            return area
-
-        except Exception as e:
-
-            self.repository.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
+        area = Area(**data, created_by=current_user_id)
+        self.repository.create_area(area)
+        self._commit("areas_code_key", "El codigo de area ya existe")
+        return area
 
     def update_area(
         self,
@@ -254,12 +246,19 @@ class MasterService:
         if not area:
             raise HTTPException(status_code=404, detail="Area not found")
 
-        for key, value in request.model_dump(exclude_unset=True).items():
+        data = request.model_dump(exclude_unset=True)
+        if "code" in data and data["code"] is not None:
+            data["code"] = data["code"].strip().upper()
+            existing = self.repository.get_area_by_code(data["code"])
+            if existing and existing.id != area_id:
+                raise ConflictError("El codigo de area ya existe")
+
+        for key, value in data.items():
             setattr(area, key, value)
 
         area.updated_by = current_user_id
 
-        self.repository.commit()
+        self._commit("areas_code_key", "El codigo de area ya existe")
 
         return area
 

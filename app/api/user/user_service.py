@@ -1,8 +1,11 @@
 from uuid import UUID
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.db.integrity import raise_integrity_error
+from app.core.exceptions import ConflictError
 from app.models import Information
 from .user_repository import UserRepository
 from .user_schemas import UserProfileCreate, UserProfileUpdate
@@ -55,18 +58,46 @@ class UserService:
         return self._to_user_response(user)
 
     def create_user_profile(self, user_id: UUID, data: UserProfileCreate):
+        if not self.repository.get_user_by_id(user_id):
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
         profile = self.repository.get_profile_by_id(user_id)
         self._validate_document(user_id, data)
 
         if profile:
             update_data = data.model_dump(exclude_unset=True)
-            self.repository.update_profile(profile, update_data)
+            try:
+                self.repository.update_profile(profile, update_data)
+            except IntegrityError as exc:
+                self.repository.rollback()
+                raise_integrity_error(
+                    exc,
+                    conflicts={
+                        "information_document_number_key": (
+                            "Documento ya registrado en otro perfil"
+                        )
+                    },
+                )
         else:
             new_profile = Information(
                 user_id=user_id,
                 **data.model_dump(),
             )
-            self.repository.add_profile(new_profile)
+            try:
+                self.repository.add_profile(new_profile)
+            except IntegrityError as exc:
+                self.repository.rollback()
+                raise_integrity_error(
+                    exc,
+                    conflicts={
+                        "information_document_number_key": (
+                            "Documento ya registrado en otro perfil"
+                        )
+                    },
+                    invalid_references={
+                        "information_user_id_fkey": "Usuario no encontrado"
+                    },
+                )
 
         return self.get_user_profile(user_id)
 
@@ -79,15 +110,37 @@ class UserService:
                 user_id=user_id,
                 **data.model_dump(),
             )
-            self.repository.add_profile(new_profile)
+            try:
+                self.repository.add_profile(new_profile)
+            except IntegrityError as exc:
+                self.repository.rollback()
+                raise_integrity_error(
+                    exc,
+                    conflicts={
+                        "information_document_number_key": (
+                            "Documento ya registrado en otro perfil"
+                        )
+                    },
+                    invalid_references={
+                        "information_user_id_fkey": "Usuario no encontrado"
+                    },
+                )
             return self.get_user_profile(user_id)
 
         try:
             update_data = data.model_dump(exclude_unset=True)
             self.repository.update_profile(profile, update_data)
             return self.get_user_profile(user_id)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={
+                    "information_document_number_key": (
+                        "Documento ya registrado en otro perfil"
+                    )
+                },
+            )
 
     def ensure_empty_profile(self, user_id: UUID):
         if self.repository.get_profile_by_id(user_id):
@@ -103,12 +156,13 @@ class UserService:
         if not data.document_number:
             return
 
+        data.document_number = data.document_number.strip()
+        if data.document_type:
+            data.document_type = data.document_type.strip().upper()
+
         if self.repository.exists_by_document(
             data.document_type,
             data.document_number,
             exclude_user_id=user_id,
         ):
-            raise HTTPException(
-                status_code=400,
-                detail="Documento ya registrado en otro perfil",
-            )
+            raise ConflictError("Documento ya registrado en otro perfil")

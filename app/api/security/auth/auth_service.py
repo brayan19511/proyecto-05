@@ -1,6 +1,7 @@
 import logging
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from uuid6 import uuid7
 
 from app.api.security.auth.auth_repository import AuthRepository
@@ -11,6 +12,8 @@ from app.api.security.auth.auth_schemas import (
     UserTokenResponse,
 )
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.db.integrity import raise_integrity_error
+from app.core.exceptions import ConflictError
 from app.models import Auth, Information
 
 
@@ -59,17 +62,15 @@ class AuthService:
         return self.auth_repository.get_by_email(email)
 
     def register_user(self, data: UserRegisterSchema):
-        if self.auth_repository.get_by_email(data.email):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email ya registrado",
-            )
+        email = data.email.strip().lower()
+        if self.auth_repository.get_by_email(email):
+            raise ConflictError("Email ya registrado")
 
         try:
             user_id = uuid7()
             new_auth = Auth(
                 id=user_id,
-                email=data.email,
+                email=email,
                 password_hash=hash_password(data.password),
             )
             self.auth_repository.create_auth(new_auth)
@@ -79,6 +80,13 @@ class AuthService:
                 "message": "Usuario creado exitosamente",
                 "id": user_id,
             }
+        except IntegrityError as exc:
+            self.auth_repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={"auth_email_key": "Email ya registrado"},
+                default_message="No se pudo crear el usuario",
+            )
         except Exception as exc:
             self.auth_repository.rollback()
             logger.exception("Error al crear usuario")

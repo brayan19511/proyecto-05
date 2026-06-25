@@ -210,6 +210,20 @@ class ProvisionRepository:
             .first()
         )
 
+    def get_provision_by_ticket(
+        self,
+        company_id: int,
+        ticket_code: str,
+    ):
+        return (
+            self.db.query(Provision)
+            .filter(
+                Provision.company_id == company_id,
+                Provision.ticket_code == ticket_code,
+            )
+            .first()
+        )
+
     def update_provision_document(
         self,
         document: ProvisionDocument,
@@ -243,6 +257,20 @@ class ProvisionRepository:
         self.db.flush()
 
         return access_items
+
+    def get_provision_access(
+        self,
+        provision_id: UUID,
+        user_id: UUID,
+    ):
+        return (
+            self.db.query(ProvisionAccess)
+            .filter(
+                ProvisionAccess.provision_id == provision_id,
+                ProvisionAccess.user_id == user_id,
+            )
+            .first()
+        )
 
     # =====================================================
     # ATTACHMENTS

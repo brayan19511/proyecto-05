@@ -1,5 +1,6 @@
 from datetime import date
 import io
+import logging
 
 import pandas as pd
 
@@ -34,6 +35,8 @@ from app.api.libro_mayor.service.reglas_gastos_service import ReglasGastosServic
 from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/libro-mayor",
@@ -199,11 +202,11 @@ def reprocess_rule(
             detail=str(ve),
         )
 
-    except Exception as e:
-
+    except Exception:
+        logger.exception("Error reprocesando regla de libro mayor")
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="No se pudo reprocesar la regla",
         )
 
 
@@ -230,11 +233,11 @@ def reprocess_date_range(
             detail=str(ve),
         )
 
-    except Exception as e:
-
+    except Exception:
+        logger.exception("Error reprocesando rango de libro mayor")
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="No se pudo reprocesar el rango",
         )
 
 
@@ -270,11 +273,11 @@ def get_libro_mayor(
             detail=str(ve),
         )
 
-    except Exception as e:
-
+    except Exception:
+        logger.exception("Error consultando libro mayor")
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="No se pudo consultar el libro mayor",
         )
 
 
@@ -305,11 +308,11 @@ def get_libro_mayor_sap(
             detail=str(ve),
         )
 
-    except Exception as e:
-
+    except Exception:
+        logger.exception("Error consultando libro mayor en SAP")
         raise HTTPException(
             status_code=500,
-            detail=str(e),
+            detail="No se pudo consultar el libro mayor en SAP",
         )
 
 
@@ -373,11 +376,14 @@ def export_excel(
             detail=str(ve),
         )
 
-    except Exception as e:
+    except HTTPException:
+        raise
 
+    except Exception:
+        logger.exception("Error exportando libro mayor a Excel")
         raise HTTPException(
             status_code=500,
-            detail=f"Error exportando Excel: {str(e)}",
+            detail="No se pudo generar el archivo Excel",
         )
 
 

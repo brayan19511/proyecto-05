@@ -2,7 +2,6 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.provisions.concepts.concepts_schema import (
     ConceptCreateRequest,
-    ConceptCreateRequest,
     ConceptUpdateRequest,
 )
 from app.models.finance.provision_model import ProvisionConcept
@@ -29,13 +28,25 @@ class ConceptsRepository:
             .first()
         )
 
+    def get_concept_by_company_and_code(
+        self,
+        company_id: int,
+        code: str,
+    ):
+        return (
+            self.db.query(ProvisionConcept)
+            .filter(
+                ProvisionConcept.company_id == company_id,
+                ProvisionConcept.code == code,
+            )
+            .first()
+        )
+
     def create_concept(self, concept_data: ConceptCreateRequest, current_user_id: int):
         new_concept = ProvisionConcept(
             **concept_data.model_dump(), created_by=current_user_id
         )
         self.db.add(new_concept)
-        self.db.commit()
-        self.db.refresh(new_concept)
         return new_concept
 
     def update_concept(
@@ -47,8 +58,6 @@ class ConceptsRepository:
             update_data = concept_data.model_dump(exclude_unset=True)
             for key, value in update_data.items():
                 setattr(concept, key, value)
-            self.db.commit()
-            self.db.refresh(concept)
             return concept
         return None
 
@@ -57,6 +66,11 @@ class ConceptsRepository:
         if concept:
             concept.active = False
             concept.updated_by = current_user_id
-            self.db.commit()
             return True
         return False
+
+    def commit(self):
+        self.db.commit()
+
+    def rollback(self):
+        self.db.rollback()

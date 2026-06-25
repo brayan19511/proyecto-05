@@ -9,6 +9,7 @@ Esta carpeta contiene las guias tecnicas y operativas del backend de Finanzas.
 3. [Base de datos y Alembic](readme_database.md)
 4. [Despliegue en produccion](deployment.md)
 5. [Estructura del proyecto](project_structure.md)
+6. [Automatizacion y tareas en cola](automation_and_queues.md)
 
 ## Recursos
 

@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.api.security.permission.permission_repository import PermissionRepository
 from app.api.security.permission.permission_schemas import (
@@ -6,6 +7,8 @@ from app.api.security.permission.permission_schemas import (
     PermissionUpdateRequest,
 )
 from app.api.security.role.role_repository import RoleRepository
+from app.core.db.integrity import raise_integrity_error
+from app.core.exceptions import ConflictError
 
 
 class PermissionService:
@@ -17,7 +20,23 @@ class PermissionService:
         return self.permission_repository.get_all_permissions()
 
     def create_permission(self, new_permission: PermisionCreateRequest):
-        return self.permission_repository.create_permission(new_permission)
+        code = new_permission.code.strip().lower()
+        if self.permission_repository.get_permission_by_code(code):
+            raise ConflictError(f"El permiso '{code}' ya existe")
+
+        try:
+            return self.permission_repository.create_permission(
+                PermisionCreateRequest(
+                    code=code,
+                    description=new_permission.description.strip(),
+                )
+            )
+        except IntegrityError as exc:
+            self.permission_repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={"uq_permission_code": f"El permiso '{code}' ya existe"},
+            )
 
     def get_permission(self, permission_id: int):
         permission = self.permission_repository.get_permission_by_id(permission_id)
@@ -39,11 +58,26 @@ class PermissionService:
         data = permission_data.model_dump(exclude_unset=True)
 
         if "code" in data:
+            data["code"] = data["code"].strip().lower()
             existing = self.permission_repository.get_permission_by_code(data["code"])
             if existing and existing.id != permission_id:
-                raise ValueError(f"Permission with code '{data['code']}' already exists.")
+                raise ConflictError(f"El permiso '{data['code']}' ya existe")
 
-        return self.permission_repository.update_permission(permission, permission_data)
+        try:
+            return self.permission_repository.update_permission(
+                permission,
+                PermissionUpdateRequest(**data),
+            )
+        except IntegrityError as exc:
+            self.permission_repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={
+                    "uq_permission_code": (
+                        f"El permiso '{data.get('code', permission.code)}' ya existe"
+                    )
+                },
+            )
 
     def delete_permission(self, permission_id: int):
         if not self.permission_repository.delete_permission(permission_id):
@@ -75,7 +109,18 @@ class PermissionService:
                 "message": "El rol ya tiene este permiso",
             }
 
-        self.permission_repository.assign_role_to_permission(role_id, permission_id)
+        try:
+            self.permission_repository.assign_role_to_permission(
+                role_id,
+                permission_id,
+            )
+        except IntegrityError:
+            self.permission_repository.rollback()
+            return {
+                "assigned": False,
+                "already_exists": True,
+                "message": "El rol ya tiene este permiso",
+            }
         return {
             "assigned": True,
             "message": "Permiso asignado correctamente",

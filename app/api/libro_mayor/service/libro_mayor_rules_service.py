@@ -1,5 +1,7 @@
 # app/api/libro_mayor/rules_engine.py
 import pandas as pd
+
+from app.api.libro_mayor.constants import TEXT_SEARCH_COLUMNS
 from app.models.finance.libro_mayor_model import ReglasGastos
 
 
@@ -17,12 +19,6 @@ class LibroMayorRulesService:
         self._inicializar_columnas(df, user_id)
         for regla in reglas:
             self._aplicar_regla(df, regla)
-        # eliminar columna auxiliar
-        # df.drop(
-        #     columns=["_descripcion_lower"],
-        #     inplace=True,
-        #     errors="ignore"
-        # )
         df.drop(
             columns=["_texto_busqueda_lower"],
             inplace=True,
@@ -32,19 +28,12 @@ class LibroMayorRulesService:
         return df
 
     def _inicializar_columnas(self, df: pd.DataFrame, user_id: str | None):
-        # df["_descripcion_lower"] = df["descripcion"].fillna("").str.lower()
-        text_columns = [
-            "descripcion",
-            "referencia_1",
-            "referencia_2",
-            "referencia_3",
-        ]
         df["_texto_busqueda_lower"] = (
-            df.reindex(columns=text_columns)
+            df.reindex(columns=TEXT_SEARCH_COLUMNS)
             .fillna("")
             .astype(str)
             .agg(" ".join, axis=1)
-            .str.lower()
+            .str.casefold()
         )
 
         df["id_regla"] = None
@@ -93,18 +82,22 @@ class LibroMayorRulesService:
             mask &= df["centro_costo"] == regla.centro_costo
 
         if regla.filtro_texto:
-
-            texto = regla.filtro_texto.lower()
-
-            mask &= df["_texto_busqueda_lower"].str.contains(
-                texto, regex=False)
+            texto = regla.filtro_texto.strip().casefold()
+            if texto:
+                mask &= df["_texto_busqueda_lower"].str.contains(
+                    texto,
+                    regex=False,
+                    na=False,
+                )
 
         if regla.texto_excluido:
-
-            texto = regla.texto_excluido.lower()
-
-            mask &= ~df["_texto_busqueda_lower"].str.contains(
-                texto, regex=False)
+            texto = regla.texto_excluido.strip().casefold()
+            if texto:
+                mask &= ~df["_texto_busqueda_lower"].str.contains(
+                    texto,
+                    regex=False,
+                    na=False,
+                )
 
         if regla.monto_min is not None:
             mask &= df["cargo_abono_ml"] >= regla.monto_min
