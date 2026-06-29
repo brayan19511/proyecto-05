@@ -6,7 +6,7 @@ from app.api.health import health_router
 from app.api.libro_mayor import libro_mayor_router
 from app.api.master import master_router
 from app.api.provisions import provisions_router
-from app.api.sales_channel import sales_channel_router
+from app.api.sales_channel import router as sales_channel_router
 from app.api.sap import sap_router
 from app.api.security import security_router
 from app.api.storage import attachments_router

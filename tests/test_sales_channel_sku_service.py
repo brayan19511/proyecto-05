@@ -3,17 +3,17 @@ import unittest
 from unittest.mock import Mock
 
 from sqlalchemy.dialects import mssql
-from app.api.sales_channel.sku_repository import SkuRepository
-from app.api.sales_channel.sku_schema import (
+from app.api.sales_channel.peya.promotion_service import PromoSkuService
+from app.api.sales_channel.peya.schemas import PromoSkuCreateRequest
+from app.api.sales_channel.sku.repository import SkuRepository
+from app.api.sales_channel.sku.schemas import (
     ActiveSkuSnapshotRequest,
     BulkSkuSyncRequest,
-    PromoSkuCreateRequest,
     SkuCreateRequest,
     SkuUpdateRequest,
 )
-from app.api.sales_channel.sku_service import (
+from app.api.sales_channel.sku.service import (
     ManagedSkuService,
-    PromoSkuService,
     SkuModelConfig,
 )
 from app.core.exceptions import ConflictError, NotFoundError
@@ -179,6 +179,22 @@ class ManagedSkuServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ActiveSkuSnapshotRequest(skus=["SKU-1", " sku-1 "])
 
+    def test_bulk_preview_rolls_back_instead_of_committing(self):
+        service = make_managed_service()
+        service.repository.list.return_value = [
+            FakeSku("SKU-1", is_active=False)
+        ]
+
+        service.bulk_sync(
+            BulkSkuSyncRequest(
+                items=[{"sku": "SKU-1", "active": True}],
+            ),
+            dry_run=True,
+        )
+
+        service.repository.rollback.assert_called_once()
+        service.repository.commit.assert_not_called()
+
 
 class PromoSkuServiceTests(unittest.TestCase):
     def test_delete_physically_removes_promo_sku(self):
@@ -208,6 +224,35 @@ class PromoSkuServiceTests(unittest.TestCase):
 
         with self.assertRaises(NotFoundError):
             service.create(PromoSkuCreateRequest(sku="UNKNOWN"))
+
+    def test_promotion_snapshot_adds_and_removes_atomically(self):
+        service = PromoSkuService(Mock(), FakePromoSku, FakeSku)
+        service.repository = Mock()
+        existing = FakePromoSku("OLD")
+        service.repository.list.return_value = [existing]
+        service.repository.list_skus.return_value = {"OLD", "NEW"}
+
+        result = service.sync_snapshot(["NEW"])
+
+        created = service.repository.add.call_args.args[0]
+        self.assertEqual(created.sku, "NEW")
+        service.repository.delete.assert_called_once_with(existing)
+        service.repository.commit.assert_called_once()
+        self.assertEqual(result["promotions_added"], 1)
+        self.assertEqual(result["promotions_removed"], 1)
+
+    def test_promotion_snapshot_does_not_write_with_unknown_sku(self):
+        service = PromoSkuService(Mock(), FakePromoSku, FakeSku)
+        service.repository = Mock()
+        service.repository.list.return_value = []
+        service.repository.list_skus.return_value = {"KNOWN"}
+
+        result = service.sync_snapshot(["UNKNOWN"])
+
+        self.assertEqual(result["missing"], ["UNKNOWN"])
+        service.repository.add.assert_not_called()
+        service.repository.delete.assert_not_called()
+        service.repository.commit.assert_not_called()
 
 
 class SkuRepositorySqlTests(unittest.TestCase):

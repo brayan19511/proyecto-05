@@ -36,6 +36,36 @@ app/api/<dominio>/
 - Repository: consultas y persistencia SQLAlchemy.
 - Model: estructura persistente y relaciones.
 
+Cuando un dominio crece, se divide por capacidad en lugar de crear un
+`utils.py`. Por ejemplo:
+
+```text
+app/api/sales_channel/
+|-- router.py
+|-- channel_registry.py
+|-- permissions.py
+|-- sku/
+|   |-- schemas.py
+|   |-- repository.py
+|   |-- service.py
+|   `-- router_factory.py
+|-- imports/
+|   |-- schemas.py
+|   |-- excel_reader.py
+|   `-- service.py
+|-- rappi/
+|   `-- router.py
+`-- peya/
+    |-- router.py
+    |-- sku_router.py
+    |-- promotion_router.py
+    |-- promotion_service.py
+    `-- schemas.py
+```
+
+Las carpetas `sku` e `imports` contienen capacidades compartidas. Las reglas
+que solo pertenecen a promociones permanecen dentro de `peya`.
+
 ## Donde colocar codigo compartido
 
 - `app/core/`: infraestructura global, seguridad, configuración y DB.

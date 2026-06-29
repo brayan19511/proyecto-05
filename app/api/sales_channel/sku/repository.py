@@ -1,3 +1,5 @@
+"""Persistence operations shared by all externally managed SKU tables."""
+
 from typing import Any
 
 from sqlalchemy import or_

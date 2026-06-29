@@ -1,0 +1,34 @@
+from enum import StrEnum
+
+from pydantic import BaseModel, Field
+
+
+class SkuImportMode(StrEnum):
+    ACTIVE_SNAPSHOT = "active_snapshot"
+    STATUS_UPDATE = "status_update"
+    PROMOTION_SNAPSHOT = "promotion_snapshot"
+
+
+class SkuImportIssue(BaseModel):
+    row: int | None = None
+    field: str | None = None
+    message: str
+
+
+class SkuImportResponse(BaseModel):
+    filename: str
+    sha256: str
+    mode: SkuImportMode
+    preview: bool
+    can_apply: bool
+    applied: bool
+    received: int
+    valid: int
+    created: int = 0
+    activated: int = 0
+    deactivated: int = 0
+    unchanged: int = 0
+    promotions_added: int = 0
+    promotions_removed: int = 0
+    missing: list[str] = Field(default_factory=list)
+    errors: list[SkuImportIssue] = Field(default_factory=list)

@@ -14,6 +14,10 @@ app/
 |           `-- generated_models.py
 `-- api/
     `-- sales_channel/
+        |-- sku/          CRUD y sincronizacion compartida.
+        |-- imports/      Lectura y orquestacion de Excel.
+        |-- rappi/        Registro de rutas Rappi por pais.
+        `-- peya/         SKU y promociones exclusivas de Peya.
 ```
 
 `models/external/ofisis/ecomm` representa la ubicacion fisica del dato.
@@ -67,37 +71,52 @@ debe escribirse dentro de `generated_models.py`.
 
 ## API de canales de venta
 
-Rappi y Peya normal permiten consultar, crear, editar, activar y desactivar:
+Rappi y Peya normal permiten consultar, crear, editar, activar y desactivar.
+Las rutas usan códigos ISO 3166-1 alpha-2 para el país:
 
 ```text
-GET    /api/sales-channels/{canal}/skus
-GET    /api/sales-channels/{canal}/skus/{sku}
-POST   /api/sales-channels/{canal}/skus
-PATCH  /api/sales-channels/{canal}/skus/{sku}
-POST   /api/sales-channels/{canal}/skus/{sku}/activate
-POST   /api/sales-channels/{canal}/skus/{sku}/deactivate
+GET    /api/sales-channels/{pais}/{proveedor}/skus
+GET    /api/sales-channels/{pais}/{proveedor}/skus/{sku}
+POST   /api/sales-channels/{pais}/{proveedor}/skus
+PATCH  /api/sales-channels/{pais}/{proveedor}/skus/{sku}
+POST   /api/sales-channels/{pais}/{proveedor}/skus/{sku}/activate
+POST   /api/sales-channels/{pais}/{proveedor}/skus/{sku}/deactivate
 ```
 
-Los valores de `{canal}` implementados son `rappi` y `peya`.
+Las combinaciones implementadas son:
+
+- `pe/rappi`: Rappi Peru, tabla `rappi_sku`.
+- `mx/rappi`: Rappi Mexico, tabla `mx_rappi_sku`.
+- `pe/peya`: PedidosYa Peru, tabla `peya_sku`.
 
 Las promociones Peya permiten eliminacion fisica:
 
 ```text
-GET    /api/sales-channels/peya/promo-skus
-GET    /api/sales-channels/peya/promo-skus/{sku}
-POST   /api/sales-channels/peya/promo-skus
-DELETE /api/sales-channels/peya/promo-skus/{sku}
+GET    /api/sales-channels/pe/peya/promo-skus
+GET    /api/sales-channels/pe/peya/promo-skus/{sku}
+POST   /api/sales-channels/pe/peya/promo-skus
+DELETE /api/sales-channels/pe/peya/promo-skus/{sku}
 ```
 
 Permisos:
 
 - `sales_channels.skus.view`
 - `sales_channels.skus.edit`
+- `sales_channels.skus.import`
+- `sales_channels.promotions.view`
+- `sales_channels.promotions.edit`
+- `sales_channels.promotions.import`
+
+Roles iniciales:
+
+- `Canales Venta Consulta`: consulta SKU y promociones.
+- `Canales Venta Importador`: previsualiza e importa archivos.
+- `Canales Venta Admin`: consulta, CRUD manual e importaciones.
 
 El listado Peya incluye `has_promotion`. El frontend puede usar:
 
-- `POST /api/sales-channels/peya/promo-skus` para agregarla.
-- `DELETE /api/sales-channels/peya/promo-skus/{sku}` para eliminarla.
+- `POST /api/sales-channels/pe/peya/promo-skus` para agregarla.
+- `DELETE /api/sales-channels/pe/peya/promo-skus/{sku}` para eliminarla.
 
 No existe una llave foranea entre las tablas externas. La aplicacion valida
 que el SKU exista en `peya_sku` antes de crear su promocion.
@@ -131,8 +150,9 @@ una fotografia completa del canal.
 Cuando el archivo contiene unicamente los SKU que deben quedar activos, usar:
 
 ```text
-POST /api/sales-channels/rappi/skus/active-snapshot
-POST /api/sales-channels/peya/skus/active-snapshot
+POST /api/sales-channels/pe/rappi/skus/active-snapshot
+POST /api/sales-channels/mx/rappi/skus/active-snapshot
+POST /api/sales-channels/pe/peya/skus/active-snapshot
 ```
 
 ```json
@@ -160,3 +180,81 @@ get_ofisis_engine("OtraDB")  -> Engine OtraDB
 
 Cada `Engine` administra su propio pool de conexiones. Cada solicitud sigue
 abriendo y cerrando su propia `Session` mediante `get_db_ofisis()`.
+
+## Agregar un país o proveedor
+
+`channel_registry.py` contiene las combinaciones públicas permitidas. Para
+agregar Peya México se debe:
+
+1. Generar o agregar el modelo de la tabla externa.
+2. Declarar `PEYA_MEXICO` con país `mx`, proveedor `peya` y su modelo.
+3. Añadirlo a `SALES_CHANNELS`.
+4. Registrar su router usando los prefijos calculados por la definición.
+
+No se debe recibir desde HTTP el nombre de la base o tabla. País y proveedor
+solo resuelven configuraciones declaradas por el backend.
+
+## Importar Excel
+
+El frontend envia `multipart/form-data`; no debe convertir el archivo a
+base64. El backend procesa temporalmente el libro y no lo almacena.
+
+Para SKU normales:
+
+```text
+POST /api/sales-channels/{pais}/{proveedor}/skus/import/preview
+POST /api/sales-channels/{pais}/{proveedor}/skus/import
+```
+
+Campos:
+
+- `file`: archivo `.xlsx`.
+- `mode`: `active_snapshot` o `status_update`.
+- `create_missing`: `true` o `false`.
+- `expected_sha256`: opcional en `import`; debe ser el hash de `preview`.
+
+`active_snapshot` necesita solamente la columna `sku`. Los SKU presentes
+quedan activos y los omitidos se desactivan.
+
+`status_update` necesita `sku` y una columna `active`, `is_active`, `on`,
+`on_off` u `on/off`. Acepta `on/off`, `true/false`, `1/0`,
+`activo/inactivo` y `si/no`.
+
+Para promociones Peya:
+
+```text
+POST /api/sales-channels/pe/peya/promo-skus/import/preview
+POST /api/sales-channels/pe/peya/promo-skus/import
+```
+
+El archivo contiene solo `sku`. Los presentes quedan como promociones y los
+omitidos se eliminan de `peya_promo_sku`. Un SKU que no exista en `peya_sku`
+bloquea la importacion completa.
+
+Ejemplo para JavaScript:
+
+```javascript
+const form = new FormData();
+form.append("file", file);
+form.append("mode", "active_snapshot");
+form.append("create_missing", "true");
+
+await fetch(
+  "/api/sales-channels/pe/rappi/skus/import/preview",
+  { method: "POST", body: form }
+);
+```
+
+La respuesta indica:
+
+- `preview=true`: solo calculo; se ejecuto rollback.
+- `can_apply=false`: hay errores que deben corregirse.
+- `applied=true`: la transaccion fue confirmada.
+- `sha256`: huella del archivo procesado.
+
+Restricciones:
+
+- Solo `.xlsx`.
+- Maximo 5 MB y 20000 filas.
+- No se admiten SKU vacios ni duplicados.
+- Nginx debe permitir al menos 6 MB mediante `client_max_body_size 6m`.

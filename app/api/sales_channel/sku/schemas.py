@@ -56,10 +56,6 @@ class SkuResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PeyaSkuResponse(SkuResponse):
-    has_promotion: bool
-
-
 class BulkSkuItem(BaseModel):
     sku: str = Field(min_length=1, max_length=255)
     active: bool = Field(
@@ -117,18 +113,3 @@ class ActiveSkuSnapshotRequest(BaseModel):
         if len(comparable) != len(set(comparable)):
             raise ValueError("La lista contiene SKU duplicados")
         return normalized
-
-
-class PromoSkuCreateRequest(BaseModel):
-    sku: str = Field(min_length=1, max_length=255)
-
-    @field_validator("sku")
-    @classmethod
-    def normalize_sku(cls, value: str) -> str:
-        return value.strip()
-
-
-class PromoSkuResponse(BaseModel):
-    sku: str
-
-    model_config = ConfigDict(from_attributes=True)

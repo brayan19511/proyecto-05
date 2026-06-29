@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.sales_channel.sku_repository import SkuRepository
-from app.api.sales_channel.sku_schema import (
+from app.api.sales_channel.sku.repository import SkuRepository
+from app.api.sales_channel.sku.schemas import (
     ActiveSkuSnapshotRequest,
     BulkSkuSyncRequest,
-    PromoSkuCreateRequest,
     SkuCreateRequest,
     SkuUpdateRequest,
 )
@@ -78,7 +79,12 @@ class ManagedSkuService:
         self._commit(entity)
         return self._serialize_one(entity)
 
-    def bulk_sync(self, request: BulkSkuSyncRequest) -> dict:
+    def bulk_sync(
+        self,
+        request: BulkSkuSyncRequest,
+        *,
+        dry_run: bool = False,
+    ) -> dict:
         existing_entities = self.repository.list()
         existing_by_sku = {
             entity.sku.casefold(): entity
@@ -131,7 +137,10 @@ class ManagedSkuService:
                 result["deactivated"] += 1
 
         try:
-            self.repository.commit()
+            if dry_run:
+                self.repository.rollback()
+            else:
+                self.repository.commit()
         except IntegrityError as exc:
             self.repository.rollback()
             raise ConflictError(
@@ -143,6 +152,8 @@ class ManagedSkuService:
     def apply_active_snapshot(
         self,
         request: ActiveSkuSnapshotRequest,
+        *,
+        dry_run: bool = False,
     ) -> dict:
         return self.bulk_sync(
             BulkSkuSyncRequest(
@@ -152,7 +163,8 @@ class ManagedSkuService:
                 ],
                 create_missing=request.create_missing,
                 deactivate_missing=True,
-            )
+            ),
+            dry_run=dry_run,
         )
 
     def _get_or_raise(self, sku: str):
@@ -210,57 +222,3 @@ class ManagedSkuService:
         )
         promotion_skus = {entity.sku.casefold()} if has_promotion else set()
         return self._serialize(entity, promotion_skus)
-
-
-class PromoSkuService:
-    def __init__(self, db: Session, model: type, parent_model: type):
-        self.model = model
-        self.parent_model = parent_model
-        self.repository = SkuRepository(db, model)
-
-    def list(self, search: str | None = None):
-        return self.repository.list(search)
-
-    def get(self, sku: str):
-        return self._get_or_raise(sku)
-
-    def create(self, request: PromoSkuCreateRequest):
-        if not self.repository.sku_exists(self.parent_model, request.sku):
-            raise NotFoundError(
-                f"El SKU {request.sku} no existe en el catalogo Peya"
-            )
-
-        if self.repository.get(request.sku):
-            raise ConflictError(
-                f"El SKU promocional {request.sku} ya existe en Peya"
-            )
-
-        entity = self.repository.add(self.model(sku=request.sku))
-        try:
-            self.repository.commit()
-            self.repository.refresh(entity)
-        except IntegrityError as exc:
-            self.repository.rollback()
-            raise ConflictError(
-                f"No se pudo guardar el SKU promocional {request.sku}"
-            ) from exc
-        return entity
-
-    def delete(self, sku: str) -> None:
-        entity = self._get_or_raise(sku)
-        self.repository.delete(entity)
-        try:
-            self.repository.commit()
-        except IntegrityError as exc:
-            self.repository.rollback()
-            raise ConflictError(
-                f"No se pudo eliminar el SKU promocional {sku}"
-            ) from exc
-
-    def _get_or_raise(self, sku: str):
-        entity = self.repository.get(sku)
-        if not entity:
-            raise NotFoundError(
-                f"El SKU promocional {sku} no existe en Peya"
-            )
-        return entity

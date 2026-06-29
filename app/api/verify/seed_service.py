@@ -10,6 +10,14 @@ from app.api.provisions.constants import (
     REJECTED_FINAL_STATUS,
     REJECTED_FOR_EDIT_STATUS,
 )
+from app.api.sales_channel.permissions import (
+    PROMOTION_EDIT_PERMISSION,
+    PROMOTION_IMPORT_PERMISSION,
+    PROMOTION_VIEW_PERMISSION,
+    SKU_EDIT_PERMISSION,
+    SKU_IMPORT_PERMISSION,
+    SKU_VIEW_PERMISSION,
+)
 from app.core.security import hash_password
 from app.models.auth.security_model import (
     Auth,
@@ -21,7 +29,6 @@ from app.models.auth.security_model import (
 from app.models.auth.user_model import Information
 from app.models.finance.provision_model import ProvisionStatus
 from app.models.master.master_model import Area, Company, Currency
-
 
 ADMIN_EMAIL = "admin@admin.com"
 ADMIN_PASSWORD = "admin123"
@@ -99,10 +106,22 @@ PERMISSIONS = [
     {"code": "provisions.view_all", "description": "Ver todas las provisiones"},
     {"code": "provisions.edit_all", "description": "Editar todas las provisiones"},
     {"code": "provisions.concepts.view", "description": "Ver conceptos de provisiones"},
-    {"code": "provisions.concepts.edit", "description": "Gestionar conceptos de provisiones"},
-    {"code": "provisions.documents.view", "description": "Ver documentos de provisiones"},
-    {"code": "provisions.documents.edit", "description": "Gestionar documentos de provisiones"},
-    {"code": "provisions.access.edit", "description": "Gestionar accesos de provisiones"},
+    {
+        "code": "provisions.concepts.edit",
+        "description": "Gestionar conceptos de provisiones",
+    },
+    {
+        "code": "provisions.documents.view",
+        "description": "Ver documentos de provisiones",
+    },
+    {
+        "code": "provisions.documents.edit",
+        "description": "Gestionar documentos de provisiones",
+    },
+    {
+        "code": "provisions.access.edit",
+        "description": "Gestionar accesos de provisiones",
+    },
     {"code": "provisions.view", "description": "Ver provisiones"},
     {"code": "provisions.edit", "description": "Gestionar provisiones"},
     {"code": "expenses.view", "description": "Ver gastos"},
@@ -115,12 +134,28 @@ PERMISSIONS = [
     {"code": "ledger.export", "description": "Exportar libro mayor"},
     {"code": "ledger.sync", "description": "Sincronizar libro mayor"},
     {
-        "code": "sales_channels.skus.view",
+        "code": SKU_VIEW_PERMISSION,
         "description": "Ver SKU de canales de venta",
     },
     {
-        "code": "sales_channels.skus.edit",
+        "code": SKU_EDIT_PERMISSION,
         "description": "Gestionar SKU de canales de venta",
+    },
+    {
+        "code": SKU_IMPORT_PERMISSION,
+        "description": "Importar y sincronizar SKU de canales de venta",
+    },
+    {
+        "code": PROMOTION_VIEW_PERMISSION,
+        "description": "Ver promociones de canales de venta",
+    },
+    {
+        "code": PROMOTION_EDIT_PERMISSION,
+        "description": "Gestionar promociones de canales de venta",
+    },
+    {
+        "code": PROMOTION_IMPORT_PERMISSION,
+        "description": "Importar promociones de canales de venta",
     },
 ]
 
@@ -136,6 +171,7 @@ ROLES = [
     "Gastos Operador",
     "Gastos Admin",
     "Canales Venta Consulta",
+    "Canales Venta Importador",
     "Canales Venta Admin",
 ]
 
@@ -228,11 +264,22 @@ ROLE_PERMISSIONS = {
         "expenses.review",
     },
     "Canales Venta Consulta": {
-        "sales_channels.skus.view",
+        SKU_VIEW_PERMISSION,
+        PROMOTION_VIEW_PERMISSION,
+    },
+    "Canales Venta Importador": {
+        SKU_VIEW_PERMISSION,
+        SKU_IMPORT_PERMISSION,
+        PROMOTION_VIEW_PERMISSION,
+        PROMOTION_IMPORT_PERMISSION,
     },
     "Canales Venta Admin": {
-        "sales_channels.skus.view",
-        "sales_channels.skus.edit",
+        SKU_VIEW_PERMISSION,
+        SKU_EDIT_PERMISSION,
+        SKU_IMPORT_PERMISSION,
+        PROMOTION_VIEW_PERMISSION,
+        PROMOTION_EDIT_PERMISSION,
+        PROMOTION_IMPORT_PERMISSION,
     },
 }
 
@@ -317,11 +364,7 @@ class SeedService:
         roles = {}
 
         for role_name in ROLES:
-            role = (
-                self.db.query(Role)
-                .filter(Role.name == role_name)
-                .first()
-            )
+            role = self.db.query(Role).filter(Role.name == role_name).first()
 
             if role:
                 role.active = True
@@ -340,11 +383,7 @@ class SeedService:
         return roles
 
     def ensure_admin_user(self):
-        admin_user = (
-            self.db.query(Auth)
-            .filter(Auth.email == ADMIN_EMAIL)
-            .first()
-        )
+        admin_user = self.db.query(Auth).filter(Auth.email == ADMIN_EMAIL).first()
 
         if admin_user:
             admin_user.active = True
@@ -365,9 +404,7 @@ class SeedService:
 
     def ensure_user_profile(self, user: Auth):
         profile = (
-            self.db.query(Information)
-            .filter(Information.user_id == user.id)
-            .first()
+            self.db.query(Information).filter(Information.user_id == user.id).first()
         )
 
         if profile:
@@ -451,11 +488,7 @@ class SeedService:
             self.ensure_currency(item)
 
     def ensure_company(self, item: dict):
-        company = (
-            self.db.query(Company)
-            .filter(Company.code == item["code"])
-            .first()
-        )
+        company = self.db.query(Company).filter(Company.code == item["code"]).first()
 
         if company:
             company.name = item["name"]
@@ -470,11 +503,7 @@ class SeedService:
         return company
 
     def ensure_area(self, item: dict):
-        area = (
-            self.db.query(Area)
-            .filter(Area.code == item["code"])
-            .first()
-        )
+        area = self.db.query(Area).filter(Area.code == item["code"]).first()
 
         if area:
             area.name = item["name"]
@@ -489,11 +518,7 @@ class SeedService:
         return area
 
     def ensure_currency(self, item: dict):
-        currency = (
-            self.db.query(Currency)
-            .filter(Currency.code == item["code"])
-            .first()
-        )
+        currency = self.db.query(Currency).filter(Currency.code == item["code"]).first()
 
         if currency:
             currency.name = item["name"]

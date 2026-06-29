@@ -1,3 +1,3 @@
-from .last_miller import Base, PeyaPromoSku, PeyaSku, RappiSku
+from .last_miller import Base, MxRappiSku, PeyaPromoSku, PeyaSku, RappiSku
 
-__all__ = ["Base", "PeyaPromoSku", "PeyaSku", "RappiSku"]
+__all__ = ["Base", "MxRappiSku", "PeyaPromoSku", "PeyaSku", "RappiSku"]

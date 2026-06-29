@@ -1,3 +1,1 @@
-from . import rappi_router
-
-__all__ = ["rappi_router"]
+"""Rappi route registration for each supported country."""
