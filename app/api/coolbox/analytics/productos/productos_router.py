@@ -26,7 +26,7 @@ router = APIRouter(
     response_model=list[ProductoABCItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_productos_abc(
+def get_productos_abc(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -54,7 +54,7 @@ async def get_productos_abc(
     response_model=list[ProductoTopItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_top_productos(
+def get_top_productos(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -82,7 +82,7 @@ async def get_top_productos(
     response_model=list[ProductoBajoMovimientoItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_productos_bajo_movimiento(
+def get_productos_bajo_movimiento(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -110,7 +110,7 @@ async def get_productos_bajo_movimiento(
     response_model=list[ProductoResumenCategoriaItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_productos_por_rubro(
+def get_productos_por_rubro(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -132,7 +132,7 @@ async def get_productos_por_rubro(
     response_model=list[ProductoResumenCategoriaItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_productos_por_familia(
+def get_productos_por_familia(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -154,7 +154,7 @@ async def get_productos_por_familia(
     response_model=ProductosFiltrosResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_filtros_productos(
+def get_filtros_productos(
     db=Depends(get_db),
 ):
     service = AnalyticsProductosService(db)

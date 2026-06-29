@@ -15,8 +15,8 @@ class TiendasDestRepository:
     def upsert_dim_tiendas(self, df_limpio: pd.DataFrame):
         registros = []
 
-        for row in df_limpio.to_dict("records"):
-            codigo = row["ALMA_STR_CODIGO"]
+        for row in df_limpio.itertuples(index=False):
+            codigo = row.ALMA_STR_CODIGO
 
             if pd.isna(codigo):
                 continue
@@ -25,58 +25,58 @@ class TiendasDestRepository:
                 "id": uuid4(),
                 "codigo": str(codigo).strip(),
                 "nombre": (
-                    str(row["ALMA_STR_DESCRIPCION"]).strip()
-                    if pd.notna(row["ALMA_STR_DESCRIPCION"])
+                    str(row.ALMA_STR_DESCRIPCION).strip()
+                    if pd.notna(row.ALMA_STR_DESCRIPCION)
                     else str(codigo).strip()
                 ),
                 "categoria": (
-                    str(row["ALMA_STR_CATEGORIA"]).strip()
-                    if pd.notna(row["ALMA_STR_CATEGORIA"])
+                    str(row.ALMA_STR_CATEGORIA).strip()
+                    if pd.notna(row.ALMA_STR_CATEGORIA)
                     else None
                 ),
                 "region": (
-                    str(row["ALMA_STR_REGION"]).strip()
-                    if pd.notna(row["ALMA_STR_REGION"])
+                    str(row.ALMA_STR_REGION).strip()
+                    if pd.notna(row.ALMA_STR_REGION)
                     else None
                 ),
                 "formato": (
-                    str(row["TIE_STR_FORMATO"]).strip()
-                    if pd.notna(row["TIE_STR_FORMATO"])
+                    str(row.TIE_STR_FORMATO).strip()
+                    if pd.notna(row.TIE_STR_FORMATO)
                     else None
                 ),
                 "latitud": (
-                    float(row["ALMA_DEC_LATITUD"])
-                    if pd.notna(row["ALMA_DEC_LATITUD"])
+                    float(row.ALMA_DEC_LATITUD)
+                    if pd.notna(row.ALMA_DEC_LATITUD)
                     else None
                 ),
                 "longitud": (
-                    float(row["ALMA_DEC_LONGITUD"])
-                    if pd.notna(row["ALMA_DEC_LONGITUD"])
+                    float(row.ALMA_DEC_LONGITUD)
+                    if pd.notna(row.ALMA_DEC_LONGITUD)
                     else None
                 ),
                 "metraje": (
-                    float(row["ALMA_DEC_METRAJE"])
-                    if pd.notna(row["ALMA_DEC_METRAJE"])
+                    float(row.ALMA_DEC_METRAJE)
+                    if pd.notna(row.ALMA_DEC_METRAJE)
                     else None
                 ),
                 "ubigeo": (
-                    str(row["ALMA_STR_UBIGEO"]).strip()
-                    if pd.notna(row["ALMA_STR_UBIGEO"])
+                    str(row.ALMA_STR_UBIGEO).strip()
+                    if pd.notna(row.ALMA_STR_UBIGEO)
                     else None
                 ),
                 "departamento": (
-                    str(row["DEPARTAMENTO"]).strip()
-                    if pd.notna(row["DEPARTAMENTO"])
+                    str(row.DEPARTAMENTO).strip()
+                    if pd.notna(row.DEPARTAMENTO)
                     else None
                 ),
                 "provincia": (
-                    str(row["PROVINCIA"]).strip()
-                    if pd.notna(row["PROVINCIA"])
+                    str(row.PROVINCIA).strip()
+                    if pd.notna(row.PROVINCIA)
                     else None
                 ),
                 "distrito": (
-                    str(row["DISTRITO"]).strip()
-                    if pd.notna(row["DISTRITO"])
+                    str(row.DISTRITO).strip()
+                    if pd.notna(row.DISTRITO)
                     else None
                 ),
                 "activo": True,

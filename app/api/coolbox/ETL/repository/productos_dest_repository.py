@@ -13,29 +13,29 @@ class ProductosDestRepository:
     def upsert_dim_productos(self, df_limpio: pd.DataFrame):
         registros = []
 
-        for row in df_limpio.to_dict("records"):
+        for row in df_limpio.itertuples(index=False):
             registros.append(
                 {
                     "id": uuid4(),
-                    "codigo": str(row["CODARTICULO"]),
+                    "codigo": str(row.CODARTICULO),
                     "codigo_comercial": (
-                        str(row["REFPROVEEDOR"])
-                        if pd.notna(row["REFPROVEEDOR"])
+                        str(row.REFPROVEEDOR)
+                        if pd.notna(row.REFPROVEEDOR)
                         else None
                     ),
-                    "descripcion": row["DESCRIPCION_LIMPIA"],
-                    "marca": row["MARCA"] if pd.notna(row["MARCA"]) else "SIN MARCA",
-                    "rubro": row["RUBRO"] if pd.notna(row["RUBRO"]) else "SIN RUBRO",
+                    "descripcion": row.DESCRIPCION_LIMPIA,
+                    "marca": row.MARCA if pd.notna(row.MARCA) else "SIN MARCA",
+                    "rubro": row.RUBRO if pd.notna(row.RUBRO) else "SIN RUBRO",
                     "familia": (
-                        row["FAMILIA"] if pd.notna(row["FAMILIA"]) else "SIN FAMILIA"
+                        row.FAMILIA if pd.notna(row.FAMILIA) else "SIN FAMILIA"
                     ),
                     "subfamilia": (
-                        row["SUBFAMILIA"]
-                        if pd.notna(row["SUBFAMILIA"])
+                        row.SUBFAMILIA
+                        if pd.notna(row.SUBFAMILIA)
                         else "SIN SUBFAMILIA"
                     ),
-                    "tipo": row["TI_ITEM"] if pd.notna(row["TI_ITEM"]) else "OTROS",
-                    "descatalogado": bool(row["IS_DESCATALOGADO"]),
+                    "tipo": row.TI_ITEM if pd.notna(row.TI_ITEM) else "OTROS",
+                    "descatalogado": bool(row.IS_DESCATALOGADO),
                     "activo": True,
                 }
             )

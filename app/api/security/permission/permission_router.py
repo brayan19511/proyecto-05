@@ -4,11 +4,15 @@ from sqlalchemy.orm import Session
 
 from app.api.security.permission.permission_schemas import AssignRoleToPermissionRequest, PermisionCreateRequest
 from app.api.security.permission.permission_service import PermissionService
-from app.api.security.role.role_service import RoleService
 from app.core.db.db_postgres import get_db
+from app.core.security import PermissionChecker
 
 
-router = APIRouter(    prefix="/permission",    tags=["Permission"],)
+router = APIRouter(
+    prefix="/permission",
+    tags=["Permission"],
+    dependencies=[Depends(PermissionChecker("security.roles.edit"))],
+)
 
 @router.post("/assign-role")
 def assign_role_to_permission(role_request: AssignRoleToPermissionRequest, db: Session = Depends(get_db)):

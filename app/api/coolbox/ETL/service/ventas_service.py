@@ -97,24 +97,23 @@ class VentasService:
         return df_agrupado
 
     def procesar_fecha(self, fecha: date):
-        totales_fuente = self.repo_fuente.obtener_totales_control_fuente(fecha)
+        data_cruda = self.repo_fuente.get_ventas(fecha)
 
-        if totales_fuente["total_filas"] == 0:
+        if not data_cruda:
             return {
                 "fecha": str(fecha),
                 "status": "Sin Datos",
                 "detalle": "No hay ventas en la fuente",
             }
 
-        data_cruda = self.repo_fuente.get_ventas(fecha)
         df = pd.DataFrame(data_cruda)
-
-        if df.empty:
-            return {
-                "fecha": str(fecha),
-                "status": "Sin Datos",
-                "detalle": "No hay ventas luego de extraer la fuente",
-            }
+        # Controls come from the exact extracted snapshot. Querying the source a
+        # second time could both double its load and observe different data.
+        totales_fuente = {
+            "total_filas": len(df),
+            "suma_total": df["TOTAL"].sum(),
+            "suma_cantidad": df["UNIDADESTOTAL"].sum(),
+        }
 
         df_agrupado = self.transformar_ventas(df)
 

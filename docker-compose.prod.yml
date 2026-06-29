@@ -29,9 +29,20 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       DB_HOST: db-postgres  # OJO: Aquí usamos el nombre del servicio 'db'
       DB_PORT: 5432
+      DB_SSL_MODE: disable
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+      DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALG: ${JWT_ALG}
       JWT_EXPIRES_MIN: ${JWT_EXPIRES_MIN}
+      AUDIT_ANALYTICS_REQUESTS: ${AUDIT_ANALYTICS_REQUESTS:-false}
+      DB_RASH_USER: ${DB_RASH_USER}
+      DB_RASH_PASSWORD: ${DB_RASH_PASSWORD}
+      DB_RASH_HOST: ${DB_RASH_HOST}
+      DB_RASH_DB: ${DB_RASH_DB}
+      DB_RASH_PORT: ${DB_RASH_PORT}
     ports:
       - "${API_PORT}:8000"
     depends_on:

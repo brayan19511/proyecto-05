@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     POSTGRES_DB: Optional[str] = Field(default=None)
     DB_HOST: Optional[str] = Field(default="localhost")
     DB_PORT: Optional[int] = Field(default=5432)
+    DB_SSL_MODE: str = "require"
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
 
     ENV: str = "dev"
     PROJECT_NAME: str = Field(default="Proyecto-rash")
@@ -28,6 +33,14 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALG: str = "HS256"
     JWT_EXPIRES_MIN: int = 3600
+
+    # Bootstrap credentials are optional so secrets never live in source code.
+    SEED_ADMIN_EMAIL: Optional[str] = None
+    SEED_ADMIN_PASSWORD: Optional[str] = None
+
+    # Audit payloads are useful for diagnostics, but must remain bounded.
+    AUDIT_BODY_MAX_BYTES: int = 16_384
+    AUDIT_ANALYTICS_REQUESTS: bool = False
 
     @property
     def ASYNC_DATABASE_ICG_URL(self) -> str:
@@ -52,7 +65,7 @@ class Settings(BaseSettings):
         return (
             f"postgresql+psycopg2://{self.POSTGRES_USER}:"
             f"{self.POSTGRES_PASSWORD}@{self.DB_HOST}:"
-            f"{self.DB_PORT}/{self.POSTGRES_DB}?sslmode=require"
+            f"{self.DB_PORT}/{self.POSTGRES_DB}?sslmode={self.DB_SSL_MODE}"
         )
 
     model_config = SettingsConfigDict(

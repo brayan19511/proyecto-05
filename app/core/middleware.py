@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.audit_utils import get_client_ip, get_request_body
 from app.core.audit_utils import audit_steps_context
+from app.core.audit_sanitizer import sanitize_headers, sanitize_payload
 from app.services.audit.audit_service import AuditService
 
 
@@ -39,7 +40,17 @@ class AuditMiddleware(BaseHTTPMiddleware):
         method = request.method
         path = request.url.path
 
-        query_params = dict(request.query_params)
+        # Analytics GETs are high-frequency and read-only. Skipping two audit
+        # transactions per chart avoids unnecessary pressure on small plans.
+        if (
+            method == "GET"
+            and path.startswith("/api/analytics/")
+            and not settings.AUDIT_ANALYTICS_REQUESTS
+        ):
+            audit_steps_context.reset(token)
+            return await call_next(request)
+
+        query_params = sanitize_payload(dict(request.query_params))
 
         client_ip = get_client_ip(request)
 
@@ -55,7 +66,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
             try:
                 body_bytes = await get_request_body(request)
 
-                req_body = json.loads(body_bytes) if body_bytes else None
+                if len(body_bytes) > settings.AUDIT_BODY_MAX_BYTES:
+                    req_body = {
+                        "omitted": True,
+                        "reason": "request body exceeds audit limit",
+                    }
+                else:
+                    parsed_body = json.loads(body_bytes) if body_bytes else None
+                    req_body = sanitize_payload(parsed_body)
 
             except Exception:
                 req_body = {"error": "Could not parse body"}
@@ -140,16 +158,29 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         response_body = None
 
-        if "application/json" in response.headers.get("content-type", ""):
+        should_capture_response = (
+            "application/json" in response.headers.get("content-type", "")
+            and content_length is not None
+            and response_size <= settings.AUDIT_BODY_MAX_BYTES
+        )
 
-            response_body_bytes = [section async for section in response.body_iterator]
+        if should_capture_response:
+            response_body_bytes = [
+                section async for section in response.body_iterator
+            ]
 
             response.body_iterator = iterate_in_threadpool(iter(response_body_bytes))
 
             try:
-                response_body = json.loads(response_body_bytes[0].decode())
+                raw_response = b"".join(response_body_bytes)
+                response_body = sanitize_payload(json.loads(raw_response.decode()))
             except Exception:
                 response_body = {"info": "Body no serializable"}
+        elif "application/json" in response.headers.get("content-type", ""):
+            response_body = {
+                "omitted": True,
+                "reason": "response body exceeds audit limit or has unknown size",
+            }
 
         # =====================================================
         # NIVEL DE AUDITORÍA
@@ -172,6 +203,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # =====================================================
 
         background_tasks = BackgroundTasks()
+        if response.background is not None:
+            background_tasks.tasks.append(response.background)
 
         background_tasks.add_task(
             AuditService.finish_audit,
@@ -185,7 +218,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 "user_id": getattr(request.state, "user_id", None),
             },
             {
-                "request_headers": dict(request.headers),
+                "request_headers": sanitize_headers(request.headers),
                 "query_params": query_params,
                 "request_body": req_body,
                 "response_body": response_body,
@@ -202,4 +235,3 @@ class AuditMiddleware(BaseHTTPMiddleware):
         return response
 
 
-    

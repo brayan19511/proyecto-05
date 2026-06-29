@@ -1,12 +1,30 @@
-# app/models/__init__.py
-from app.core.db.db_postgres import Base # Importas tu Base
-from .auth import Auth, Role, UserRole, Information, Permission, RolePermission
+"""Central model registry used by Alembic and repositories."""
+
+from app.core.db.db_postgres import Base
+
 from .audit import AuditLog, AuditLogDetail, AuditStep
-from .coolbox.ventas.coolbox_ventas_model import Ventas # Importas tu modelo de ventas
-# Esto asegura que ambas clases estén disponibles en el Registry de SQLAlchemy
+from .auth import (
+    ApiClient,
+    Auth,
+    Information,
+    Permission,
+    Role,
+    RolePermission,
+    UserRole,
+)
+from .coolbox.ventas.coolbox_ventas_model import Ventas
+
 __all__ = [
-    "Base", 
-    "Auth", "Role", "UserRole", "Information", "Permission", "RolePermission" , 
+    "Base",
+    "ApiClient",
+    "Auth",
+    "Role",
+    "UserRole",
+    "Information",
+    "Permission",
+    "RolePermission",
     "Ventas",
-    "AuditLog", "AuditLogDetail", "AuditStep"
-    ]
+    "AuditLog",
+    "AuditLogDetail",
+    "AuditStep",
+]

@@ -1,5 +1,13 @@
-# app/models/auth/__init__.py
-from .security_model import Auth, Role, UserRole, Permission, RolePermission
+from .api_client_model import ApiClient
+from .security_model import Auth, Permission, Role, RolePermission, UserRole
 from .user_model import Information
-# Esto asegura que ambas clases estén disponibles en el Registry de SQLAlchemy
-__all__ = ["Auth", "Role", "UserRole", "Information", "Permission", "RolePermission"]
+
+__all__ = [
+    "ApiClient",
+    "Auth",
+    "Role",
+    "UserRole",
+    "Information",
+    "Permission",
+    "RolePermission",
+]

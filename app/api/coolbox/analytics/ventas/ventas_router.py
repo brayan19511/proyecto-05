@@ -27,7 +27,7 @@ router = APIRouter(
     response_model=VentasKpisResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_kpis_ventas(
+def get_kpis_ventas(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -49,7 +49,7 @@ async def get_kpis_ventas(
     response_model=list[VentasEvolucionItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_evolucion_ventas(
+def get_evolucion_ventas(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -71,7 +71,7 @@ async def get_evolucion_ventas(
     response_model=list[VentasPorCanalItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_ventas_por_canal(
+def get_ventas_por_canal(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     tiendas: list[str] | None = Query(default=None),
@@ -91,7 +91,7 @@ async def get_ventas_por_canal(
     response_model=list[VentasPorTiendaItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_ventas_por_tienda(
+def get_ventas_por_tienda(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -115,7 +115,7 @@ async def get_ventas_por_tienda(
     response_model=list[TopProductoItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_top_productos_ventas(
+def get_top_productos_ventas(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -139,7 +139,7 @@ async def get_top_productos_ventas(
     response_model=VentasFiltrosResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_filtros_ventas(
+def get_filtros_ventas(
     db=Depends(get_db),
 ):
     service = AnalyticsVentasService(db)

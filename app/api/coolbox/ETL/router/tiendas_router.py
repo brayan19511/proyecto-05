@@ -14,7 +14,7 @@ router = APIRouter(
 
 @router.post(
     "/sincronizar",
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
 )
 async def sincronizar_tiendas(
     db_fuente=Depends(get_db_coolbox),

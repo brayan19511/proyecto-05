@@ -1,16 +1,21 @@
-# app/core/security.py
-from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException, Request,status
+"""Password, JWT, and permission helpers for interactive users."""
+
+from datetime import datetime, timedelta, timezone
+from uuid import UUID
+
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from pwdlib import PasswordHash
 import jwt
+from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
+
 from app.api.security.auth.auth_repository import AuthRepository
 from app.core.config import settings
 from app.core.db.db_postgres import get_db
 
 
 pwd_context = PasswordHash.recommended()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/security/auth/login")
 
 
 def hash_password(password: str) -> str:
@@ -22,67 +27,73 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(data: dict, minutes: int | None = None) -> str:
-    to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=minutes or settings.JWT_EXPIRES_MIN)
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
+    payload = data.copy()
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=minutes or settings.JWT_EXPIRES_MIN
+    )
+    payload.update({"exp": expires_at})
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
-
-def get_current_user(request: Request,
-    token: str = Depends(oauth2_scheme), 
-    db: Session = Depends(get_db)
+def get_user_from_token(
+    token: str,
+    db: Session,
+    request: Request | None = None,
 ):
-    credentials_exception = HTTPException(
+    """Resolve a JWT when a route supports more than one auth mechanism."""
+    credentials_error = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="No se pudo validar las credenciales",
+        detail="No se pudo validar las credenciales.",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # 1. Decodificar el token
-        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALG])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
+        subject = decode_token(token).get("sub")
+        if subject is None:
+            raise credentials_error
+        user_id = UUID(subject)
     except Exception:
-        raise credentials_exception
+        raise credentials_error
 
-    # 2. BUSCAR AL USUARIO (Aquí usamos el Repositorio)
-    repository = AuthRepository(db)
-    user = repository.get_by_id(user_id)
-    
+    user = AuthRepository(db).get_by_id(user_id)
     if user is None:
-        raise credentials_exception
-    
+        raise credentials_error
     if not user.active:
-        raise HTTPException(status_code=400, detail="Usuario inactivo")
-    request.state.user_id = user.id
-    return user # Retorna el objeto Auth completo
+        raise HTTPException(status_code=403, detail="Usuario inactivo.")
+
+    if request is not None:
+        request.state.user_id = user.id
+        request.state.auth_type = "jwt"
+    return user
+
+
+def get_current_user(
+    request: Request,
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    return get_user_from_token(token=token, db=db, request=request)
+
 
 class PermissionChecker:
     def __init__(self, required_permission: str):
         self.required_permission = required_permission
 
-    def __call__(self, current_user = Depends(get_current_user)):
-        # 1. El superusuario o Admin total siempre pasa
-        # Asumiendo que tus roles tienen nombres fijos para el "admin" del sistema
-        user_roles = [link.role.name for link in current_user.user_roles_links if link.active]
-        if "Admin" in user_roles:
+    def __call__(self, current_user=Depends(get_current_user)):
+        roles = {role.name for role in current_user.active_roles}
+        if "Admin" in roles:
             return current_user
 
-        # 2. Verificamos los permisos individuales
-        # Gracias a la @property 'permissions' que creamos en tu modelo Auth
-        user_permissions = [p.code for p in current_user.permissions]
-        
-        if self.required_permission not in user_permissions:
+        permissions = {permission.code for permission in current_user.permissions}
+        if self.required_permission not in permissions:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No tienes el permiso necesario: {self.required_permission}"
+                detail=(
+                    "No tienes el permiso necesario: "
+                    f"{self.required_permission}"
+                ),
             )
-        
         return current_user

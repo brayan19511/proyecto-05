@@ -1,9 +1,12 @@
 from datetime import date
 
-from fastapi import HTTPException, status
-
 from app.api.coolbox.analytics.clientes.clientes_repository import (
     AnalyticsClientesRepository,
+)
+from app.api.coolbox.analytics.common.validators import (
+    normalize_optional,
+    validate_date_range,
+    validate_limit,
 )
 
 
@@ -11,45 +14,15 @@ class AnalyticsClientesService:
     def __init__(self, db):
         self.repo = AnalyticsClientesRepository(db)
 
-    def _validar_fechas(self, fecha_inicio: date, fecha_fin: date):
-        if fecha_inicio > fecha_fin:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="La fecha de inicio no puede ser mayor a la fecha fin.",
-            )
-
-    def _validar_limit(self, limit: int):
-        if limit <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El límite debe ser mayor a cero.",
-            )
-
-        if limit > 100:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El límite máximo permitido es 100.",
-            )
-
-    def _validar_limit_detalle(self, limit: int):
-        if limit <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El limite debe ser mayor a cero.",
-            )
-
-        if limit > 500:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El limite maximo permitido para detalle es 500.",
-            )
-
-    def _normalizar_filtro(self, valor: str | None):
-        if not valor:
-            return None
-
-        valor = valor.strip()
-        return valor or None
+    def _filters(
+        self,
+        canal: str | None,
+        tienda: str | None,
+    ) -> dict:
+        return {
+            "canal": normalize_optional(canal),
+            "tienda": normalize_optional(tienda),
+        }
 
     def get_rfm(
         self,
@@ -59,15 +32,13 @@ class AnalyticsClientesService:
         tienda: str | None = None,
         limit: int = 100,
     ):
-        self._validar_fechas(fecha_inicio, fecha_fin)
-        self._validar_limit_detalle(limit)
-
+        validate_date_range(fecha_inicio, fecha_fin)
+        validate_limit(limit, maximum=500)
         return self.repo.get_rfm(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=self._normalizar_filtro(canal),
-            tienda=self._normalizar_filtro(tienda),
             limit=limit,
+            **self._filters(canal, tienda),
         )
 
     def get_segmentos(
@@ -77,13 +48,11 @@ class AnalyticsClientesService:
         canal: str | None = None,
         tienda: str | None = None,
     ):
-        self._validar_fechas(fecha_inicio, fecha_fin)
-
+        validate_date_range(fecha_inicio, fecha_fin)
         return self.repo.get_segmentos(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=self._normalizar_filtro(canal),
-            tienda=self._normalizar_filtro(tienda),
+            **self._filters(canal, tienda),
         )
 
     def get_top_clientes(
@@ -94,15 +63,13 @@ class AnalyticsClientesService:
         tienda: str | None = None,
         limit: int = 10,
     ):
-        self._validar_fechas(fecha_inicio, fecha_fin)
-        self._validar_limit(limit)
-
+        validate_date_range(fecha_inicio, fecha_fin)
+        validate_limit(limit, maximum=100)
         return self.repo.get_top_clientes(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=self._normalizar_filtro(canal),
-            tienda=self._normalizar_filtro(tienda),
             limit=limit,
+            **self._filters(canal, tienda),
         )
 
     def get_frecuencia_compra(
@@ -113,15 +80,13 @@ class AnalyticsClientesService:
         tienda: str | None = None,
         limit: int = 10,
     ):
-        self._validar_fechas(fecha_inicio, fecha_fin)
-        self._validar_limit(limit)
-
+        validate_date_range(fecha_inicio, fecha_fin)
+        validate_limit(limit, maximum=100)
         return self.repo.get_frecuencia_compra(
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            canal=self._normalizar_filtro(canal),
-            tienda=self._normalizar_filtro(tienda),
             limit=limit,
+            **self._filters(canal, tienda),
         )
 
     def get_filtros(self):

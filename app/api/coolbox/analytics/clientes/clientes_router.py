@@ -26,7 +26,7 @@ router = APIRouter(
     response_model=list[ClienteRfmItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_clientes_rfm(
+def get_clientes_rfm(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -50,7 +50,7 @@ async def get_clientes_rfm(
     response_model=list[ClienteSegmentoItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_clientes_segmentos(
+def get_clientes_segmentos(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -72,7 +72,7 @@ async def get_clientes_segmentos(
     response_model=list[ClienteTopItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_top_clientes(
+def get_top_clientes(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -96,7 +96,7 @@ async def get_top_clientes(
     response_model=list[ClienteFrecuenciaCompraItem],
     status_code=status.HTTP_200_OK,
 )
-async def get_clientes_frecuencia_compra(
+def get_clientes_frecuencia_compra(
     fecha_inicio: date = Query(...),
     fecha_fin: date = Query(...),
     canal: Optional[str] = Query(default=None),
@@ -120,7 +120,7 @@ async def get_clientes_frecuencia_compra(
     response_model=ClientesFiltrosResponse,
     status_code=status.HTTP_200_OK,
 )
-async def get_filtros_clientes(
+def get_filtros_clientes(
     db=Depends(get_db),
 ):
     service = AnalyticsClientesService(db)

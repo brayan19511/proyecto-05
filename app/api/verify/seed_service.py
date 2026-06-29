@@ -1,86 +1,195 @@
-# app/api/security/seed/seed_service.py
+"""Idempotent bootstrap of roles, permissions, and the initial administrator."""
+
+from uuid6 import uuid7
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from app.api.security.auth.auth_schemas import UserRegisterSchema
-from app.api.security.role.role_service import RoleService
-from app.api.security.auth.auth_service import AuthService
-from app.api.security.permission.permission_service import PermissionService
-from app.api.security.role.role_schemas import RoleRequest
-from app.api.security.permission.permission_schemas import PermisionCreateRequest
+
+from app.api.verify.seed_definitions import PERMISSIONS, ROLE_PERMISSIONS, ROLES
+from app.core.config import settings
+from app.core.security import hash_password
+from app.models import Auth, Permission, Role, RolePermission, UserRole
+
 
 class SeedService:
+    """Reconcile the minimum security catalog in one transaction."""
+
     def __init__(self, db: Session):
         self.db = db
-        self.role_service = RoleService(db)
-        self.auth_service = AuthService(db)
-        self.perm_service = PermissionService(db)
-        
-    def run_seed(self):
-        
-            self.create_roles_and_permissions()
 
-            return {"status": "success", "message": "Seeding completed"}
+    def run_seed(self) -> dict:
+        # A concurrent seed may win a unique-key race. Retrying after rollback
+        # turns that situation into the same idempotent reconciliation.
+        for attempt in range(2):
+            try:
+                result = self._reconcile()
+                self.db.commit()
+                return {"status": "success", **result}
+            except IntegrityError:
+                self.db.rollback()
+                if attempt == 1:
+                    raise
+            except Exception:
+                self.db.rollback()
+                raise
 
-    def create_masters(self):
-        # Aquí podrías implementar la creación de datos maestros como áreas, monedas, etc.
-        data_areas = ["Finanzas", "Recursos Humanos", "Tecnología"]
-        for area_name in data_areas:
-            # Implementa la lógica para crear áreas si no existen
-            pass
-        data_currencies = ["USD", "EUR", "PEN"]
-        for currency_code in data_currencies:
-            # Implementa la lógica para crear monedas si no existen
-            pass
-        
-        pass
-    def create_roles_and_permissions(self):
-        # Aquí podrías implementar solo la parte de creación de roles y permisos sin tocar usuarios
-        # 1. DEFINIR PERMISOS (Granulares)
-        perms_data = [
-            # Módulo SAP
-            {"code": "sap.read", "desc": "Ver datos de SAP"},
-            {"code": "sap.write", "desc": "Modificar datos en SAP"},
-            {"code": "sap.execute", "desc": "Ejecutar operaciones en SAP"},
-            # Módulo Seguridad (Para que los admins puedan gestionar el sistema)
-            {"code": "security.roles.edit", "desc": "Editar roles y sus permisos"},
-            {"code": "security.users.view", "desc": "Ver lista de usuarios y sus perfiles"},
-            # Otros módulos
-            {"code": "cic.execute", "desc": "Ejecutar procesos automáticos CIC"},
-        ]
-        
-        perms_objects = {}
-        for p in perms_data:
-            # Buscamos si existe (necesitas implementar get_permission_by_code en tu service)
-            existing_p = self.perm_service.get_permission_by_code(p["code"])
-            if not existing_p:
-                existing_p = self.perm_service.create_permission(
-                    PermisionCreateRequest(code=p["code"], description=p["desc"])
+        raise RuntimeError("No se pudo completar el seed.")
+
+    def _reconcile(self) -> dict:
+        counters = {
+            "created": 0,
+            "updated": 0,
+            "existing": 0,
+            "relations_created": 0,
+        }
+
+        permissions = {
+            code: self._ensure_permission(code, description, counters)
+            for code, description in PERMISSIONS
+        }
+        roles = {
+            name: self._ensure_role(name, counters)
+            for name in ROLES
+        }
+
+        for role_name, permission_codes in ROLE_PERMISSIONS.items():
+            for code in permission_codes:
+                self._ensure_role_permission(
+                    roles[role_name],
+                    permissions[code],
+                    counters,
                 )
-            perms_objects[p["code"]] = existing_p
 
-        # 2. DEFINIR ROLES
-        roles_to_create = ["Admin", "Admin SAP"]
-        roles_objects = {}
-        for role_name in roles_to_create:
-            existing_r = self.role_service.get_role_by_name(role_name) # Implementar este método
-            if not existing_r:
-                existing_r = self.role_service.create_role(
-                    RoleRequest(name=role_name, active=True)
+        admin_result = self._ensure_admin(roles["Admin"], counters)
+
+        return {
+            "message": "Datos base verificados correctamente.",
+            "summary": counters,
+            "admin": admin_result,
+        }
+
+    def _ensure_permission(
+        self,
+        code: str,
+        description: str,
+        counters: dict,
+    ) -> Permission:
+        permission = self.db.scalar(
+            select(Permission).where(Permission.code == code)
+        )
+
+        if permission is None:
+            permission = Permission(
+                code=code,
+                description=description,
+                active=True,
+            )
+            self.db.add(permission)
+            self.db.flush()
+            counters["created"] += 1
+            return permission
+
+        changed = permission.description != description or not permission.active
+        permission.description = description
+        permission.active = True
+        counters["updated" if changed else "existing"] += 1
+        return permission
+
+    def _ensure_role(self, name: str, counters: dict) -> Role:
+        role = self.db.scalar(select(Role).where(Role.name == name))
+
+        if role is None:
+            role = Role(name=name, active=True)
+            self.db.add(role)
+            self.db.flush()
+            counters["created"] += 1
+            return role
+
+        if not role.active:
+            role.active = True
+            counters["updated"] += 1
+        else:
+            counters["existing"] += 1
+        return role
+
+    def _ensure_role_permission(
+        self,
+        role: Role,
+        permission: Permission,
+        counters: dict,
+    ) -> None:
+        relation = self.db.scalar(
+            select(RolePermission).where(
+                RolePermission.role_id == role.id,
+                RolePermission.permission_id == permission.id,
+            )
+        )
+        if relation is None:
+            self.db.add(
+                RolePermission(
+                    role_id=role.id,
+                    permission_id=permission.id,
                 )
-            roles_objects[role_name] = existing_r
+            )
+            counters["relations_created"] += 1
 
-        # 3. ASIGNAR PERMISOS A ROLES
-        # Admin recibe todo
-        admin_role = roles_objects["Admin"]
-        for p_obj in perms_objects.values():
-            # Debes validar en tu service que no se duplique en la tabla intermedia
-            self.perm_service.assign_role_to_permission(admin_role.id, p_obj.id)
+    def _ensure_admin(self, admin_role: Role, counters: dict) -> dict:
+        email = settings.SEED_ADMIN_EMAIL
+        password = settings.SEED_ADMIN_PASSWORD
 
-        # 4. CREAR USUARIO ADMIN INICIAL
-        admin_email = "admin@admin.com"
-        # Supongamos que tu AuthService ya maneja la verificación de "si existe"
-        admin_user = self.auth_service.get_by_email(admin_email)
-        
-        if not admin_user:
-            admin_user = self.auth_service.register_user(UserRegisterSchema(email=admin_email, password="admin123"))
-            # Asignar rol
-            self.role_service.assign_role_to_user(admin_user["id"], admin_role.id)
+        if not email:
+            return {
+                "status": "skipped",
+                "detail": "SEED_ADMIN_EMAIL no esta configurado.",
+            }
+
+        admin = self.db.scalar(select(Auth).where(Auth.email == email))
+        if admin is None:
+            if not password:
+                return {
+                    "status": "skipped",
+                    "detail": (
+                        "El usuario no existe y SEED_ADMIN_PASSWORD "
+                        "no esta configurado."
+                    ),
+                }
+            admin = Auth(
+                id=uuid7(),
+                email=email,
+                password_hash=hash_password(password),
+                active=True,
+            )
+            self.db.add(admin)
+            self.db.flush()
+            counters["created"] += 1
+            admin_status = "created"
+        else:
+            if not admin.active:
+                admin.active = True
+                counters["updated"] += 1
+                admin_status = "reactivated"
+            else:
+                counters["existing"] += 1
+                admin_status = "existing"
+
+        relation = self.db.scalar(
+            select(UserRole).where(
+                UserRole.user_id == admin.id,
+                UserRole.role_id == admin_role.id,
+            )
+        )
+        if relation is None:
+            self.db.add(
+                UserRole(
+                    user_id=admin.id,
+                    role_id=admin_role.id,
+                    active=True,
+                )
+            )
+            counters["relations_created"] += 1
+        elif not relation.active:
+            relation.active = True
+            counters["updated"] += 1
+
+        return {"status": admin_status, "email": email}
