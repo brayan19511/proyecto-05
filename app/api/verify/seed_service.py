@@ -114,6 +114,14 @@ PERMISSIONS = [
     {"code": "ledger.view", "description": "Ver libro mayor"},
     {"code": "ledger.export", "description": "Exportar libro mayor"},
     {"code": "ledger.sync", "description": "Sincronizar libro mayor"},
+    {
+        "code": "sales_channels.skus.view",
+        "description": "Ver SKU de canales de venta",
+    },
+    {
+        "code": "sales_channels.skus.edit",
+        "description": "Gestionar SKU de canales de venta",
+    },
 ]
 
 ROLES = [
@@ -127,6 +135,8 @@ ROLES = [
     "Gastos Consulta",
     "Gastos Operador",
     "Gastos Admin",
+    "Canales Venta Consulta",
+    "Canales Venta Admin",
 ]
 
 ROLE_PERMISSIONS = {
@@ -216,6 +226,13 @@ ROLE_PERMISSIONS = {
         "expenses.edit",
         "expenses.edit_all",
         "expenses.review",
+    },
+    "Canales Venta Consulta": {
+        "sales_channels.skus.view",
+    },
+    "Canales Venta Admin": {
+        "sales_channels.skus.view",
+        "sales_channels.skus.edit",
     },
 }
 

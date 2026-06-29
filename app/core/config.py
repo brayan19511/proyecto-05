@@ -1,6 +1,6 @@
 from typing import Optional
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     DB_SAP_USER: str
     DB_SAP_PASSWORD: str
     SAP_URL: str
+
+    DB_OFISIS_HOST: Optional[str] = None
+    DB_OFISIS_PORT: int = 1433
+    DB_OFISIS_USER: Optional[str] = None
+    DB_OFISIS_PASSWORD: Optional[str] = None
+    DB_OFISIS_DRIVER: str = "ODBC Driver 17 for SQL Server"
+    DB_OFISIS_ENCRYPT: bool = False
+    DB_OFISIS_TRUST_SERVER_CERTIFICATE: bool = False
+    DB_OFISIS_ECOMM_DATABASE: str = "EcommDB"
 
     @property
     def DATABASE_URL_SAP(self) -> str:
@@ -74,6 +83,38 @@ class Settings(BaseSettings):
             for origin in self.BACKEND_CORS_ORIGINS.split(",")
             if origin.strip()
         ]
+
+    def get_ofisis_database_url(self, database: str) -> URL:
+        required_values = {
+            "DB_OFISIS_HOST": self.DB_OFISIS_HOST,
+            "DB_OFISIS_USER": self.DB_OFISIS_USER,
+            "DB_OFISIS_PASSWORD": self.DB_OFISIS_PASSWORD,
+        }
+        missing = [name for name, value in required_values.items() if not value]
+        if missing:
+            raise ValueError(
+                "Falta configurar las variables de Ofisis: "
+                f"{', '.join(missing)}"
+            )
+
+        if not database.strip():
+            raise ValueError("El nombre de la base de datos Ofisis es obligatorio")
+
+        return URL.create(
+            "mssql+pyodbc",
+            username=self.DB_OFISIS_USER,
+            password=self.DB_OFISIS_PASSWORD,
+            host=self.DB_OFISIS_HOST,
+            port=self.DB_OFISIS_PORT,
+            database=database,
+            query={
+                "driver": self.DB_OFISIS_DRIVER,
+                "Encrypt": "yes" if self.DB_OFISIS_ENCRYPT else "no",
+                "TrustServerCertificate": (
+                    "yes" if self.DB_OFISIS_TRUST_SERVER_CERTIFICATE else "no"
+                ),
+            },
+        )
 
     model_config = SettingsConfigDict(
         env_file=".env",

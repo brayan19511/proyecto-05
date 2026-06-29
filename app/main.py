@@ -6,6 +6,7 @@ from app.api.health import health_router
 from app.api.libro_mayor import libro_mayor_router
 from app.api.master import master_router
 from app.api.provisions import provisions_router
+from app.api.sales_channel import sales_channel_router
 from app.api.sap import sap_router
 from app.api.security import security_router
 from app.api.storage import attachments_router
@@ -51,4 +52,5 @@ app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)
 app.include_router(prefix="/api", router=attachments_router.router)
 app.include_router(prefix="/api", router=user_router.router)
+app.include_router(prefix="/api", router=sales_channel_router.router)
 app.include_router(router=health_router.router)

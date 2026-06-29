@@ -7,10 +7,11 @@
 3. [Estructura del proyecto](development/project-structure.md)
 4. [Pruebas](development/testing.md)
 5. [Base de datos y Alembic](database/alembic.md)
-6. [Despliegue en produccion](deployment/production.md)
-7. [Aprender GitHub Actions](automation/github-actions.md)
-8. [Workflows del proyecto](automation/workflows.md)
-9. [Tareas en cola](automation/queues.md)
+6. [Bases externas SQL Server](database/external-sql-server.md)
+7. [Despliegue en produccion](deployment/production.md)
+8. [Aprender GitHub Actions](automation/github-actions.md)
+9. [Workflows del proyecto](automation/workflows.md)
+10. [Tareas en cola](automation/queues.md)
 
 ## Estructura
 
