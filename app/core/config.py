@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     DB_OFISIS_TRUST_SERVER_CERTIFICATE: bool = False
     DB_OFISIS_ECOMM_DATABASE: str = "EcommDB"
 
+    DB_CIC_HOST: Optional[str] = None
+    DB_CIC_PORT: int = 1433
+    DB_CIC_USER: Optional[str] = None
+    DB_CIC_PASSWORD: Optional[str] = None
+    DB_CIC_DRIVER: str = "ODBC Driver 17 for SQL Server"
+    DB_CIC_ENCRYPT: bool = False
+    DB_CIC_TRUST_SERVER_CERTIFICATE: bool = False
+    DB_CIC_DATABASE: str = "dbcoolbox"
+
     @property
     def DATABASE_URL_SAP(self) -> str:
         return (
@@ -84,36 +93,76 @@ class Settings(BaseSettings):
             if origin.strip()
         ]
 
-    def get_ofisis_database_url(self, database: str) -> URL:
+    def _build_mssql_url(
+        self,
+        *,
+        system_name: str,
+        database: str,
+        host: str | None,
+        port: int,
+        user: str | None,
+        password: str | None,
+        driver: str,
+        encrypt: bool,
+        trust_server_certificate: bool,
+    ) -> URL:
         required_values = {
-            "DB_OFISIS_HOST": self.DB_OFISIS_HOST,
-            "DB_OFISIS_USER": self.DB_OFISIS_USER,
-            "DB_OFISIS_PASSWORD": self.DB_OFISIS_PASSWORD,
+            f"DB_{system_name}_HOST": host,
+            f"DB_{system_name}_USER": user,
+            f"DB_{system_name}_PASSWORD": password,
         }
         missing = [name for name, value in required_values.items() if not value]
         if missing:
             raise ValueError(
-                "Falta configurar las variables de Ofisis: "
+                f"Falta configurar las variables de {system_name}: "
                 f"{', '.join(missing)}"
             )
 
         if not database.strip():
-            raise ValueError("El nombre de la base de datos Ofisis es obligatorio")
+            raise ValueError(
+                f"El nombre de la base de datos {system_name} es obligatorio"
+            )
 
         return URL.create(
             "mssql+pyodbc",
-            username=self.DB_OFISIS_USER,
-            password=self.DB_OFISIS_PASSWORD,
-            host=self.DB_OFISIS_HOST,
-            port=self.DB_OFISIS_PORT,
+            username=user,
+            password=password,
+            host=host,
+            port=port,
             database=database,
             query={
-                "driver": self.DB_OFISIS_DRIVER,
-                "Encrypt": "yes" if self.DB_OFISIS_ENCRYPT else "no",
+                "driver": driver,
+                "Encrypt": "yes" if encrypt else "no",
                 "TrustServerCertificate": (
-                    "yes" if self.DB_OFISIS_TRUST_SERVER_CERTIFICATE else "no"
+                    "yes" if trust_server_certificate else "no"
                 ),
             },
+        )
+
+    def get_ofisis_database_url(self, database: str) -> URL:
+        return self._build_mssql_url(
+            system_name="OFISIS",
+            database=database,
+            host=self.DB_OFISIS_HOST,
+            port=self.DB_OFISIS_PORT,
+            user=self.DB_OFISIS_USER,
+            password=self.DB_OFISIS_PASSWORD,
+            driver=self.DB_OFISIS_DRIVER,
+            encrypt=self.DB_OFISIS_ENCRYPT,
+            trust_server_certificate=self.DB_OFISIS_TRUST_SERVER_CERTIFICATE,
+        )
+
+    def get_cic_database_url(self) -> URL:
+        return self._build_mssql_url(
+            system_name="CIC",
+            database=self.DB_CIC_DATABASE,
+            host=self.DB_CIC_HOST,
+            port=self.DB_CIC_PORT,
+            user=self.DB_CIC_USER,
+            password=self.DB_CIC_PASSWORD,
+            driver=self.DB_CIC_DRIVER,
+            encrypt=self.DB_CIC_ENCRYPT,
+            trust_server_certificate=self.DB_CIC_TRUST_SERVER_CERTIFICATE,
         )
 
     model_config = SettingsConfigDict(

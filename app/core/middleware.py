@@ -27,6 +27,17 @@ SENSITIVE_BODY_KEYS = {
     "refresh_token",
     "secret",
     "api_key",
+    # "document_number",
+    # "document_numbers",
+}
+
+SENSITIVE_QUERY_KEYS = {
+    # "document_number",
+    # "document_numbers"
+}
+
+REDACT_RESPONSE_BODY_PATH_PREFIXES = {
+    "/api/attendance",
 }
 
 FILE_CONTENT_KEYS = {
@@ -42,6 +53,31 @@ def sanitize_headers(headers: dict) -> dict:
         key: ("[REDACTED]" if key.lower() in SENSITIVE_HEADER_KEYS else value)
         for key, value in headers.items()
     }
+
+
+def sanitize_query_params(query_params) -> dict:
+    """Preserve repeated query parameters while redacting sensitive values."""
+    items = (
+        query_params.multi_items()
+        if hasattr(query_params, "multi_items")
+        else query_params.items()
+    )
+    sanitized = {}
+
+    for key, value in items:
+        safe_value = (
+            "[REDACTED]"
+            if key.lower() in SENSITIVE_QUERY_KEYS
+            else value
+        )
+        if key not in sanitized:
+            sanitized[key] = safe_value
+        elif isinstance(sanitized[key], list):
+            sanitized[key].append(safe_value)
+        else:
+            sanitized[key] = [sanitized[key], safe_value]
+
+    return sanitized
 
 
 def sanitize_payload(value):
@@ -97,7 +133,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         method = request.method
         path = request.url.path
 
-        query_params = dict(request.query_params)
+        query_params = sanitize_query_params(request.query_params)
 
         client_ip = get_client_ip(request)
 
@@ -199,7 +235,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         response_body = None
 
-        if "application/json" in response.headers.get("content-type", ""):
+        redact_response_body = any(
+            path.startswith(prefix)
+            for prefix in REDACT_RESPONSE_BODY_PATH_PREFIXES
+        )
+
+        if redact_response_body:
+            response_body = {"info": "[REDACTED]"}
+        elif "application/json" in response.headers.get("content-type", ""):
 
             response_body_bytes = [section async for section in response.body_iterator]
 

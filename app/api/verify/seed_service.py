@@ -2,6 +2,7 @@
 from sqlalchemy.orm import Session
 from uuid6 import uuid7
 
+from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
 from app.api.provisions.constants import (
     APPROVED_STATUS,
     CANCELLED_STATUS,
@@ -157,6 +158,10 @@ PERMISSIONS = [
         "code": PROMOTION_IMPORT_PERMISSION,
         "description": "Importar promociones de canales de venta",
     },
+    {
+        "code": ATTENDANCE_MARKS_VIEW_PERMISSION,
+        "description": "Ver registros de asistencia",
+    },
 ]
 
 ROLES = [
@@ -173,6 +178,7 @@ ROLES = [
     "Canales Venta Consulta",
     "Canales Venta Importador",
     "Canales Venta Admin",
+    "Asistencia Consulta",
 ]
 
 ROLE_PERMISSIONS = {
@@ -280,6 +286,9 @@ ROLE_PERMISSIONS = {
         PROMOTION_VIEW_PERMISSION,
         PROMOTION_EDIT_PERMISSION,
         PROMOTION_IMPORT_PERMISSION,
+    },
+    "Asistencia Consulta": {
+        ATTENDANCE_MARKS_VIEW_PERMISSION,
     },
 }
 

@@ -1,5 +1,6 @@
 import unittest
 
+from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
 from app.api.sales_channel.permissions import (
     PROMOTION_EDIT_PERMISSION,
     PROMOTION_IMPORT_PERMISSION,
@@ -53,6 +54,13 @@ class SeedConfigurationTests(unittest.TestCase):
                 PROMOTION_EDIT_PERMISSION,
                 PROMOTION_IMPORT_PERMISSION,
             },
+        )
+
+    def test_attendance_role_has_read_only_permission(self):
+        self.assertIn("Asistencia Consulta", ROLES)
+        self.assertEqual(
+            ROLE_PERMISSIONS["Asistencia Consulta"],
+            {ATTENDANCE_MARKS_VIEW_PERMISSION},
         )
 
 
