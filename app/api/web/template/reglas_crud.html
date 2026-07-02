@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-gavel text-secondary"></i> Gestión de Reglas Contables</h2>
+    <button class="btn btn-success" onclick="abrirModalCrear()"><i class="bi bi-plus-lg"></i> Nueva Regla</button>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="px-3">Prioridad</th>
+                        <th>Tipo</th>
+                        <th>Cuenta SAP</th>
+                        <th>Contrapartida</th>
+                        <th>C.C.</th>
+                        <th>Código Local (Sub)</th>
+                        <th>Nombre Cuenta Reporte</th>
+                        <th>Filtros de Texto</th>
+                        <th>Rango Montos</th>
+                        <th>Estado</th>
+                        <th class="text-end px-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-reglas">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="reglaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg"> <div class="modal-content">
+            <form id="reglaForm" onsubmit="guardarRegla(event)">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold" id="modalTitle">Nueva Regla</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="regla_id">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Prioridad</label>
+                            <input type="number" class="form-control" id="prioridad" required min="1">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tipo Regla</label>
+                            <select class="form-select" id="tipo_regla" required>
+                                <option value="CUENTA">CUENTA</option>
+                                <option value="MIXTA">MIXTA</option>
+                                <option value="TEXTO">TEXTO</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end shadow-none">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="activo" checked>
+                                <label class="form-check-label fw-semibold" for="activo">Regla Activa</label>
+                            </div>
+                        </div>
+
+                        <hr class="my-2 text-muted">
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Cuenta Asociada SAP</label>
+                            <input type="text" class="form-control" id="cuenta" maxlength="15">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Cuenta Contrapartida</label>
+                            <input type="text" class="form-control" id="cuenta_contrapartida" maxlength="15">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Centro Costo (C.C.)</label>
+                            <input type="text" class="form-control" id="centro_costo" maxlength="30">
+                        </div>
+
+                        <hr class="my-2 text-muted">
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Texto Obligatorio (Inclusión)</label>
+                            <input type="text" class="form-control" id="filtro_texto" maxlength="255" placeholder="Debe contener...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Texto Excluido</label>
+                            <input type="text" class="form-control" id="texto_excluido" maxlength="255" placeholder="NO debe contener...">
+                        </div>
+
+                        <hr class="my-2 text-muted">
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Monto Mínimo</label>
+                            <input type="number" step="0.000001" class="form-control" id="monto_min" placeholder="0.00">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Monto Máximo</label>
+                            <input type="number" step="0.000001" class="form-control" id="monto_max" placeholder="No acotado">
+                        </div>
+
+                        <hr class="my-2 text-muted">
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Código Ejecutivo 1</label>
+                            <input type="text" class="form-control" id="codigo" required maxlength="50" placeholder="Ej: ASESORIA_LEGAL">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Subcódigo Ejecutivo 2</label>
+                            <input type="text" class="form-control" id="subcodigo" required maxlength="50" placeholder="Ej: OTROS">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Nombre Cuenta Destino</label>
+                            <input type="text" class="form-control" id="nombre_cuenta" required maxlength="100" placeholder="Nombre para reporte">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i> Guardar Regla</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let modalInstance;
+    document.addEventListener("DOMContentLoaded", () => {
+        modalInstance = new bootstrap.Modal(document.getElementById('reglaModal'));
+        cargarReglas();
+    });
+
+    async function cargarReglas() {
+        const res = await fetch('/api/sap/finance/reglas-gastos/');
+        const reglas = await res.json();
+        const tbody = document.getElementById('tabla-reglas');
+        tbody.innerHTML = '';
+        
+        reglas.forEach(r => {
+            // Lógica visual para filtros de texto complejos
+            let detallesTexto = [];
+            if(r.filtro_texto) detallesTexto.push(`<span class="text-success">INC: "${r.filtro_texto}"</span>`);
+            if(r.texto_excluido) detallesTexto.push(`<span class="text-danger">EXC: "${r.texto_excluido}"</span>`);
+            let textoVisual = detallesTexto.length > 0 ? detallesTexto.join('<br>') : '<span class="text-muted">-</span>';
+
+            // Lógica visual para rangos monetarios
+            let rangoVisual = '<span class="text-muted">Cualquiera</span>';
+            if(r.monto_min !== null || r.monto_max !== null) {
+                rangoVisual = `${r.monto_min || 0} a ${r.monto_max || '∞'}`;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td class="fw-bold px-3">${r.prioridad}</td>
+                    <td><span class="badge bg-secondary small">${r.tipo_regla}</span></td>
+                    <td><code>${r.cuenta || '-'}</code></td>
+                    <td><code>${r.cuenta_contrapartida || '-'}</code></td>
+                    <td><small class="fw-semibold">${r.centro_costo || '-'}</small></td>
+                    <td>
+                        <span class="badge bg-primary">${r.codigo}</span><br>
+                        <span class="badge bg-light text-dark mt-1">${r.subcodigo}</span>
+                    </td>
+                    <td><small class="fw-bold text-dark">${r.nombre_cuenta}</small></td>
+                    <td><small>${textoVisual}</small></td>
+                    <td><small class="font-monospace">${rangoVisual}</small></td>
+                    <td>
+                        <span class="badge ${r.activo ? 'bg-success' : 'bg-danger'}">
+                            ${r.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                    </td>
+                    <td class="text-end px-4">
+                        <button class="btn btn-sm btn-outline-primary bi bi-pencil" onclick='editarRegla(${JSON.stringify(r)})'></button>
+                        <button class="btn btn-sm btn-outline-danger bi bi-trash" onclick="eliminarRegla(${r.id_regla})"></button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function abrirModalCrear() {
+        document.getElementById('reglaForm').reset();
+        document.getElementById('regla_id').value = '';
+        document.getElementById('activo').checked = true;
+        document.getElementById('modalTitle').innerText = 'Registrar Nueva Regla';
+        modalInstance.show();
+    }
+
+    function editarRegla(regla) {
+        document.getElementById('regla_id').value = regla.id_regla;
+        document.getElementById('prioridad').value = regla.prioridad;
+        document.getElementById('tipo_regla').value = regla.tipo_regla;
+        document.getElementById('cuenta').value = regla.cuenta || '';
+        document.getElementById('cuenta_contrapartida').value = regla.cuenta_contrapartida || '';
+        document.getElementById('centro_costo').value = regla.centro_costo || '';
+        document.getElementById('filtro_texto').value = regla.filtro_texto || '';
+        document.getElementById('texto_excluido').value = regla.texto_excluido || '';
+        document.getElementById('monto_min').value = regla.monto_min !== null ? regla.monto_min : '';
+        document.getElementById('monto_max').value = regla.monto_max !== null ? regla.monto_max : '';
+        document.getElementById('codigo').value = regla.codigo;
+        document.getElementById('subcodigo').value = regla.subcodigo;
+        document.getElementById('nombre_cuenta').value = regla.nombre_cuenta;
+        document.getElementById('activo').checked = regla.activo;
+        
+        document.getElementById('modalTitle').innerText = 'Editar Regla #' + regla.id_regla;
+        modalInstance.show();
+    }
+
+    async function guardarRegla(e) {
+        e.preventDefault();
+        const id = document.getElementById('regla_id').value;
+        
+        // Mapeo limpio respetando tipos numéricos y nulos del backend
+        const payload = {
+            prioridad: parseInt(document.getElementById('prioridad').value),
+            tipo_regla: document.getElementById('tipo_regla').value,
+            cuenta: document.getElementById('cuenta').value.trim() || null,
+            cuenta_contrapartida: document.getElementById('cuenta_contrapartida').value.trim() || null,
+            centro_costo: document.getElementById('centro_costo').value.trim() || null,
+            filtro_texto: document.getElementById('filtro_texto').value.trim() || null,
+            texto_excluido: document.getElementById('texto_excluido').value.trim() || null,
+            monto_min: document.getElementById('monto_min').value ? parseFloat(document.getElementById('monto_min').value) : null,
+            monto_max: document.getElementById('monto_max').value ? parseFloat(document.getElementById('monto_max').value) : null,
+            codigo: document.getElementById('codigo').value.trim(),
+            subcodigo: document.getElementById('subcodigo').value.trim(),
+            nombre_cuenta: document.getElementById('nombre_cuenta').value.trim(),
+            activo: document.getElementById('activo').checked
+        };
+
+        const url = id ? `/api/sap/finance/reglas-gastos/${id}` : '/api/sap/finance/reglas-gastos/';
+        const method = id ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            modalInstance.hide();
+            cargarReglas();
+        } else {
+            const err = await res.json();
+            alert("Error al guardar: " + (err.detail || "Error interno"));
+        }
+    }
+
+    async function eliminarRegla(id) {
+        if (confirm('¿Estás seguro de eliminar permanentemente esta regla contable?')) {
+            const res = await fetch(`/api/sap/finance/reglas-gastos/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                cargarReglas();
+            } else {
+                alert("No se pudo eliminar la regla.");
+            }
+        }
+    }
+</script>
+{% endblock %}

@@ -1,86 +1,568 @@
-# app/api/security/seed/seed_service.py
+# app/api/verify/seed_service.py
 from sqlalchemy.orm import Session
-from app.api.security.auth.auth_schemas import UserRegisterSchema
-from app.api.security.role.role_service import RoleService
-from app.api.security.auth.auth_service import AuthService
-from app.api.security.permission.permission_service import PermissionService
-from app.api.security.role.role_schemas import RoleRequest
-from app.api.security.permission.permission_schemas import PermisionCreateRequest
+from uuid6 import uuid7
+
+from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
+from app.api.provisions.constants import (
+    APPROVED_STATUS,
+    CANCELLED_STATUS,
+    PENDING_DETAIL_STATUS,
+    READY_FOR_REVIEW_STATUS,
+    REJECTED_FINAL_STATUS,
+    REJECTED_FOR_EDIT_STATUS,
+)
+from app.api.sales_channel.permissions import (
+    PROMOTION_EDIT_PERMISSION,
+    PROMOTION_IMPORT_PERMISSION,
+    PROMOTION_VIEW_PERMISSION,
+    SKU_EDIT_PERMISSION,
+    SKU_IMPORT_PERMISSION,
+    SKU_VIEW_PERMISSION,
+)
+from app.core.security import hash_password
+from app.models.auth.security_model import (
+    Auth,
+    Permission,
+    Role,
+    RolePermission,
+    UserRole,
+)
+from app.models.auth.user_model import Information
+from app.models.finance.provision_model import ProvisionStatus
+from app.models.master.master_model import Area, Company, Currency
+
+ADMIN_EMAIL = "admin@admin.com"
+ADMIN_PASSWORD = "admin123"
+
+COMPANIES = [
+    {
+        "code": "RASH",
+        "name": "RASH PERU SRL",
+        "rut": "20378890161",
+    },
+]
+
+AREAS = [
+    {
+        "code": "CON",
+        "name": "Contabilidad",
+        "description": "Area de contabilidad",
+    },
+    {
+        "code": "FIN",
+        "name": "Finanzas",
+        "description": "Area de finanzas",
+    },
+    {
+        "code": "TI",
+        "name": "TI",
+        "description": "Area de tecnologia",
+    },
+]
+
+CURRENCIES = [
+    {
+        "code": "PEN",
+        "name": "Sol Peruano",
+        "symbol": "S/",
+        "exchange_rate_to_base": 1,
+        "is_base_currency": True,
+    },
+    {
+        "code": "USD",
+        "name": "Dolar Americano",
+        "symbol": "$",
+        "exchange_rate_to_base": 3.75,
+        "is_base_currency": False,
+    },
+    {
+        "code": "EUR",
+        "name": "Euro",
+        "symbol": "EUR",
+        "exchange_rate_to_base": 4.05,
+        "is_base_currency": False,
+    },
+]
+
+PERMISSIONS = [
+    {"code": "sap.read", "description": "Ver datos de SAP"},
+    {"code": "sap.write", "description": "Modificar datos en SAP"},
+    {"code": "sap.execute", "description": "Ejecutar operaciones en SAP"},
+    {"code": "security.roles.view", "description": "Ver roles y permisos"},
+    {"code": "security.roles.edit", "description": "Editar roles y permisos"},
+    {"code": "security.users.view", "description": "Ver usuarios y perfiles"},
+    {"code": "security.users.edit", "description": "Editar usuarios y perfiles"},
+    {"code": "cic.execute", "description": "Ejecutar procesos automaticos CIC"},
+    {"code": "master.company.view", "description": "Ver empresas"},
+    {"code": "master.company.edit", "description": "Gestionar empresas"},
+    {"code": "master.currency.view", "description": "Ver monedas"},
+    {"code": "master.currency.edit", "description": "Gestionar monedas"},
+    {"code": "master.area.view", "description": "Ver areas"},
+    {"code": "master.area.edit", "description": "Gestionar areas"},
+    {"code": "master.data.edit", "description": "Editar datos maestros"},
+    {"code": "provisions.create", "description": "Crear provisiones"},
+    {"code": "provisions.submit", "description": "Enviar provisiones a revision"},
+    {"code": "provisions.review", "description": "Revisar y aprobar provisiones"},
+    {"code": "provisions.cancel", "description": "Cancelar provisiones"},
+    {"code": "provisions.view_all", "description": "Ver todas las provisiones"},
+    {"code": "provisions.edit_all", "description": "Editar todas las provisiones"},
+    {"code": "provisions.concepts.view", "description": "Ver conceptos de provisiones"},
+    {
+        "code": "provisions.concepts.edit",
+        "description": "Gestionar conceptos de provisiones",
+    },
+    {
+        "code": "provisions.documents.view",
+        "description": "Ver documentos de provisiones",
+    },
+    {
+        "code": "provisions.documents.edit",
+        "description": "Gestionar documentos de provisiones",
+    },
+    {
+        "code": "provisions.access.edit",
+        "description": "Gestionar accesos de provisiones",
+    },
+    {"code": "provisions.view", "description": "Ver provisiones"},
+    {"code": "provisions.edit", "description": "Gestionar provisiones"},
+    {"code": "expenses.view", "description": "Ver gastos"},
+    {"code": "expenses.create", "description": "Crear gastos"},
+    {"code": "expenses.edit", "description": "Gestionar gastos"},
+    {"code": "expenses.review", "description": "Revisar gastos"},
+    {"code": "expenses.view_all", "description": "Ver todos los gastos"},
+    {"code": "expenses.edit_all", "description": "Editar todos los gastos"},
+    {"code": "ledger.view", "description": "Ver libro mayor"},
+    {"code": "ledger.export", "description": "Exportar libro mayor"},
+    {"code": "ledger.sync", "description": "Sincronizar libro mayor"},
+    {
+        "code": SKU_VIEW_PERMISSION,
+        "description": "Ver SKU de canales de venta",
+    },
+    {
+        "code": SKU_EDIT_PERMISSION,
+        "description": "Gestionar SKU de canales de venta",
+    },
+    {
+        "code": SKU_IMPORT_PERMISSION,
+        "description": "Importar y sincronizar SKU de canales de venta",
+    },
+    {
+        "code": PROMOTION_VIEW_PERMISSION,
+        "description": "Ver promociones de canales de venta",
+    },
+    {
+        "code": PROMOTION_EDIT_PERMISSION,
+        "description": "Gestionar promociones de canales de venta",
+    },
+    {
+        "code": PROMOTION_IMPORT_PERMISSION,
+        "description": "Importar promociones de canales de venta",
+    },
+    {
+        "code": ATTENDANCE_MARKS_VIEW_PERMISSION,
+        "description": "Ver registros de asistencia",
+    },
+]
+
+ROLES = [
+    "Admin",
+    "Admin SAP",
+    "Master Consulta",
+    "Master Admin",
+    "Contabilidad Consulta",
+    "Contabilidad",
+    "Contabilidad Admin",
+    "Gastos Consulta",
+    "Gastos Operador",
+    "Gastos Admin",
+    "Canales Venta Consulta",
+    "Canales Venta Importador",
+    "Canales Venta Admin",
+    "Asistencia Consulta",
+]
+
+ROLE_PERMISSIONS = {
+    "Admin SAP": {
+        "ledger.view",
+        "ledger.export",
+        "ledger.sync",
+        "sap.read",
+        "sap.write",
+        "sap.execute",
+    },
+    "Master Consulta": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+    },
+    "Master Admin": {
+        "master.company.view",
+        "master.company.edit",
+        "master.currency.view",
+        "master.currency.edit",
+        "master.area.view",
+        "master.area.edit",
+        "master.data.edit",
+    },
+    "Contabilidad Consulta": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+        "provisions.view",
+        "provisions.concepts.view",
+        "provisions.documents.view",
+    },
+    "Contabilidad": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+        "provisions.create",
+        "provisions.submit",
+        "provisions.view",
+        "provisions.edit",
+        "provisions.concepts.view",
+        "provisions.documents.view",
+        "provisions.documents.edit",
+    },
+    "Contabilidad Admin": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+        "master.area.edit",
+        "provisions.create",
+        "provisions.submit",
+        "provisions.view",
+        "provisions.view_all",
+        "provisions.edit",
+        "provisions.edit_all",
+        "provisions.review",
+        "provisions.cancel",
+        "provisions.concepts.view",
+        "provisions.concepts.edit",
+        "provisions.documents.view",
+        "provisions.documents.edit",
+        "provisions.access.edit",
+        "master.data.edit",
+    },
+    "Gastos Consulta": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+        "expenses.view",
+    },
+    "Gastos Operador": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+        "expenses.view",
+        "expenses.create",
+        "expenses.edit",
+    },
+    "Gastos Admin": {
+        "master.company.view",
+        "master.currency.view",
+        "master.area.view",
+        "expenses.view",
+        "expenses.view_all",
+        "expenses.create",
+        "expenses.edit",
+        "expenses.edit_all",
+        "expenses.review",
+    },
+    "Canales Venta Consulta": {
+        SKU_VIEW_PERMISSION,
+        PROMOTION_VIEW_PERMISSION,
+    },
+    "Canales Venta Importador": {
+        SKU_VIEW_PERMISSION,
+        SKU_IMPORT_PERMISSION,
+        PROMOTION_VIEW_PERMISSION,
+        PROMOTION_IMPORT_PERMISSION,
+    },
+    "Canales Venta Admin": {
+        SKU_VIEW_PERMISSION,
+        SKU_EDIT_PERMISSION,
+        SKU_IMPORT_PERMISSION,
+        PROMOTION_VIEW_PERMISSION,
+        PROMOTION_EDIT_PERMISSION,
+        PROMOTION_IMPORT_PERMISSION,
+    },
+    "Asistencia Consulta": {
+        ATTENDANCE_MARKS_VIEW_PERMISSION,
+    },
+}
+
+PROVISION_STATUSES = [
+    {"code": "DRAFT", "name": "Borrador"},
+    {"code": PENDING_DETAIL_STATUS, "name": "Pendiente de completar detalle"},
+    {"code": READY_FOR_REVIEW_STATUS, "name": "Listo para revision"},
+    {"code": "REVIEWING", "name": "En revision"},
+    {"code": APPROVED_STATUS, "name": "Aprobado"},
+    {"code": REJECTED_FOR_EDIT_STATUS, "name": "Observado para corregir"},
+    {"code": REJECTED_FINAL_STATUS, "name": "Rechazado definitivo"},
+    {"code": CANCELLED_STATUS, "name": "Cancelado"},
+    {"code": "POSTED_SAP", "name": "Registrado en SAP"},
+    {"code": "SAP_ERROR", "name": "Error SAP"},
+]
+
 
 class SeedService:
     def __init__(self, db: Session):
         self.db = db
-        self.role_service = RoleService(db)
-        self.auth_service = AuthService(db)
-        self.perm_service = PermissionService(db)
-        
+        self.created = []
+        self.existing = []
+
     def run_seed(self):
-        
-            self.create_roles_and_permissions()
+        try:
+            permissions = self.ensure_permissions()
+            roles = self.ensure_roles()
+            admin_user = self.ensure_admin_user()
 
-            return {"status": "success", "message": "Seeding completed"}
+            self.ensure_role_permissions(roles["Admin"], permissions.values())
+            self.ensure_functional_role_permissions(roles, permissions)
+            self.ensure_user_role(admin_user, roles["Admin"])
+            self.ensure_user_profile(admin_user)
+            self.ensure_master_data()
+            self.ensure_provision_statuses()
 
-    def create_masters(self):
-        # Aquí podrías implementar la creación de datos maestros como áreas, monedas, etc.
-        data_areas = ["Finanzas", "Recursos Humanos", "Tecnología"]
-        for area_name in data_areas:
-            # Implementa la lógica para crear áreas si no existen
-            pass
-        data_currencies = ["USD", "EUR", "PEN"]
-        for currency_code in data_currencies:
-            # Implementa la lógica para crear monedas si no existen
-            pass
-        
-        pass
-    def create_roles_and_permissions(self):
-        # Aquí podrías implementar solo la parte de creación de roles y permisos sin tocar usuarios
-        # 1. DEFINIR PERMISOS (Granulares)
-        perms_data = [
-            # Módulo SAP
-            {"code": "sap.read", "desc": "Ver datos de SAP"},
-            {"code": "sap.write", "desc": "Modificar datos en SAP"},
-            {"code": "sap.execute", "desc": "Ejecutar operaciones en SAP"},
-            # Módulo Seguridad (Para que los admins puedan gestionar el sistema)
-            {"code": "security.roles.edit", "desc": "Editar roles y sus permisos"},
-            {"code": "security.users.view", "desc": "Ver lista de usuarios y sus perfiles"},
-            # Otros módulos
-            {"code": "cic.execute", "desc": "Ejecutar procesos automáticos CIC"},
-        ]
-        
-        perms_objects = {}
-        for p in perms_data:
-            # Buscamos si existe (necesitas implementar get_permission_by_code en tu service)
-            existing_p = self.perm_service.get_permission_by_code(p["code"])
-            if not existing_p:
-                existing_p = self.perm_service.create_permission(
-                    PermisionCreateRequest(code=p["code"], description=p["desc"])
+            self.db.commit()
+
+            return {
+                "status": "success",
+                "message": "Seed verificado correctamente",
+                "created": self.created,
+                "existing": self.existing,
+            }
+
+        except Exception:
+            self.db.rollback()
+            raise
+
+    # =====================================================
+    # SECURITY
+    # =====================================================
+    def ensure_permissions(self):
+        permissions = {}
+
+        for item in PERMISSIONS:
+            permission = (
+                self.db.query(Permission)
+                .filter(Permission.code == item["code"])
+                .first()
+            )
+
+            if permission:
+                permission.description = item["description"]
+                permission.active = True
+                self.existing.append(f"permission:{item['code']}")
+            else:
+                permission = Permission(
+                    code=item["code"],
+                    description=item["description"],
+                    active=True,
                 )
-            perms_objects[p["code"]] = existing_p
+                self.db.add(permission)
+                self.db.flush()
+                self.created.append(f"permission:{item['code']}")
 
-        # 2. DEFINIR ROLES
-        roles_to_create = ["Admin", "Admin SAP"]
-        roles_objects = {}
-        for role_name in roles_to_create:
-            existing_r = self.role_service.get_role_by_name(role_name) # Implementar este método
-            if not existing_r:
-                existing_r = self.role_service.create_role(
-                    RoleRequest(name=role_name, active=True)
+            permissions[item["code"]] = permission
+
+        return permissions
+
+    def ensure_roles(self):
+        roles = {}
+
+        for role_name in ROLES:
+            role = self.db.query(Role).filter(Role.name == role_name).first()
+
+            if role:
+                role.active = True
+                self.existing.append(f"role:{role_name}")
+            else:
+                role = Role(
+                    name=role_name,
+                    active=True,
                 )
-            roles_objects[role_name] = existing_r
+                self.db.add(role)
+                self.db.flush()
+                self.created.append(f"role:{role_name}")
 
-        # 3. ASIGNAR PERMISOS A ROLES
-        # Admin recibe todo
-        admin_role = roles_objects["Admin"]
-        for p_obj in perms_objects.values():
-            # Debes validar en tu service que no se duplique en la tabla intermedia
-            self.perm_service.assign_role_to_permission(admin_role.id, p_obj.id)
+            roles[role_name] = role
 
-        # 4. CREAR USUARIO ADMIN INICIAL
-        admin_email = "admin@admin.com"
-        # Supongamos que tu AuthService ya maneja la verificación de "si existe"
-        admin_user = self.auth_service.get_by_email(admin_email)
-        
-        if not admin_user:
-            admin_user = self.auth_service.register_user(UserRegisterSchema(email=admin_email, password="admin123"))
-            # Asignar rol
-            self.role_service.assign_role_to_user(admin_user["id"], admin_role.id)
+        return roles
+
+    def ensure_admin_user(self):
+        admin_user = self.db.query(Auth).filter(Auth.email == ADMIN_EMAIL).first()
+
+        if admin_user:
+            admin_user.active = True
+            self.existing.append(f"user:{ADMIN_EMAIL}")
+            return admin_user
+
+        admin_user = Auth(
+            id=uuid7(),
+            email=ADMIN_EMAIL,
+            password_hash=hash_password(ADMIN_PASSWORD),
+            active=True,
+        )
+        self.db.add(admin_user)
+        self.db.flush()
+        self.created.append(f"user:{ADMIN_EMAIL}")
+
+        return admin_user
+
+    def ensure_user_profile(self, user: Auth):
+        profile = (
+            self.db.query(Information).filter(Information.user_id == user.id).first()
+        )
+
+        if profile:
+            self.existing.append(f"user_profile:{user.email}")
+            return profile
+
+        profile = Information(user_id=user.id)
+        self.db.add(profile)
+        self.created.append(f"user_profile:{user.email}")
+        return profile
+
+    def ensure_role_permissions(self, role: Role, permissions):
+        for permission in permissions:
+            exists = (
+                self.db.query(RolePermission)
+                .filter(
+                    RolePermission.role_id == role.id,
+                    RolePermission.permission_id == permission.id,
+                )
+                .first()
+            )
+
+            if exists:
+                self.existing.append(f"role_permission:{role.name}:{permission.code}")
+                continue
+
+            self.db.add(
+                RolePermission(
+                    role_id=role.id,
+                    permission_id=permission.id,
+                )
+            )
+            self.created.append(f"role_permission:{role.name}:{permission.code}")
+
+    def ensure_functional_role_permissions(self, roles: dict, permissions: dict):
+        for role_name, permission_codes in ROLE_PERMISSIONS.items():
+            role = roles[role_name]
+            role_permissions = [
+                permissions[permission_code]
+                for permission_code in permission_codes
+                if permission_code in permissions
+            ]
+
+            self.ensure_role_permissions(role, role_permissions)
+
+    def ensure_user_role(self, user: Auth, role: Role):
+        user_role = (
+            self.db.query(UserRole)
+            .filter(
+                UserRole.user_id == user.id,
+                UserRole.role_id == role.id,
+            )
+            .first()
+        )
+
+        if user_role:
+            user_role.active = True
+            self.existing.append(f"user_role:{user.email}:{role.name}")
+            return
+
+        self.db.add(
+            UserRole(
+                user_id=user.id,
+                role_id=role.id,
+                active=True,
+            )
+        )
+        self.created.append(f"user_role:{user.email}:{role.name}")
+
+    # =====================================================
+    # MASTER
+    # =====================================================
+    def ensure_master_data(self):
+        for item in COMPANIES:
+            self.ensure_company(item)
+
+        for item in AREAS:
+            self.ensure_area(item)
+
+        for item in CURRENCIES:
+            self.ensure_currency(item)
+
+    def ensure_company(self, item: dict):
+        company = self.db.query(Company).filter(Company.code == item["code"]).first()
+
+        if company:
+            company.name = item["name"]
+            company.rut = item["rut"]
+            company.active = True
+            self.existing.append(f"company:{item['code']}")
+            return company
+
+        company = Company(**item, active=True)
+        self.db.add(company)
+        self.created.append(f"company:{item['code']}")
+        return company
+
+    def ensure_area(self, item: dict):
+        area = self.db.query(Area).filter(Area.code == item["code"]).first()
+
+        if area:
+            area.name = item["name"]
+            area.description = item["description"]
+            area.active = True
+            self.existing.append(f"area:{item['code']}")
+            return area
+
+        area = Area(**item, active=True)
+        self.db.add(area)
+        self.created.append(f"area:{item['code']}")
+        return area
+
+    def ensure_currency(self, item: dict):
+        currency = self.db.query(Currency).filter(Currency.code == item["code"]).first()
+
+        if currency:
+            currency.name = item["name"]
+            currency.symbol = item["symbol"]
+            currency.exchange_rate_to_base = item["exchange_rate_to_base"]
+            currency.is_base_currency = item["is_base_currency"]
+            currency.active = True
+            self.existing.append(f"currency:{item['code']}")
+            return currency
+
+        currency = Currency(**item, active=True)
+        self.db.add(currency)
+        self.created.append(f"currency:{item['code']}")
+        return currency
+
+    # =====================================================
+    # PROVISIONS
+    # =====================================================
+    def ensure_provision_statuses(self):
+        for item in PROVISION_STATUSES:
+            status = (
+                self.db.query(ProvisionStatus)
+                .filter(ProvisionStatus.code == item["code"])
+                .first()
+            )
+
+            if status:
+                status.name = item["name"]
+                self.existing.append(f"provision_status:{item['code']}")
+                continue
+
+            self.db.add(
+                ProvisionStatus(
+                    code=item["code"],
+                    name=item["name"],
+                )
+            )
+            self.created.append(f"provision_status:{item['code']}")

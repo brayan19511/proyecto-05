@@ -1,103 +1,200 @@
-# api/master/master_router.py
+# app/api/master/master_router.py
+
 from fastapi import APIRouter, Depends
 
-from app.api.master.master_schema import AreaCreateRequest, CompanyCreateRequest, CompanyUpdateRequest, CurrencyUpdateRequest, CurrencyUpdateRequest, CurrencyCreateRequest
-from app.api.master.master_service import MasterService
-from app.core.db_postgres import get_db
+from app.core.access import require_any_permission
+from app.core.db.db_postgres import get_db
 
-router = APIRouter(   prefix="/master",tags=["Master"],)
+from app.api.master.master_service import (
+    MasterService,
+)
 
-# Company
+from app.api.master.master_schema import (
+    AreaCreateRequest,
+    AreaUpdateRequest,
+    CompanyCreateRequest,
+    CompanyUpdateRequest,
+    CurrencyCreateRequest,
+    CurrencyUpdateRequest,
+)
+
+router = APIRouter(prefix="/master", tags=["Master"])
+
+
+def get_master_service(db=Depends(get_db)) -> MasterService:
+    return MasterService(db)
+
+
 @router.get("/company")
-async def get_company(db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_all_companies()
-    return data
-@router.get("/company/{company_id}")
-async def get_company_by_id(company_id: int, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_company_by_id(company_id)
-    return data
-@router.get("/company/code/{code}")
-async def get_company_by_code(code: str, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_company_by_code(code)
-    return data
-@router.post("/company")
-async def create_company(company_data: CompanyCreateRequest, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.create_company(company_data)
-    return data
-@router.put("/company/{company_id}")
-async def update_company(company_id: int, company_data: CompanyUpdateRequest, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.update_company(company_id, company_data)
-    return data
-@router.delete("/company/{company_id}")
-async def delete_company(company_id: int, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.delete_company(company_id)
-    return data
-# Area
-@router.get("/area")
-async def get_area(db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_all_areas()
-    return data
-@router.get("/area/{area_id}")
-async def get_area_by_id(area_id: int, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_area_by_id(area_id)
-    return data
-@router.get("/area/code/{code}")
-async def get_area_by_code(code: str, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_area_by_code(code)
-    return data
-@router.post("/area")
-async def create_area(area_data: AreaCreateRequest, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.create_area(area_data)
-    return data 
-@router.put("/area/{area_id}")
-async def update_area(area_id: int, area_data: AreaCreateRequest, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.update_area(area_id, area_data)
-    return data
-@router.delete("/area/{area_id}")
-async def delete_area(area_id: int, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.delete_area(area_id)
-    return data
+def get_companies(
+    search: str | None = None,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.company.view", "master.data.edit"),
+    ),
+):
 
-# Currency
+    return service.get_companies(search)
+
+
+@router.get("/company/{company_id}")
+def get_company_by_id(
+    company_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.company.view", "master.data.edit"),
+    ),
+):
+
+    return service.get_company_by_id(company_id)
+
+
+@router.post("/company")
+def create_company(
+    request: CompanyCreateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.company.edit", "master.data.edit"),
+    ),
+):
+
+    return service.create_company(request, current_user.id)
+
+
+@router.put("/company/{company_id}")
+def update_company(
+    company_id: int,
+    request: CompanyUpdateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.company.edit", "master.data.edit"),
+    ),
+):
+
+    return service.update_company(company_id, request, current_user.id)
+
+
+@router.delete("/company/{company_id}")
+def delete_company(
+    company_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.company.edit", "master.data.edit"),
+    ),
+):
+
+    return service.delete_company(company_id, current_user.id)
+
+
 @router.get("/currency")
-async def get_currency(db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_all_currencies()
-    return data
+def get_currency(
+    search: str | None = None,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.currency.view", "master.data.edit"),
+    ),
+):
+    return service.get_currencies(search)
+
+
 @router.get("/currency/{currency_id}")
-async def get_currency_by_id(currency_id: int, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_currency_by_id(currency_id)
-    return data
-@router.get("/currency/code/{code}")
-async def get_currency_by_code(code: str, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.get_currency_by_code(code)
-    return data
+def get_currency_by_id(
+    currency_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.currency.view", "master.data.edit"),
+    ),
+):
+    return service.get_currency_by_id(currency_id)
+
+
 @router.post("/currency")
-async def create_currency(currency_data: CurrencyCreateRequest, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.create_currency(currency_data)
-    return data
-@router.put("/currency/{currency_id}")
-async def update_currency(currency_id: int, currency_data: CurrencyUpdateRequest, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.update_currency(currency_id, currency_data)
-    return data
+def create_currency(
+    currency: CurrencyCreateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.currency.edit", "master.data.edit"),
+    ),
+):
+    return service.create_currency(currency, current_user.id)
+
+
+@router.put(
+    "/currency/{currency_id}",
+)
+def update_currency(
+    currency_id: int,
+    currency: CurrencyUpdateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.currency.edit", "master.data.edit"),
+    ),
+):
+    return service.update_currency(currency_id, currency, current_user.id)
+
+
 @router.delete("/currency/{currency_id}")
-async def delete_currency(currency_id: int, db=Depends(get_db)):
-    master_service = MasterService(db)
-    data = master_service.delete_currency(currency_id)
-    return data
+def delete_currency(
+    currency_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.currency.edit", "master.data.edit"),
+    ),
+):
+    return service.delete_currency(currency_id, current_user.id)
+
+
+@router.get("/area")
+def get_areas(
+    search: str | None = None,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.area.view", "master.data.edit"),
+    ),
+):
+    return service.get_areas(search)
+
+
+@router.get("/area/{area_id}")
+def get_area_by_id(
+    area_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.area.view", "master.data.edit"),
+    ),
+):
+    return service.get_area_by_id(area_id)
+
+
+@router.post("/area")
+def create_area(
+    area: AreaCreateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.area.edit", "master.data.edit"),
+    ),
+):
+    return service.create_area(area, current_user.id)
+
+
+@router.put("/area/{area_id}")
+def update_area(
+    area_id: int,
+    area: AreaUpdateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.area.edit", "master.data.edit"),
+    ),
+):
+    return service.update_area(area_id, area, current_user.id)
+
+
+@router.delete("/area/{area_id}")
+def delete_area(
+    area_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.area.edit", "master.data.edit"),
+    ),
+):
+    return service.delete_area(area_id, current_user.id)

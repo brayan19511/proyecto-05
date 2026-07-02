@@ -11,6 +11,11 @@ class AuthRepository:
     def create_auth(self, auth_obj: Auth) -> Auth:
         self.db.add(auth_obj)
         return auth_obj
+
+    def create_information(self, information: Information) -> Information:
+        self.db.add(information)
+        return information
+
     def get_by_email(self, email)-> Auth | None:
         query=select(Auth).where(Auth.email == email)
         return self.db.execute(query).scalar_one_or_none()

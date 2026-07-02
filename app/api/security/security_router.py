@@ -1,5 +1,6 @@
 # app/api/security/security_router.py
 from fastapi import APIRouter
+from app.api.security.api_key import api_key_router
 from app.api.security.auth import auth_router
 from app.api.security.permission import permission_router
 from app.api.security.role import role_router
@@ -9,3 +10,4 @@ router = APIRouter()
 router.include_router(auth_router.router, prefix="/security")
 router.include_router(permission_router.router, prefix="/security")
 router.include_router(role_router.router, prefix="/security")
+router.include_router(api_key_router.router, prefix="/security")

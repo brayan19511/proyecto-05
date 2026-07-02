@@ -1,18 +1,32 @@
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException
-from app.core.db_postgres import get_db
+
 from app.api.verify.seed_service import SeedService
+from app.core.db.db_postgres import get_db
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/verify", tags=["Verify"])
 
 
 @router.get("/seed")
-async def seed(db:Session=Depends(get_db)):
+async def seed(db: Session = Depends(get_db)):
     try:
-        seed_service=SeedService(db)
-        result=seed_service.run_seed()
-        return result
+        return SeedService(db).run_seed()
+    except Exception as exc:
+        logger.exception("Error ejecutando verificacion y seed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo completar la verificacion inicial",
+        ) from exc
 
-    except Exception as e:
-        return HTTPException(status_code=500, detail={"message": "Verification failed", "error": str(e)})   
+
+@router.get("/debug-ip")
+def debug_ip(request: Request):
+    return {
+        "client": request.client.host if request.client else None,
+        "x_forwarded_for": request.headers.get("x-forwarded-for"),
+        "x_real_ip": request.headers.get("x-real-ip"),
+    }

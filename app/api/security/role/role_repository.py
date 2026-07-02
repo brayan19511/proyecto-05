@@ -1,4 +1,6 @@
 # app/api/security/role/role_repository.py
+from uuid import UUID
+
 from sqlalchemy.orm import Session
 
 from app.api.security.role.role_schemas import RoleRequest
@@ -24,27 +26,45 @@ class RoleRepository:
         return new_role
 
     def delete_role(self, role:Role):
-        try:
-            role.active = False
-            self.db.commit()
-            self.db.refresh(role)
-            return True
-        except Exception as e:
-            self.db.rollback()
-            raise e
+        role.active = False
+        self.db.commit()
+        self.db.refresh(role)
+        return True
 
     def update_role(self, role:Role, role_data:RoleRequest):
-        try:
-            role.name = role_data.name
-            role.active = role_data.active
-            self.db.commit()
-            return True
-        except Exception as e:
-            self.db.rollback()
-            raise e
-    def is_role_assigned_to_user(self, user_id: int, role_id: int) -> bool:
-        return self.db.query(UserRole).filter_by(user_id=user_id, role_id=role_id).first() is not None
-    def assign_role_to_user(self, user_id: int, role_id: int):
+        role.name = role_data.name
+        role.active = role_data.active
+        self.db.commit()
+        return True
+
+    def get_user_role(self, user_id: UUID, role_id: int):
+        return self.db.query(UserRole).filter_by(user_id=user_id, role_id=role_id).first()
+
+    def is_role_assigned_to_user(self, user_id: UUID, role_id: int) -> bool:
+        user_role = self.get_user_role(user_id, role_id)
+        return user_role is not None and user_role.active
+
+    def assign_role_to_user(self, user_id: UUID, role_id: int):
         user_role = UserRole(user_id=user_id, role_id=role_id)
         self.db.add(user_role)
         self.db.commit()
+        return user_role
+
+    def activate_user_role(self, user_role: UserRole):
+        user_role.active = True
+        self.db.commit()
+        self.db.refresh(user_role)
+        return user_role
+
+    def deactivate_user_role(self, user_id: UUID, role_id: int):
+        user_role = self.get_user_role(user_id, role_id)
+
+        if not user_role:
+            return False
+
+        user_role.active = False
+        self.db.commit()
+        return True
+
+    def rollback(self):
+        self.db.rollback()
