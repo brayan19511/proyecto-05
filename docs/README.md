@@ -12,7 +12,7 @@
 8. [Despliegue en produccion](deployment/production.md)
 9. [Aprender GitHub Actions](automation/github-actions.md)
 10. [Workflows del proyecto](automation/workflows.md)
-11. [Tareas en cola](automation/queues.md)
+11. [Jobs y tareas en cola](automation/queues.md)
 
 ## Estructura
 

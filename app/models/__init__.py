@@ -5,6 +5,7 @@ from .audit import AuditLog, AuditLogDetail, AuditStep
 from .finance import Provision, ProvisionAccess, ProvisionConcept, ProvisionDocument, ProvisionStatus
 from .finance import LibroMayor, ReglasGastos
 from .master import Area, Company, Currency
+from .jobs import Job, JobBatch, JobItem
 from .storage import Attachment
 from .tickets import Tickets
 # Esto asegura que ambas clases estén disponibles en el Registry de SQLAlchemy
@@ -14,6 +15,7 @@ __all__ = [
     "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission" , 
     "Provision", "ProvisionAccess", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus",
     "Company", "Currency", "Area", "Attachment",
+    "Job", "JobBatch", "JobItem",
     "LibroMayor", "ReglasGastos",
     "Tickets"
     ]

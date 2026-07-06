@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     DB_SAP_USER: str
     DB_SAP_PASSWORD: str
     SAP_URL: str
+    SAP_JOB_BATCH_SIZE: int = 200
+    SAP_JOB_MAX_DOCUMENTS: int = 50_000
+    SAP_JOB_SOFT_TIME_LIMIT: int = 3600
+    SAP_JOB_TIME_LIMIT: int = 3900
+
+    CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
+    JOB_CREDENTIALS_KEY: Optional[str] = None
 
     DB_OFISIS_HOST: Optional[str] = None
     DB_OFISIS_PORT: int = 1433

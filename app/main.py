@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.attendance import router as attendance_router
 from app.api.health import health_router
 from app.api.libro_mayor import libro_mayor_router
+from app.api.jobs.router import router as jobs_router
 from app.api.master import master_router
 from app.api.provisions import provisions_router
 from app.api.sales_channel import router as sales_channel_router
@@ -55,4 +56,5 @@ app.include_router(prefix="/api", router=attachments_router.router)
 app.include_router(prefix="/api", router=user_router.router)
 app.include_router(prefix="/api", router=sales_channel_router.router)
 app.include_router(prefix="/api", router=attendance_router.router)
+app.include_router(prefix="/api", router=jobs_router)
 app.include_router(router=health_router.router)

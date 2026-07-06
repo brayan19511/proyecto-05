@@ -13,6 +13,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Index,
+    text,
 )
 
 from sqlalchemy.orm import (
@@ -132,7 +133,12 @@ class Provision(Base, AuditMixin):
 
     observations: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=text("true"),
+        nullable=False,
+    )
 
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     reviewed_by_user_id: Mapped[UUID | None] = mapped_column(
@@ -239,7 +245,12 @@ class ProvisionAccess(Base, AuditMixin):
 
     access_type: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=text("true"),
+        nullable=False,
+    )
 
     provision: Mapped["Provision"] = relationship(back_populates="access_grants")
 

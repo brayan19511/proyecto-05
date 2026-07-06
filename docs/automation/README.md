@@ -4,7 +4,7 @@
 
 1. [Conceptos y aprendizaje de GitHub Actions](github-actions.md)
 2. [Explicacion de los workflows actuales](workflows.md)
-3. [Diseño futuro de tareas en cola](queues.md)
+3. [Jobs y tareas en cola](queues.md)
 
 Los workflows ejecutables viven en:
 

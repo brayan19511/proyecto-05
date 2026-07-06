@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Numeric, String
+from sqlalchemy import Boolean, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db.db_postgres import Base
@@ -29,11 +29,13 @@ class Currency(Base, AuditMixin):
     exchange_rate_to_base: Mapped[Decimal] = mapped_column(
         Numeric(18, 6),
         default=Decimal("1"),
+        server_default=text("1"),
         nullable=False,
     )
     is_base_currency: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
+        server_default=text("false"),
         nullable=False,
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

@@ -3,6 +3,13 @@ from sqlalchemy.orm import Session
 from uuid6 import uuid7
 
 from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
+from app.api.jobs.constants import (
+    JOBS_CANCEL_ALL_PERMISSION,
+    JOBS_CANCEL_PERMISSION,
+    JOBS_RETRY_PERMISSION,
+    JOBS_VIEW_ALL_PERMISSION,
+    JOBS_VIEW_PERMISSION,
+)
 from app.api.provisions.constants import (
     APPROVED_STATUS,
     CANCELLED_STATUS,
@@ -162,6 +169,17 @@ PERMISSIONS = [
         "code": ATTENDANCE_MARKS_VIEW_PERMISSION,
         "description": "Ver registros de asistencia",
     },
+    {"code": JOBS_VIEW_PERMISSION, "description": "Ver tareas propias"},
+    {
+        "code": JOBS_VIEW_ALL_PERMISSION,
+        "description": "Ver tareas de todos los usuarios",
+    },
+    {"code": JOBS_CANCEL_PERMISSION, "description": "Cancelar tareas propias"},
+    {
+        "code": JOBS_CANCEL_ALL_PERMISSION,
+        "description": "Cancelar tareas de todos los usuarios",
+    },
+    {"code": JOBS_RETRY_PERMISSION, "description": "Reintentar tareas"},
 ]
 
 ROLES = [
@@ -189,6 +207,11 @@ ROLE_PERMISSIONS = {
         "sap.read",
         "sap.write",
         "sap.execute",
+        JOBS_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+        JOBS_CANCEL_ALL_PERMISSION,
+        JOBS_RETRY_PERMISSION,
     },
     "Master Consulta": {
         "master.company.view",

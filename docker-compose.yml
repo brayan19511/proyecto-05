@@ -1,4 +1,23 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4.2-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-finance}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-finance}
+    ports:
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - finance-network
+
   db-postgres:
     image: postgres:16
     restart: unless-stopped
@@ -45,6 +64,7 @@ services:
       DB_SAP_HOST: ${DB_SAP_HOST}
       DB_SAP_PORT: ${DB_SAP_PORT}
       SAP_URL: ${SAP_URL}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://finance:finance@rabbitmq:5672//}
       DB_OFISIS_PORT: ${DB_OFISIS_PORT:-1433}
       DB_OFISIS_HOST: ${DB_OFISIS_HOST}
       DB_OFISIS_USER: ${DB_OFISIS_USER}
@@ -73,6 +93,42 @@ services:
     depends_on:
       db-postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance-network
+
+  worker-sap:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://finance:finance@rabbitmq:5672//}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=sap",
+        "--concurrency=4",
+        "--hostname=sap@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - .:/app
     networks:
       - finance-network
 
@@ -97,6 +153,7 @@ services:
 volumes:
   postgres-db:
   pgadmin-data:
+  rabbitmq-data:
 
 networks:
   finance-network:

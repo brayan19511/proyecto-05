@@ -18,6 +18,20 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -60,3 +74,17 @@ jobs:
             --entrypoint python \
             backend-finance:test \
             -c "from app.main import app; assert app.openapi()['paths']"
+
+      - name: Validate database migrations
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL=postgresql+psycopg2://ci:ci@localhost:5432/ci \
+            -e JWT_SECRET=ci-secret \
+            -e DB_SAP_USER=ci \
+            -e DB_SAP_PASSWORD=ci \
+            -e DB_SAP_HOST=localhost \
+            -e DB_SAP_PORT=30015 \
+            -e SAP_URL=https://localhost:50000/b1s/v1 \
+            --entrypoint sh \
+            backend-finance:test \
+            -c "alembic upgrade head && alembic check && python -m tests.integration.job_db_smoke"
