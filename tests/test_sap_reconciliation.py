@@ -26,7 +26,7 @@ def build_workbook(rows: list[list]) -> BytesIO:
             "TransId",
             "Account",
             "ShortName",
-            "Amount",
+            "ReconcileAmount",
         ]
     )
     for row in rows:
