@@ -17,7 +17,7 @@ REQUIRED_COLUMNS = {
     "TransRowId",
     "TransId",
     "ShortName",
-    "Amount",
+    "ReconcileAmount",
 }
 MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024
 
@@ -94,24 +94,24 @@ class SapReconciliationExcelService:
                 continue
 
             recon_num = self._required(row, headers, "ReconNum", row_number)
-            amount = self._required(
+            reconcile_amount = self._required(
                 row,
                 headers,
-                "Amount",
+                "ReconcileAmount",
                 row_number,
                 parser=Decimal,
                 type_name="numerico",
             )
-            if amount == 0:
-                raise ValidationError(f"Fila {row_number}: Amount no puede ser 0")
+            if reconcile_amount == 0:
+                raise ValidationError(f"Fila {row_number}: ReconcileAmount no puede ser 0")
 
             # SAP recibe montos absolutos y el lado contable se define con
-            # codDebit/codCredit segun el signo del Amount en el Excel.
+            # codDebit/codCredit segun el signo del ReconcileAmount en el Excel.
             groups[recon_num].append(
                 {
                     "CashDiscount": None,
-                    "CreditOrDebit": "codDebit" if amount > 0 else "codCredit",
-                    "ReconcileAmount": float(abs(amount)),
+                    "CreditOrDebit": "codDebit" if reconcile_amount > 0 else "codCredit",
+                    "ReconcileAmount": float(abs(reconcile_amount)),
                     "Selected": "tYES",
                     "ShortName": self._required(
                         row,
@@ -149,7 +149,7 @@ class SapReconciliationExcelService:
                         parser=int,
                         type_name="numerico",
                     ),
-                    "_amount": amount,
+                    "_reconcile_amount": reconcile_amount,
                 }
             )
 
@@ -164,18 +164,18 @@ class SapReconciliationExcelService:
     ) -> dict[str, dict]:
         payloads = {}
         for recon_num, rows in groups.items():
-            total = sum(row["_amount"] for row in rows)
+            total = sum(row["_reconcile_amount"] for row in rows)
             if abs(total) > Decimal("0.01"):
                 raise ValidationError(
-                    f"ReconNum {recon_num}: la suma Amount debe ser 0"
+                    f"ReconNum {recon_num}: la suma ReconcileAmount debe ser 0"
                 )
 
-            # SAP no necesita el Amount original; solo el lado debito/credito
+            # SAP no necesita el ReconcileAmount original; solo el lado debito/credito
             # y el monto absoluto que se va a reconciliar.
             clean_rows = []
             for row in rows:
                 clean = dict(row)
-                clean.pop("_amount", None)
+                clean.pop("_reconcile_amount", None)
                 clean_rows.append(clean)
 
             payloads[recon_num] = {
