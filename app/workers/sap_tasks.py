@@ -19,13 +19,15 @@ from app.workers.celery_app import celery_app
     time_limit=settings.SAP_JOB_TIME_LIMIT,
 )
 def process_sap_batch(self, batch_id: str):
-    """Run one retryable SAP batch; business state remains in PostgreSQL."""
+    """Procesa un lote SAP; PostgreSQL guarda el avance visible para la UX."""
     parsed_batch_id = UUID(batch_id)
     with SessionLocal() as db:
         processor = SapJobProcessor(db)
         try:
             return processor.process(parsed_batch_id, self.request.id)
         except SAPConnectionError as exc:
+            # Si SAP no responde, Celery reintenta el mismo lote. Los items
+            # exitosos ya quedan guardados, asi que no se repiten.
             error = "SAP no responde; el lote sera reintentado"
             if self.request.retries >= self.max_retries:
                 processor.mark_failed(parsed_batch_id, error)
@@ -36,12 +38,15 @@ def process_sap_batch(self, batch_id: str):
                 countdown=min(30 * (2 ** self.request.retries), 300),
             )
         except SoftTimeLimitExceeded:
+            # El limite evita que un lote se quede colgado indefinidamente.
             processor.mark_failed(
                 parsed_batch_id,
                 "El lote excedio el tiempo permitido",
             )
             raise
         except Exception:
+            # Se guarda un error seguro para el usuario y el detalle queda en
+            # logs del worker; asi no exponemos credenciales ni payloads.
             processor.mark_failed(
                 parsed_batch_id,
                 "Error inesperado durante el procesamiento",

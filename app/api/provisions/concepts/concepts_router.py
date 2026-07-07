@@ -10,7 +10,6 @@ from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker, get_current_user
 
 router = APIRouter(
-    tags=["Provisions Concepts"],
 )
 
 

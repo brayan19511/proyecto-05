@@ -49,6 +49,7 @@ class JobService:
         idempotency_key: str | None = None,
         parent_job_id: UUID | None = None,
         encrypted_secrets: str | None = None,
+        item_payloads: dict[str, dict | list | str] | None = None,
     ) -> Job:
         normalized = list(dict.fromkeys(str(item) for item in references))
         if not normalized:
@@ -92,17 +93,22 @@ class JobService:
                 status=JobBatchStatus.PENDING.value,
                 total_items=len(references_chunk),
             )
-            batch.items = [
-                JobItem(
+            batch.items = []
+            for reference in references_chunk:
+                item = JobItem(
                     job_id=job.id,
                     reference=reference,
                     status=JobItemStatus.PENDING.value,
                 )
-                for reference in references_chunk
-            ]
+                # Algunas tareas necesitan guardar el payload ya normalizado
+                # por item. El worker lo lee desde aqui y no vuelve a tocar
+                # archivos subidos por el usuario.
+                if item_payloads:
+                    item.result_data = item_payloads.get(reference)
+                batch.items.append(item)
             job.batches.append(batch)
 
-        # Workers are notified only after the complete graph is committed.
+        # Avisamos al worker solo despues de guardar job, lotes e items.
         job.total_batches = len(job.batches)
         job.status = JobStatus.QUEUED.value
         self.db.add(job)
@@ -267,8 +273,8 @@ class JobService:
             self._dispatch(job)
             return self.get_job(job.id, user_id=user_id, can_view_all=True)
 
-        # Retrying processed failures creates a child job and preserves the
-        # original execution as immutable history for the user.
+        # Reintentar fallidos crea una tarea hija. La ejecucion original queda
+        # como historial para auditoria y para la UX.
         references = self.repository.get_failed_references(job.id)
         if not references:
             raise ConflictError("La tarea no tiene elementos fallidos para reintentar")
@@ -288,8 +294,8 @@ class JobService:
         if not job:
             return
 
-        # Aggregate in PostgreSQL: a 35,000-item job never loads all statuses
-        # into worker memory just to refresh four counters.
+        # Agregamos en PostgreSQL. Asi una tarea grande no carga todos los
+        # items en memoria solo para actualizar contadores.
         status_counts = dict(
             self.db.query(JobItem.status, func.count(JobItem.id))
             .filter(JobItem.job_id == job_id)
@@ -363,7 +369,7 @@ class JobService:
 
             celery_app.control.revoke(task_ids, terminate=False)
         except Exception:
-            # Cooperative cancellation still works through job.status.
+            # La cancelacion cooperativa sigue funcionando por job.status.
             logger.warning(
                 "Could not revoke Celery tasks; cancellation remains cooperative",
                 exc_info=True,

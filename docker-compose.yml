@@ -64,7 +64,7 @@ services:
       DB_SAP_HOST: ${DB_SAP_HOST}
       DB_SAP_PORT: ${DB_SAP_PORT}
       SAP_URL: ${SAP_URL}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://finance:finance@rabbitmq:5672//}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
       DB_OFISIS_PORT: ${DB_OFISIS_PORT:-1433}
       DB_OFISIS_HOST: ${DB_OFISIS_HOST}
       DB_OFISIS_USER: ${DB_OFISIS_USER}
@@ -108,7 +108,7 @@ services:
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://finance:finance@rabbitmq:5672//}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
     command:
       [
         "celery",

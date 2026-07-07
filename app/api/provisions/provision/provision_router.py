@@ -24,7 +24,7 @@ from app.core.access import get_permission_codes, is_admin
 from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker, get_current_user
 
-router = APIRouter(tags=["Provisions"])
+router = APIRouter()
 
 
 def get_service(db: Session = Depends(get_db)):

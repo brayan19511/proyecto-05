@@ -29,7 +29,7 @@ from app.core.db.db_postgres import get_db
 from app.workers.dispatcher import dispatch_job
 
 
-router = APIRouter(prefix="/jobs", tags=["Jobs"])
+router = APIRouter(prefix="/jobs", tags=["JOBS"])
 
 
 def get_job_service(db: Session = Depends(get_db)) -> JobService:

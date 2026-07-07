@@ -9,8 +9,9 @@ celery_app = Celery(
     include=["app.workers.sap_tasks"],
 )
 
-# RabbitMQ only transports task identifiers. Business status and results live
-# in PostgreSQL, so Celery's result backend is intentionally disabled.
+# RabbitMQ solo transporta mensajes pequenos para avisar "procesa este lote".
+# El estado real del negocio queda en PostgreSQL, por eso no usamos result
+# backend de Celery ni guardamos resultados sensibles en RabbitMQ.
 celery_app.conf.update(
     accept_content=["json"],
     task_serializer="json",
@@ -19,7 +20,8 @@ celery_app.conf.update(
     task_track_started=False,
     broker_connection_retry_on_startup=True,
     worker_prefetch_multiplier=1,
-    # Domain queues let SAP scale independently from future exports or emails.
+    # Separar colas por dominio permite escalar SAP sin afectar futuros workers
+    # de correos, reportes, exportaciones, etc.
     task_routes={
         "jobs.sap.process_batch": {"queue": "sap"},
     },

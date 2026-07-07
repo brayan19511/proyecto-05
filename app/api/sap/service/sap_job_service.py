@@ -11,6 +11,8 @@ from app.api.jobs.constants import (
     JobStatus,
 )
 from app.api.jobs.service import JobService
+from app.api.sap.handlers import get_sap_item_handler
+from app.api.sap.handlers.base import SapItemHandler
 from app.api.sap.service.sap_document_service import SapDocumentService
 from app.core.exceptions import (
     SAPAuthenticationError,
@@ -64,16 +66,16 @@ class SapJobProcessor:
         }:
             return {"status": batch.status}
 
-        # A RUNNING item survived a worker crash. Replaying it blindly could
-        # execute the same non-idempotent SAP action twice.
+        # Si el worker se apago con items RUNNING, no los repetimos a ciegas:
+        # una accion SAP podria no ser idempotente y ejecutarse dos veces.
         self._mark_uncertain_items(batch)
         if self._is_cancel_requested(batch.job):
             self._cancel_pending(batch)
             return {"status": JobBatchStatus.CANCELLED.value}
 
         now = datetime.now(timezone.utc)
-        # Conditional updates prevent cancellation and worker startup from
-        # overwriting each other when both occur at the same time.
+        # Este update condicional evita que una cancelacion y el inicio del
+        # worker se pisen si ocurren al mismo tiempo.
         claimed = (
             self.db.query(JobBatch)
             .filter(
@@ -118,8 +120,8 @@ class SapJobProcessor:
             )
             .update(
                 {
-                    # Keep partial dispatch failures visible while batches that
-                    # were published successfully continue processing.
+                    # Si fallo publicar algun lote, mantenemos visible ese
+                    # estado aunque los lotes ya publicados sigan avanzando.
                     Job.status: case(
                         (
                             Job.status == JobStatus.DISPATCH_FAILED.value,
@@ -151,6 +153,8 @@ class SapJobProcessor:
 
         try:
             with document_service.build_client() as client:
+                handler_class = get_sap_item_handler(batch.job.job_type)
+                handler = handler_class(document_service, client)
                 for item in batch.items:
                     if item.status != JobItemStatus.PENDING.value:
                         continue
@@ -160,8 +164,7 @@ class SapJobProcessor:
                     self._process_item(
                         batch,
                         item,
-                        document_service,
-                        client,
+                        handler,
                     )
         except SAPConnectionError:
             self.db.rollback()
@@ -215,24 +218,18 @@ class SapJobProcessor:
         self,
         batch: JobBatch,
         item: JobItem,
-        service: SapDocumentService,
-        client,
+        handler: SapItemHandler,
     ) -> None:
         item.status = JobItemStatus.RUNNING.value
         item.attempts += 1
         item.started_at = datetime.now(timezone.utc)
         batch.heartbeat_at = item.started_at
-        # Persist RUNNING before SAP so a crash leaves an explicit uncertain
-        # result rather than silently replaying the document.
+        # Guardamos RUNNING antes de llamar a SAP. Si el worker cae, luego
+        # sabremos que ese item quedo incierto y requiere revision.
         self.db.commit()
 
         try:
-            service.execute(
-                client,
-                entity=batch.job.parameters["entity"],
-                action=batch.job.parameters["action"],
-                document=item.reference,
-            )
+            handler.execute(batch, item)
             item.status = JobItemStatus.SUCCEEDED.value
             item.external_status_code = 200
             item.result_data = {"completed": True}
@@ -253,8 +250,8 @@ class SapJobProcessor:
             succeeded=item.status == JobItemStatus.SUCCEEDED.value,
             failed=item.status == JobItemStatus.FAILED.value,
         )
-        # Each external result is durable immediately. Batch retries can skip
-        # terminal items instead of replaying the whole batch.
+        # Cada resultado externo se persiste de inmediato. Si el lote se
+        # reintenta, los items terminales se saltan y no se repiten.
         self.db.commit()
 
     def _finish_batch(self, batch: JobBatch) -> None:
@@ -300,6 +297,8 @@ class SapJobProcessor:
         self.db.commit()
 
     def _mark_uncertain_items(self, batch: JobBatch) -> None:
+        # RUNNING al reanudar significa "no se si SAP alcanzo a procesarlo".
+        # Preferimos marcarlo fallido para revision manual antes que duplicarlo.
         uncertain = [
             item
             for item in batch.items

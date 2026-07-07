@@ -5,7 +5,7 @@ from app.models.sap.sap_models import SAPCredentials
 
 
 class SapDocumentService:
-    """Execute one configured document action using an existing SAP session."""
+    """Ejecuta acciones SAP usando una sesion ya autenticada."""
 
     def __init__(self, credentials: SAPCredentials):
         self.credentials = credentials
@@ -38,3 +38,13 @@ class SapDocumentService:
 
         endpoint = f"{safe_entity}({document})/{safe_action}"
         return client.post(endpoint)
+
+    def execute_reconciliation(
+        self,
+        client: SAPServiceLayerClient,
+        *,
+        payload: dict,
+    ):
+        # La reconciliacion interna siempre apunta a este recurso estandar de
+        # SAP Service Layer; el Excel solo define las lineas del payload.
+        return client.post("InternalReconciliations", data=payload)

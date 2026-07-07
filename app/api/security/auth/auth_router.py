@@ -7,7 +7,7 @@ from app.api.security.auth.auth_service import AuthService
 from app.core.db.db_postgres import get_db
 from app.core.security import get_current_user
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["AUTENTICACION"])
 
 @router.post("/login", response_model=TokenResponse)
 def login(login_data: LoginRequest, db: Session = Depends(get_db)):

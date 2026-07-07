@@ -3,6 +3,7 @@ from enum import StrEnum
 
 class JobType(StrEnum):
     SAP_DOCUMENT_ACTION = "SAP_DOCUMENT_ACTION"
+    SAP_RECONCILIATION = "SAP_RECONCILIATION"
 
 
 class JobStatus(StrEnum):

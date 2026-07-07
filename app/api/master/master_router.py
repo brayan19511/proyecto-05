@@ -18,7 +18,7 @@ from app.api.master.master_schema import (
     CurrencyUpdateRequest,
 )
 
-router = APIRouter(prefix="/master", tags=["Master"])
+router = APIRouter(prefix="/master", tags=["MASTER"])
 
 
 def get_master_service(db=Depends(get_db)) -> MasterService:

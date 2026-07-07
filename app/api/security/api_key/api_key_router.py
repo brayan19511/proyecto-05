@@ -22,7 +22,7 @@ from app.api.security.api_key.api_key_schemas import (
 
 router = APIRouter(
     prefix="/api-key",
-    tags=["API Keys"],
+    tags=["API KEYS"],
 )
 
 @router.post(
