@@ -97,6 +97,7 @@ class DimProducto(Base):
         Index("ix_dim_producto_codigo", "codigo"),
         Index("ix_dim_producto_rubro", "rubro"),
         Index("ix_dim_producto_familia", "familia"),
+        Index("ix_dim_producto_tipo", "tipo"),
         {"schema": "coolbox"},
     )
 

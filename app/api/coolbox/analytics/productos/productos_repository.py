@@ -2,6 +2,11 @@ from datetime import date
 
 from sqlalchemy import text
 
+from app.api.coolbox.common.product_types import (
+    analytics_product_type_filter,
+    analytics_product_type_params,
+)
+
 
 class AnalyticsProductosRepository:
     def __init__(self, db):
@@ -327,6 +332,7 @@ class AnalyticsProductosRepository:
             .mappings()
             .all()
         )
+
     def get_filtros(self):
         canales_sql = text("""
             SELECT DISTINCT
@@ -335,7 +341,10 @@ class AnalyticsProductosRepository:
             FROM coolbox.fact_ventas f
             INNER JOIN coolbox.dim_canal c
                 ON c.id = f.canal_id
+            INNER JOIN coolbox.dim_producto p
+                ON p.id = f.producto_id
             WHERE c.activo = TRUE
+            AND p.tipo = :analytics_product_type
             ORDER BY c.nombre
         """)
 
@@ -346,49 +355,58 @@ class AnalyticsProductosRepository:
             FROM coolbox.fact_ventas f
             INNER JOIN coolbox.dim_tienda t
                 ON t.id = f.tienda_id
+            INNER JOIN coolbox.dim_producto p
+                ON p.id = f.producto_id
             WHERE t.activo = TRUE
+            AND p.tipo = :analytics_product_type
             ORDER BY t.nombre
         """)
 
         rubros_sql = text("""
             SELECT DISTINCT rubro AS valor
-            FROM coolbox.dim_producto
+            FROM coolbox.dim_producto p
             WHERE rubro IS NOT NULL
             AND TRIM(rubro) <> ''
+            AND p.tipo = :analytics_product_type
             ORDER BY rubro
         """)
 
         familias_sql = text("""
             SELECT DISTINCT familia AS valor
-            FROM coolbox.dim_producto
+            FROM coolbox.dim_producto p
             WHERE familia IS NOT NULL
             AND TRIM(familia) <> ''
+            AND p.tipo = :analytics_product_type
             ORDER BY familia
         """)
 
         marcas_sql = text("""
             SELECT DISTINCT marca AS valor
-            FROM coolbox.dim_producto
+            FROM coolbox.dim_producto p
             WHERE marca IS NOT NULL
             AND TRIM(marca) <> ''
+            AND p.tipo = :analytics_product_type
             ORDER BY marca
         """)
 
         subfamilias_sql = text("""
             SELECT DISTINCT subfamilia AS valor
-            FROM coolbox.dim_producto
+            FROM coolbox.dim_producto p
             WHERE subfamilia IS NOT NULL
             AND TRIM(subfamilia) <> ''
+            AND p.tipo = :analytics_product_type
             ORDER BY subfamilia
         """)
 
+        params = analytics_product_type_params()
+
         return {
-            "canales": self.db.execute(canales_sql).mappings().all(),
-            "tiendas": self.db.execute(tiendas_sql).mappings().all(),
-            "rubros": self.db.execute(rubros_sql).mappings().all(),
-            "familias": self.db.execute(familias_sql).mappings().all(),
-            "marcas": self.db.execute(marcas_sql).mappings().all(),
-            "subfamilias": self.db.execute(subfamilias_sql).mappings().all(),
+            "canales": self.db.execute(canales_sql, params).mappings().all(),
+            "tiendas": self.db.execute(tiendas_sql, params).mappings().all(),
+            "rubros": self.db.execute(rubros_sql, params).mappings().all(),
+            "familias": self.db.execute(familias_sql, params).mappings().all(),
+            "marcas": self.db.execute(marcas_sql, params).mappings().all(),
+            "subfamilias": self.db.execute(subfamilias_sql, params).mappings().all(),
         }
 
     def _filters_sql(
@@ -398,7 +416,10 @@ class AnalyticsProductosRepository:
         rubro: str | None = None,
         familia: str | None = None,
     ):
-        filters = []
+        filters = [
+            # El dashboard de productos se enfoca en articulos de tipo PRO.
+            analytics_product_type_filter(),
+        ]
 
         if canal:
             filters.append("AND c.codigo = :canal")
@@ -421,7 +442,7 @@ class AnalyticsProductosRepository:
         rubro: str | None = None,
         familia: str | None = None,
     ):
-        params = {}
+        params = analytics_product_type_params()
 
         if canal:
             params["canal"] = canal

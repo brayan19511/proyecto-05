@@ -2,6 +2,11 @@ from datetime import date
 
 from sqlalchemy import bindparam, text
 
+from app.api.coolbox.common.product_types import (
+    analytics_product_type_filter,
+    analytics_product_type_params,
+)
+
 
 class AnalyticsVentasRepository:
     def __init__(self, db):
@@ -212,6 +217,7 @@ class AnalyticsVentasRepository:
     ):
         canal_filter = self._canal_filter_sql(canal)
         tiendas_filter = self._tiendas_filter_sql(tiendas)
+        product_type_filter = analytics_product_type_filter()
 
         sql = text(f"""
             SELECT
@@ -232,6 +238,7 @@ class AnalyticsVentasRepository:
                 ON t.id = f.tienda_id
             WHERE f.fecha >= :fecha_inicio
             AND f.fecha < (:fecha_fin + INTERVAL '1 day')
+            {product_type_filter}
             {canal_filter}
             {tiendas_filter}
             GROUP BY
@@ -251,6 +258,7 @@ class AnalyticsVentasRepository:
             "fecha_inicio": fecha_inicio,
             "fecha_fin": fecha_fin,
             **self._canal_params(canal),
+            **analytics_product_type_params(),
             "limit": limit,
             **self._tiendas_params(tiendas),
         }

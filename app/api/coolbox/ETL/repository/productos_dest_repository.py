@@ -3,6 +3,7 @@ from uuid import uuid4
 import pandas as pd
 from sqlalchemy import text
 
+from app.api.coolbox.common.product_types import normalize_product_type
 from app.models.coolbox.ventas.coolbox_ventas_model import DimProducto
 
 
@@ -34,7 +35,7 @@ class ProductosDestRepository:
                         if pd.notna(row.SUBFAMILIA)
                         else "SIN SUBFAMILIA"
                     ),
-                    "tipo": row.TI_ITEM if pd.notna(row.TI_ITEM) else "OTROS",
+                    "tipo": normalize_product_type(row.TI_ITEM),
                     "descatalogado": bool(row.IS_DESCATALOGADO),
                     "activo": True,
                 }
