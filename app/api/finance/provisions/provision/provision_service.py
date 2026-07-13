@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.provisions.constants import (
+from app.api.finance.provisions.constants import (
     APPROVED_STATUS,
     BASE_CURRENCY_CODE,
     CANCELLED_STATUS,
@@ -16,8 +16,8 @@ from app.api.provisions.constants import (
     REJECTED_FINAL_STATUS,
     REJECTED_FOR_EDIT_STATUS,
 )
-from app.api.provisions.provision.provision_repository import ProvisionRepository
-from app.api.provisions.provision.provision_schema import (
+from app.api.finance.provisions.provision.provision_repository import ProvisionRepository
+from app.api.finance.provisions.provision.provision_schema import (
     ProvisionAccessRequest,
     ProvisionActionRequest,
     ProvisionCreateRequest,

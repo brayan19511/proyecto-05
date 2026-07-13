@@ -1,6 +1,6 @@
 # app\api\libro_mayor\service\libro_mayor_resumen_service.py
 
-from app.api.libro_mayor.repository.libro_mayor_repository import LibroMayorRepository
+from app.api.finance.libro_mayor.repository.libro_mayor_repository import LibroMayorRepository
 
 
 class LibroMayorResumenService:

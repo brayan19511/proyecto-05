@@ -7,14 +7,14 @@ import pandas as pd
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.api.libro_mayor.libro_mayor_schema import LibroMayorSap
-from app.api.libro_mayor.repository.libro_mayor_repository import (
+from app.api.finance.libro_mayor.libro_mayor_schema import LibroMayorSap
+from app.api.finance.libro_mayor.repository.libro_mayor_repository import (
     LibroMayorRepository,
 )
-from app.api.libro_mayor.repository.sap_finance_repository import (
+from app.api.finance.libro_mayor.repository.sap_finance_repository import (
     SapRepository,
 )
-from app.api.libro_mayor.service.libro_mayor_rules_service import (
+from app.api.finance.libro_mayor.service.libro_mayor_rules_service import (
     LibroMayorRulesService,
 )
 from app.models.finance.libro_mayor_model import LibroMayor

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 
-from app.api.provisions.concepts.concepts_schema import (
+from app.api.finance.provisions.concepts.concepts_schema import (
     ConceptCreateRequest,
     ConceptUpdateRequest,
 )

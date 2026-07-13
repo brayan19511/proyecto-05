@@ -4,10 +4,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.attendance import router as attendance_router
 from app.api.health import health_router
-from app.api.libro_mayor import libro_mayor_router
+from app.api.finance.router import router as finance_router
 from app.api.jobs.router import router as jobs_router
 from app.api.master import master_router
-from app.api.provisions import provisions_router
+from app.api.finance.provisions import provisions_router
 from app.api.sales_channel import router as sales_channel_router
 from app.api.sap import sap_router
 from app.api.security import security_router
@@ -47,8 +47,7 @@ register_exception_handlers(app)
 # =========================================================
 app.include_router(prefix="/api", router=sap_router.router)
 app.include_router(prefix="/api", router=web_router.router)
-app.include_router(prefix="/api", router=libro_mayor_router.router)
-app.include_router(prefix="/api", router=provisions_router.router)
+app.include_router(prefix="/api", router=finance_router)
 app.include_router(prefix="/api", router=master_router.router)
 app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)

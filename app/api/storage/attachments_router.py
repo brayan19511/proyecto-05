@@ -9,7 +9,7 @@ from app.api.storage.attachments_schema import (
     AttachmentUpdateRequest,
 )
 from app.api.storage.attachments_service import AttachmentService
-from app.api.provisions.access import (
+from app.api.finance.provisions.access import (
     can_edit_all_provisions,
     can_view_all_provisions,
 )

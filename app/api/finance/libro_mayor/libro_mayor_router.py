@@ -13,7 +13,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 
-from app.api.libro_mayor.libro_mayor_schema import (
+from app.api.finance.libro_mayor.libro_mayor_schema import (
     LibroMayorResponse,
     ReglaGastoCreate,
     ReglaGastoUpdate,
@@ -21,17 +21,17 @@ from app.api.libro_mayor.libro_mayor_schema import (
     SyncDeltaRequest,
     ReprocessDateRangeRequest,
 )
-from app.api.libro_mayor.libro_mayor_service import (
+from app.api.finance.libro_mayor.libro_mayor_service import (
     LibroMayorService,
 )
-from app.api.libro_mayor.service.libro_mayor_reproces_service import (
+from app.api.finance.libro_mayor.service.libro_mayor_reproces_service import (
     LibroMayorReprocessService,
 )
 
-from app.api.libro_mayor.service.libro_mayor_resumen_service import (
+from app.api.finance.libro_mayor.service.libro_mayor_resumen_service import (
     LibroMayorResumenService,
 )
-from app.api.libro_mayor.service.reglas_gastos_service import ReglasGastosService
+from app.api.finance.libro_mayor.service.reglas_gastos_service import ReglasGastosService
 from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
 from app.core.db.db_sap import get_db_sap

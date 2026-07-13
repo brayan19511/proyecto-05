@@ -10,7 +10,7 @@ from app.api.jobs.constants import (
     JOBS_VIEW_ALL_PERMISSION,
     JOBS_VIEW_PERMISSION,
 )
-from app.api.provisions.constants import (
+from app.api.finance.provisions.constants import (
     APPROVED_STATUS,
     CANCELLED_STATUS,
     PENDING_DETAIL_STATUS,

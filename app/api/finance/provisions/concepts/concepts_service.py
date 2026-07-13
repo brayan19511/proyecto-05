@@ -1,8 +1,8 @@
 from sqlalchemy.exc import IntegrityError
 
 from app.api.master.master_service import MasterService
-from app.api.provisions.concepts.concepts_repository import ConceptsRepository
-from app.api.provisions.concepts.concepts_schema import (
+from app.api.finance.provisions.concepts.concepts_repository import ConceptsRepository
+from app.api.finance.provisions.concepts.concepts_schema import (
     ConceptCreateRequest,
     ConceptUpdateRequest,
 )

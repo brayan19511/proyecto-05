@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.provisions.provision.provision_schema import (
+from app.api.finance.provisions.provision.provision_schema import (
     ProvisionAccessRequest,
     ProvisionActionRequest,
     ProvisionCreateRequest,
@@ -15,11 +15,11 @@ from app.api.provisions.provision.provision_schema import (
     ProvisionSummaryResponse,
     ProvisionUpdateRequest,
 )
-from app.api.provisions.access import (
+from app.api.finance.provisions.access import (
     can_edit_all_provisions,
     can_view_all_provisions,
 )
-from app.api.provisions.provision.provision_service import ProvisionService
+from app.api.finance.provisions.provision.provision_service import ProvisionService
 from app.core.access import get_permission_codes, is_admin
 from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker, get_current_user

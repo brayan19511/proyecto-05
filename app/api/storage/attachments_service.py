@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.provisions.provision.provision_service import ProvisionService
+from app.api.finance.provisions.provision.provision_service import ProvisionService
 from app.api.storage.attachments_repository import AttachmentRepository
 from app.api.storage.attachments_schema import (
     AttachmentCreateRequest,

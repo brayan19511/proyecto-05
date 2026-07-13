@@ -9,7 +9,7 @@ from sqlalchemy import and_, extract, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.api.libro_mayor.constants import TEXT_SEARCH_COLUMNS
+from app.api.finance.libro_mayor.constants import TEXT_SEARCH_COLUMNS
 from app.models.finance.libro_mayor_model import (
     LibroMayor,
     ReglasGastos,

@@ -1,7 +1,7 @@
 # app/api/libro_mayor/rules_engine.py
 import pandas as pd
 
-from app.api.libro_mayor.constants import TEXT_SEARCH_COLUMNS
+from app.api.finance.libro_mayor.constants import TEXT_SEARCH_COLUMNS
 from app.models.finance.libro_mayor_model import ReglasGastos
 
 
