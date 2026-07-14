@@ -21,6 +21,7 @@ from app.core.db.integrity import raise_integrity_error
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.finance.payment_provider_model import PaymentProvider
 from app.services.email import EmailAttachment, EmailService
+from app.services.email.email_service import parse_email_list
 
 
 class PaymentProviderService:
@@ -187,7 +188,9 @@ class PaymentProviderService:
                     mailing_parameter,
                     parameters=self._build_mail_parameters(provider_group),
                     subject=f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU",
-                    to=provider_group["emails_payments"],
+                    to=provider_group["emails_payments"] + parse_email_list(mailing_parameter.to),
+                    bcc=parse_email_list(mailing_parameter.bcc),
+                    cc=parse_email_list(mailing_parameter.cc),
                     attachments=attachments,
                 )
                 self.email_service.send(message)
