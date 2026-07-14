@@ -96,6 +96,7 @@ class PaymentPdfParser:
             datos_operacion = self._extract_operation_data(contenido)
             datos_destino = self._extract_destination_data(contenido)
             self._validate_extracted_data(datos_destino)
+            # TODO HAY CASOS DONDE EL PDF NO TIENE DATOS DE DESTINO,Y EN VEZ DE ESO LLEGA DATOS DE LA TRANSFERENCIA. HAY QUE VALIDAR ESO Y EXTRAER LOS DATOS DE LA TRANSFERENCIA SI ES EL CASO
             resultado.update(
                 {
                     "procesado": True,
@@ -164,6 +165,7 @@ class PaymentPdfParser:
         return {
             "fecha_envio": obtener_valor(seccion, "Fecha de envio"),
             "estado": obtener_valor(seccion, "Estado"),
+            "tipo_operacion": obtener_valor(seccion, "Tipo de operación"),
             "fecha_proceso": obtener_valor(seccion, "Fecha de proceso"),
         }
 
@@ -186,6 +188,27 @@ class PaymentPdfParser:
             "cuenta": obtener_valor(seccion, "Cuenta"),
             "tipo": obtener_valor(seccion, "Tipo"),
             "referencia": obtener_valor(seccion, "Referencia"),
+        }
+    def _extract_transefer_data(self, contenido: str) -> dict[str, Any]:
+        seccion = self._extract_section(
+            contenido=contenido,
+            inicio="Datos de la transferencia",
+            fin="Datos de envio de constancia",
+        )
+        monto_original = obtener_valor(seccion, "Monto total")
+        monto_info = extraer_monto(monto_original)
+        return {
+            "monto_texto": monto_info["texto"] if monto_info else monto_original,
+            "monto_decimal": monto_info["monto"] if monto_info else None,
+            "moneda": monto_info["moneda"] if monto_info else None,
+            "moneda_original": (
+                monto_info["moneda_original"] if monto_info else None
+            ),
+            "titular": obtener_valor(seccion, "Titular"),
+            "cuenta": obtener_valor(seccion, "Cuenta"),
+            "tipo": obtener_valor(seccion, "Tipo"),
+            "referencia": obtener_valor(seccion, "Referencia"),
+            "ruc": obtener_valor(seccion, "RUC"),
         }
 
     @staticmethod
