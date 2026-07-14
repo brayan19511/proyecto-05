@@ -50,3 +50,34 @@ class CurrencyUpdateRequest(BaseModel):
 class CurrencyResponse(CurrencyCreateRequest):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+class MailingParameterCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    template: str | None = None
+    template_html: str | None = None
+    template_text: str | None = None
+    mp_from: str | None = Field(default=None, max_length=255)
+    to: str | None = None
+    subject: str | None = Field(default=None, max_length=255)
+    cc: str | None = None
+    bcc: str | None = None
+    active: bool = True
+
+
+class MailingParameterUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    template: str | None = None
+    template_html: str | None = None
+    template_text: str | None = None
+    mp_from: str | None = Field(default=None, max_length=255)
+    to: str | None = None
+    subject: str | None = Field(default=None, max_length=255)
+    cc: str | None = None
+    bcc: str | None = None
+    active: bool | None = None
+
+
+class MailingParameterResponse(MailingParameterCreateRequest):
+    id: int
+    model_config = ConfigDict(from_attributes=True)

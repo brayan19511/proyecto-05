@@ -33,6 +33,15 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
     JOB_CREDENTIALS_KEY: Optional[str] = None
 
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = None
+    SMTP_FROM_NAME: str = "Rash Peru"
+    SMTP_USE_TLS: bool = True
+    EMAIL_TEMPLATE_DIR: str = "app/templates/emails"
+
     DB_OFISIS_HOST: Optional[str] = None
     DB_OFISIS_PORT: int = 1433
     DB_OFISIS_USER: Optional[str] = None

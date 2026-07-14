@@ -1,550 +1,318 @@
-import re
-from decimal import Decimal, InvalidOperation
 from typing import Any
+from uuid import UUID
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
-import pdfplumber
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import UploadFile
+from sqlalchemy.exc import IntegrityError
 
-
-router = APIRouter()
-
-
-def obtener_valor(
-    contenido: str,
-    campo: str,
-) -> str | None:
-    """
-    Obtiene el valor que se encuentra después de un campo.
-
-    Ejemplo:
-        Titular DARYZA S.A.C.
-
-    Resultado:
-        DARYZA S.A.C.
-    """
-    coincidencia = re.search(
-        rf"^{re.escape(campo)}\s+(.+)$",
-        contenido,
-        flags=re.IGNORECASE | re.MULTILINE,
-    )
-
-    return coincidencia.group(1).strip() if coincidencia else None
-
-
-def normalizar_texto(
-    valor: str | None,
-) -> str:
-    """
-    Normaliza textos para poder compararlos y agruparlos.
-
-    Ejemplo:
-        'Daryza S.A.C.'
-        ' DARYZA S.A.C. '
-
-    Ambos valores se convierten en:
-        'DARYZA S.A.C.'
-    """
-    if not valor:
-        return ""
-
-    return re.sub(
-        r"\s+",
-        " ",
-        valor,
-    ).strip().upper()
-
-
-def normalizar_moneda(
-    moneda: str,
-) -> str:
-    """
-    Convierte distintos símbolos o formatos a un código estándar.
-
-    Ejemplos:
-        S/       -> PEN
-        S/.      -> PEN
-        US$      -> USD
-        USD      -> USD
-        $        -> USD
-    """
-    moneda_normalizada = (
-        moneda
-        .strip()
-        .upper()
-        .replace(" ", "")
-    )
-
-    monedas = {
-        "S/": "PEN",
-        "S/.": "PEN",
-        "PEN": "PEN",
-        "SOLES": "PEN",
-        "SOL": "PEN",
-        "US$": "USD",
-        "USD": "USD",
-        "$": "USD",
-        "DOLARES": "USD",
-        "DÓLARES": "USD",
-    }
-
-    return monedas.get(
-        moneda_normalizada,
-        moneda_normalizada,
-    )
-
-
-def extraer_monto(
-    valor: str | None,
-) -> dict[str, Any] | None:
-    """
-    Extrae moneda y monto del texto original.
-
-    Ejemplos soportados:
-        S/ 4,372.79
-        S/. 4,372.79
-        US$ 1,200.50
-        USD 1,200.50
-        $ 500.00
-
-    Resultado:
-        {
-            "texto": "S/ 4,372.79",
-            "moneda_original": "S/",
-            "moneda": "PEN",
-            "monto": Decimal("4372.79")
-        }
-    """
-    if not valor:
-        return None
-
-    coincidencia = re.match(
-        r"^\s*"
-        r"(?P<moneda>S\/\.?|US\$|USD|PEN|\$)"
-        r"\s*"
-        r"(?P<monto>[\d,]+(?:\.\d{1,2})?)"
-        r"\s*$",
-        valor,
-        flags=re.IGNORECASE,
-    )
-
-    if not coincidencia:
-        return None
-
-    moneda_original = coincidencia.group("moneda")
-    monto_texto = coincidencia.group("monto")
-
-    try:
-        monto_decimal = Decimal(
-            monto_texto.replace(",", "")
-        )
-    except InvalidOperation:
-        return None
-
-    return {
-        "texto": valor.strip(),
-        "moneda_original": moneda_original,
-        "moneda": normalizar_moneda(moneda_original),
-        "monto": monto_decimal,
-    }
+from app.api.master.master_repository import MasterRepository
+from app.api.finance.payment_provider.payment_provider_repository import (
+    PaymentProviderRepository,
+)
+from app.api.finance.payment_provider.payment_provider_schema import (
+    PaymentProviderCreateRequest,
+    PaymentProviderUpdateRequest,
+)
+from app.api.finance.payment_provider.pdf_parser import PaymentPdfParser
+from app.api.finance.payment_provider.pdf_parser import normalizar_texto
+from app.api.finance.payment_provider.processor import PaymentProviderProcessor
+from app.core.db.integrity import raise_integrity_error
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.models.finance.payment_provider_model import PaymentProvider
+from app.services.email import EmailAttachment, EmailService
 
 
 class PaymentProviderService:
-    def __init__(
+    def __init__(self, db):
+        self.db = db
+        self.repository = PaymentProviderRepository(db)
+        self.master_repository = MasterRepository(db)
+        self.pdf_parser = PaymentPdfParser()
+        self.email_service = EmailService()
+
+    def list_providers(self, search: str | None = None, active: bool | None = None):
+        return self.repository.list_providers(search=search, active=active)
+
+    def get_provider(self, provider_id: UUID):
+        provider = self.repository.get_provider(provider_id)
+        if not provider:
+            raise NotFoundError("Proveedor no encontrado")
+        return provider
+
+    def create_provider(
+        self,
+        request: PaymentProviderCreateRequest,
+        current_user_id,
+    ):
+        data = request.model_dump()
+        data["tax_id"] = data["tax_id"].strip()
+        data["normalized_names"] = self._build_normalized_names(
+            data["legal_name"],
+            data["commercial_names"],
+        )
+        if self.repository.get_provider_by_tax_id(data["tax_id"]):
+            raise ConflictError("Ya existe un proveedor con este RUC/RUT")
+
+        provider = PaymentProvider(**data, created_by=current_user_id)
+        self.repository.add(provider)
+        self._commit_provider()
+        return self.get_provider(provider.id)
+
+    def update_provider(
+        self,
+        provider_id: UUID,
+        request: PaymentProviderUpdateRequest,
+        current_user_id,
+    ):
+        provider = self.get_provider(provider_id)
+        data = request.model_dump(exclude_unset=True)
+        if "tax_id" in data and data["tax_id"] is not None:
+            data["tax_id"] = data["tax_id"].strip()
+            existing = self.repository.get_provider_by_tax_id(data["tax_id"])
+            if existing and existing.id != provider_id:
+                raise ConflictError("Ya existe un proveedor con este RUC/RUT")
+
+        for key, value in data.items():
+            setattr(provider, key, value)
+        if "legal_name" in data or "commercial_names" in data:
+            provider.normalized_names = self._build_normalized_names(
+                provider.legal_name,
+                provider.commercial_names,
+            )
+        provider.updated_by = current_user_id
+        self._commit_provider()
+        return self.get_provider(provider.id)
+
+    def delete_provider(self, provider_id: UUID, current_user_id):
+        provider = self.get_provider(provider_id)
+        provider.active = False
+        provider.updated_by = current_user_id
+        self.repository.commit()
+        return True
+
+    def process_files(self, files: list[UploadFile]) -> dict[str, Any]:
+        return self.preview_files(files)
+
+    def preview_files(self, files: list[UploadFile]) -> dict[str, Any]:
+        processed = []
+        errors = []
+
+        for file in files:
+            result = self.pdf_parser.parse(file)
+            if result["procesado"]:
+                processed.append(result)
+            else:
+                errors.append(result)
+
+        providers = self.repository.list_active_providers()
+        grouped = PaymentProviderProcessor(providers).group(processed)
+        missing_provider_count = sum(
+            1 for item in grouped if item["status"] == "MISSING_PROVIDER"
+        )
+        missing_email_count = sum(
+            1 for item in grouped if item["status"] == "MISSING_PAYMENT_EMAIL"
+        )
+        return {
+            "ready_to_send": (
+                not errors and not missing_provider_count and not missing_email_count
+            ),
+            "total_archivos": len(files),
+            "total_procesados": len(processed),
+            "total_errores": len(errors),
+            "total_proveedores": len(grouped),
+            "missing_provider_count": missing_provider_count,
+            "missing_email_count": missing_email_count,
+            "proveedores": grouped,
+            "errores": errors,
+        }
+
+    def build_renamed_zip(self, files: list[UploadFile]) -> tuple[str, bytes]:
+        preview = self.preview_files(files)
+        filename_by_original = {
+            payment["archivo"]: payment["suggested_filename"]
+            for provider in preview["proveedores"]
+            for payment in provider["pagos"]
+        }
+        zip_buffer = BytesIO()
+        used_names: set[str] = set()
+
+        with ZipFile(zip_buffer, mode="w", compression=ZIP_DEFLATED) as zip_file:
+            for file in files:
+                suggested_name = filename_by_original.get(file.filename)
+                if not suggested_name:
+                    continue
+                arcname = self._deduplicate_filename(suggested_name, used_names)
+                used_names.add(arcname)
+                file.file.seek(0)
+                zip_file.writestr(arcname, file.file.read())
+                file.file.seek(0)
+
+        return "constancias_renombradas.zip", zip_buffer.getvalue()
+
+    def send_payment_emails(
         self,
         files: list[UploadFile],
-    ):
-        self.files = files
-
-    def process(self) -> dict[str, Any]:
-        """
-        Procesa todos los archivos y agrupa los pagos por proveedor.
-        """
-        pagos_procesados = []
-        errores = []
-
-        for file in self.files:
-            resultado = self._process_file(file)
-
-            if resultado["procesado"]:
-                pagos_procesados.append(resultado)
-            else:
-                errores.append(resultado)
-
-        proveedores = self._group_by_provider(
-            pagos_procesados
-        )
-
-        return {
-            "total_archivos": len(self.files),
-            "total_procesados": len(pagos_procesados),
-            "total_errores": len(errores),
-            "total_proveedores": len(proveedores),
-            "proveedores": proveedores,
-            "errores": errores,
-        }
-
-    def _process_file(
-        self,
-        file: UploadFile,
+        *,
+        mailing_parameter_id: int | None = None,
+        mailing_parameter_name: str | None = None,
     ) -> dict[str, Any]:
+        """Envia un correo por proveedor usando la misma lectura del preview.
+
+        El frontend debe llamar primero a /payments/preview para corregir
+        proveedores o correos faltantes. Este metodo vuelve a validar antes de
+        enviar para evitar correos incompletos.
         """
-        Procesa un archivo PDF individual.
-        """
-        resultado = {
-            "archivo": file.filename,
-            "procesado": False,
-            "error": None,
-        }
-
-        try:
-            self._validate_file(file)
-
-            contenido = self._extract_pdf_text(file)
-
-            datos_operacion = (
-                self._extract_operation_data(contenido)
+        mailing_parameter = self._get_mailing_parameter(
+            mailing_parameter_id,
+            mailing_parameter_name,
+        )
+        preview = self.preview_files(files)
+        if not preview["ready_to_send"]:
+            raise ValidationError(
+                "Hay archivos con error, proveedores sin identificar o correos faltantes"
             )
 
-            datos_destino = (
-                self._extract_destination_data(contenido)
-            )
+        file_content_by_name = self._read_uploaded_files(files)
+        sent = []
+        errors = []
 
-            self._validate_extracted_data(
-                datos_operacion=datos_operacion,
-                datos_destino=datos_destino,
-            )
-
-            resultado.update(
-                {
-                    "procesado": True,
-                    "datos_operacion": datos_operacion,
-                    "datos_destino": datos_destino,
-                }
-            )
-
-        except Exception as exc:
-            resultado["error"] = str(exc)
-
-        finally:
-            # Permite volver a leer o adjuntar el archivo
-            # posteriormente en el correo.
+        for provider_group in preview["proveedores"]:
             try:
-                file.file.seek(0)
-            except Exception:
-                pass
-
-        return resultado
-
-    @staticmethod
-    def _validate_file(
-        file: UploadFile,
-    ) -> None:
-        """
-        Valida que el archivo recibido sea PDF.
-        """
-        content_type = (
-            file.content_type or ""
-        ).lower()
-
-        filename = (
-            file.filename or ""
-        ).lower()
-
-        if (
-            content_type != "application/pdf"
-            and not filename.endswith(".pdf")
-        ):
-            raise ValueError(
-                "El archivo no es un PDF."
-            )
-
-    @staticmethod
-    def _extract_pdf_text(
-        file: UploadFile,
-    ) -> str:
-        """
-        Extrae el texto de todas las páginas del PDF.
-        """
-        paginas = []
-
-        with pdfplumber.open(file.file) as pdf:
-            for pagina in pdf.pages:
-                texto_pagina = (
-                    pagina.extract_text() or ""
+                attachments = self._build_provider_attachments(
+                    provider_group,
+                    file_content_by_name,
                 )
-
-                paginas.append(texto_pagina)
-
-        contenido = "\n".join(paginas).strip()
-
-        if not contenido:
-            raise ValueError(
-                "No se pudo extraer texto del PDF. "
-                "Es posible que sea un documento escaneado."
-            )
-
-        return contenido
-
-    @staticmethod
-    def _extract_section(
-        contenido: str,
-        inicio: str,
-        fin: str,
-    ) -> str:
-        """
-        Extrae el contenido comprendido entre dos títulos.
-        """
-        coincidencia = re.search(
-            rf"{re.escape(inicio)}"
-            rf"(.*?)"
-            rf"(?:{re.escape(fin)}|$)",
-            contenido,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-
-        if not coincidencia:
-            return ""
-
-        return coincidencia.group(1).strip()
-
-    def _extract_operation_data(
-        self,
-        contenido: str,
-    ) -> dict[str, str | None]:
-        """
-        Extrae la información de la operación.
-        """
-        seccion = self._extract_section(
-            contenido=contenido,
-            inicio="Datos de la operación",
-            fin="Datos de la cuenta de origen",
-        )
-
-        return {
-            "fecha_envio": obtener_valor(
-                seccion,
-                "Fecha de envío",
-            ),
-            "estado": obtener_valor(
-                seccion,
-                "Estado",
-            ),
-            "fecha_proceso": obtener_valor(
-                seccion,
-                "Fecha de proceso",
-            ),
-        }
-
-    def _extract_destination_data(
-        self,
-        contenido: str,
-    ) -> dict[str, Any]:
-        """
-        Extrae los datos de la cuenta de destino,
-        incluyendo monto y moneda.
-        """
-        seccion = self._extract_section(
-            contenido=contenido,
-            inicio="Datos de la cuenta de destino",
-            fin="Datos de envío de constancia",
-        )
-
-        monto_original = obtener_valor(
-            seccion,
-            "Monto",
-        )
-
-        monto_info = extraer_monto(
-            monto_original
-        )
-
-        return {
-            "monto_texto": (
-                monto_info["texto"]
-                if monto_info
-                else monto_original
-            ),
-            "monto_decimal": (
-                monto_info["monto"]
-                if monto_info
-                else None
-            ),
-            "moneda": (
-                monto_info["moneda"]
-                if monto_info
-                else None
-            ),
-            "moneda_original": (
-                monto_info["moneda_original"]
-                if monto_info
-                else None
-            ),
-            "titular": obtener_valor(
-                seccion,
-                "Titular",
-            ),
-            "cuenta": obtener_valor(
-                seccion,
-                "Cuenta",
-            ),
-            "tipo": obtener_valor(
-                seccion,
-                "Tipo",
-            ),
-            "referencia": obtener_valor(
-                seccion,
-                "Referencia",
-            ),
-        }
-
-    @staticmethod
-    def _validate_extracted_data(
-        datos_operacion: dict,
-        datos_destino: dict,
-    ) -> None:
-        """
-        Valida los campos mínimos necesarios para procesar el pago.
-        """
-        campos_faltantes = []
-
-        if not datos_destino.get("titular"):
-            campos_faltantes.append("titular")
-
-        if not datos_destino.get("cuenta"):
-            campos_faltantes.append("cuenta")
-
-        if not datos_destino.get("monto_texto"):
-            campos_faltantes.append("monto")
-
-        if datos_destino.get("monto_decimal") is None:
-            campos_faltantes.append(
-                "monto válido"
-            )
-
-        if not datos_destino.get("moneda"):
-            campos_faltantes.append("moneda")
-
-        if campos_faltantes:
-            raise ValueError(
-                "No se encontraron o no se pudieron "
-                "interpretar los siguientes campos: "
-                + ", ".join(campos_faltantes)
-            )
-
-    @staticmethod
-    def _group_by_provider(
-        pagos: list[dict],
-    ) -> list[dict]:
-        """
-        Agrupa los pagos por proveedor.
-
-        Dentro de cada proveedor, los totales se separan
-        por moneda para no sumar PEN y USD.
-        """
-        proveedores: dict[str, dict] = {}
-
-        for pago in pagos:
-            datos_destino = pago["datos_destino"]
-            datos_operacion = pago["datos_operacion"]
-
-            titular = datos_destino["titular"]
-            cuenta = datos_destino["cuenta"]
-            moneda = datos_destino["moneda"]
-            monto = datos_destino["monto_decimal"]
-
-            # Agrupamos por titular.
-            # Si necesitas distinguir cuentas del mismo proveedor,
-            # puedes usar titular + cuenta.
-            proveedor_key = normalizar_texto(
-                titular
-            )
-
-            if proveedor_key not in proveedores:
-                proveedores[proveedor_key] = {
-                    "proveedor": titular,
-                    "cantidad_pagos": 0,
-                    "archivos": [],
-                    "totales": {},
-                    "pagos": [],
-                }
-
-            proveedor = proveedores[proveedor_key]
-
-            if moneda not in proveedor["totales"]:
-                proveedor["totales"][moneda] = Decimal(
-                    "0.00"
+                message = self.email_service.build_from_template(
+                    mailing_parameter,
+                    parameters=self._build_mail_parameters(provider_group),
+                    subject=f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU",
+                    to=provider_group["emails_payments"],
+                    attachments=attachments,
                 )
-
-            proveedor["totales"][moneda] += monto
-            proveedor["cantidad_pagos"] += 1
-
-            proveedor["archivos"].append(
-                pago["archivo"]
-            )
-
-            proveedor["pagos"].append(
-                {
-                    "archivo": pago["archivo"],
-                    "monto_texto": datos_destino[
-                        "monto_texto"
-                    ],
-                    "monto_decimal": monto,
-                    "moneda": moneda,
-                    "moneda_original": datos_destino[
-                        "moneda_original"
-                    ],
-                    "titular": titular,
-                    "cuenta": cuenta,
-                    "tipo": datos_destino["tipo"],
-                    "referencia": datos_destino[
-                        "referencia"
-                    ],
-                    "fecha_envio": datos_operacion[
-                        "fecha_envio"
-                    ],
-                    "fecha_proceso": datos_operacion[
-                        "fecha_proceso"
-                    ],
-                    "estado": datos_operacion[
-                        "estado"
-                    ],
-                }
-            )
-
-        resultado = []
-
-        for proveedor in proveedores.values():
-            # Convertimos los totales Decimal a string
-            # para que la respuesta sea serializable a JSON.
-            totales_formateados = []
-
-            for moneda, total in proveedor[
-                "totales"
-            ].items():
-                totales_formateados.append(
+                self.email_service.send(message)
+                sent.append(
                     {
-                        "moneda": moneda,
-                        "total": str(
-                            total.quantize(
-                                Decimal("0.01")
-                            )
-                        ),
+                        "provider_id": provider_group["provider_id"],
+                        "proveedor": provider_group["proveedor"],
+                        "to": message.to,
+                        "attachments": [item.filename for item in attachments],
+                    }
+                )
+            except Exception as exc:
+                errors.append(
+                    {
+                        "provider_id": provider_group["provider_id"],
+                        "proveedor": provider_group["proveedor"],
+                        "error": str(exc),
                     }
                 )
 
-            proveedor["totales"] = (
-                totales_formateados
+        return {
+            "sent_count": len(sent),
+            "error_count": len(errors),
+            "sent": sent,
+            "errors": errors,
+        }
+
+    def _get_mailing_parameter(
+        self,
+        parameter_id: int | None,
+        parameter_name: str | None,
+    ):
+        if parameter_id:
+            parameter = self.master_repository.get_mailing_parameter_by_id(
+                parameter_id
+            )
+        elif parameter_name:
+            parameter = self.master_repository.get_mailing_parameter_by_name(
+                parameter_name
+            )
+        else:
+            parameter = self.master_repository.get_mailing_parameter_by_name(
+                "payment_provider_summary"
             )
 
-            for pago in proveedor["pagos"]:
-                pago["monto_decimal"] = str(
-                    pago["monto_decimal"].quantize(
-                        Decimal("0.01")
-                    )
+        if not parameter or not parameter.active:
+            raise NotFoundError("Parametro de correo no encontrado o inactivo")
+        return parameter
+
+    @staticmethod
+    def _read_uploaded_files(files: list[UploadFile]) -> dict[str, bytes]:
+        content_by_name = {}
+        for file in files:
+            file.file.seek(0)
+            content_by_name[file.filename] = file.file.read()
+            file.file.seek(0)
+        return content_by_name
+
+    def _build_provider_attachments(
+        self,
+        provider_group: dict[str, Any],
+        file_content_by_name: dict[str, bytes],
+    ) -> list[EmailAttachment]:
+        attachments = []
+        used_names: set[str] = set()
+        for payment in provider_group["pagos"]:
+            content = file_content_by_name.get(payment["archivo"])
+            if not content:
+                continue
+            filename = self._deduplicate_filename(
+                payment["suggested_filename"],
+                used_names,
+            )
+            used_names.add(filename)
+            attachments.append(
+                EmailAttachment(
+                    filename=filename,
+                    content=content,
+                    content_type="application/pdf",
                 )
+            )
+        return attachments
 
-            resultado.append(proveedor)
+    @staticmethod
+    def _build_mail_parameters(provider_group: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "provider_id": provider_group["provider_id"],
+            "provider_tax_id": provider_group["provider_tax_id"],
+            "proveedor": provider_group["proveedor"],
+            "titular_pdf": provider_group["titular_pdf"],
+            "cantidad_pagos": provider_group["cantidad_pagos"],
+            "totales": provider_group["totales"],
+            "pagos": provider_group["pagos"],
+        }
 
-        return resultado
+    @staticmethod
+    def _deduplicate_filename(filename: str, used_names: set[str]) -> str:
+        if filename not in used_names:
+            return filename
+        stem, extension = filename.rsplit(".", 1)
+        counter = 2
+        while True:
+            candidate = f"{stem}_{counter}.{extension}"
+            if candidate not in used_names:
+                return candidate
+            counter += 1
 
+    @staticmethod
+    def _build_normalized_names(
+        legal_name: str,
+        commercial_names: list[str],
+    ) -> list[str]:
+        names = [legal_name, *commercial_names]
+        return list(dict.fromkeys(normalizar_texto(name) for name in names if name))
 
+    def _commit_provider(self):
+        try:
+            self.repository.commit()
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                conflicts={
+                    "uq_payment_provider_tax_id": (
+                        "Ya existe un proveedor con este RUC/RUT"
+                    ),
+                },
+            )

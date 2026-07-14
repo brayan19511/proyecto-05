@@ -9,6 +9,7 @@ from app.models.master.master_model import (
     Area,
     Currency,
 )
+from app.models.master.mailing_parameter_model import MailingParameter
 
 from app.api.master.master_repository import (
     MasterRepository,
@@ -21,6 +22,8 @@ from app.api.master.master_schema import (
     AreaUpdateRequest,
     CurrencyCreateRequest,
     CurrencyUpdateRequest,
+    MailingParameterCreateRequest,
+    MailingParameterUpdateRequest,
 )
 from app.core.db.integrity import raise_integrity_error
 from app.core.exceptions import ConflictError
@@ -203,6 +206,67 @@ class MasterService:
 
         self.repository.commit()
 
+        return True
+
+    # ==========================================
+    # MAILING PARAMETERS
+    # ==========================================
+
+    def get_mailing_parameters(self, search: str | None = None):
+        return self.repository.get_mailing_parameters(search)
+
+    def get_mailing_parameter_by_id(self, parameter_id: int):
+        parameter = self.repository.get_mailing_parameter_by_id(parameter_id)
+        if not parameter:
+            raise HTTPException(status_code=404, detail="Mailing parameter not found")
+        return parameter
+
+    def create_mailing_parameter(
+        self,
+        request: MailingParameterCreateRequest,
+        current_user_id: int | None,
+    ):
+        data = request.model_dump()
+        data["name"] = data["name"].strip()
+        if self.repository.get_mailing_parameter_by_name(data["name"]):
+            raise ConflictError("Ya existe un parametro de correo con este nombre")
+
+        parameter = MailingParameter(**data, created_by=current_user_id)
+        self.repository.create_mailing_parameter(parameter)
+        self._commit(
+            "uq_mailing_parameter_name",
+            "Ya existe un parametro de correo con este nombre",
+        )
+        return parameter
+
+    def update_mailing_parameter(
+        self,
+        parameter_id: int,
+        request: MailingParameterUpdateRequest,
+        current_user_id: int | None,
+    ):
+        parameter = self.get_mailing_parameter_by_id(parameter_id)
+        data = request.model_dump(exclude_unset=True)
+        if "name" in data and data["name"] is not None:
+            data["name"] = data["name"].strip()
+            existing = self.repository.get_mailing_parameter_by_name(data["name"])
+            if existing and existing.id != parameter_id:
+                raise ConflictError("Ya existe un parametro de correo con este nombre")
+
+        for key, value in data.items():
+            setattr(parameter, key, value)
+        parameter.updated_by = current_user_id
+        self._commit(
+            "uq_mailing_parameter_name",
+            "Ya existe un parametro de correo con este nombre",
+        )
+        return parameter
+
+    def delete_mailing_parameter(self, parameter_id: int, current_user_id: int | None):
+        parameter = self.get_mailing_parameter_by_id(parameter_id)
+        parameter.active = False
+        parameter.updated_by = current_user_id
+        self.repository.commit()
         return True
 
     # ==========================================

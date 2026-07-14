@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+  <body style="font-family: Arial, sans-serif; color: #202124; line-height: 1.45;">
+    <p>Buenas tardes,</p>
+
+    <p>Adjunto detalle de pago:</p>
+
+    <table cellpadding="3" cellspacing="0" style="border-collapse: collapse; min-width: 240px;">
+      <thead>
+        <tr>
+          <th align="left" style="border-bottom: 1px solid #202124;">Documento</th>
+          <th align="right" style="border-bottom: 1px solid #202124;">Pago total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pago in pagos %}
+        <tr>
+          <td>{{  pago.archivo or pago.referencia }}</td>
+          <td align="right">{{ pago.moneda_original or pago.moneda }} {{ pago.monto_decimal }}</td>
+        </tr>
+        {% endfor %}
+        {% for total in totales %}
+        <tr>
+          <td align="right" style="border-top: 1px solid #202124; font-weight: bold;">
+            {{ total.moneda }}
+          </td>
+          <td align="right" style="border-top: 1px solid #202124; font-weight: bold;">
+            {{ total.total }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p>Saludos.</p>
+  </body>
+</html>

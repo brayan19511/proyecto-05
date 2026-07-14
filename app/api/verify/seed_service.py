@@ -36,6 +36,7 @@ from app.models.auth.security_model import (
 )
 from app.models.auth.user_model import Information
 from app.models.finance.provision_model import ProvisionStatus
+from app.models.master.mailing_parameter_model import MailingParameter
 from app.models.master.master_model import Area, Company, Currency
 
 ADMIN_EMAIL = "admin@admin.com"
@@ -91,6 +92,20 @@ CURRENCIES = [
     },
 ]
 
+MAILING_PARAMETERS = [
+    {
+        "name": "payment_provider_summary",
+        "template": "payment_provider_summary.html",
+        "template_html": None,
+        "template_text": None,
+        "mp_from": "Coolbox <no-reply@coolbox.com.pe>",
+        "to": None,
+        "subject": "CONSTANCIA DE PAGO {{ proveedor }} || RASH PERU",
+        "cc": None,
+        "bcc": None,
+    },
+]
+
 PERMISSIONS = [
     {"code": "sap.read", "description": "Ver datos de SAP"},
     {"code": "sap.write", "description": "Modificar datos en SAP"},
@@ -138,6 +153,15 @@ PERMISSIONS = [
     {"code": "expenses.review", "description": "Revisar gastos"},
     {"code": "expenses.view_all", "description": "Ver todos los gastos"},
     {"code": "expenses.edit_all", "description": "Editar todos los gastos"},
+    {"code": "payment_provider.view", "description": "Ver pagos a proveedores"},
+    {
+        "code": "payment_provider.process",
+        "description": "Procesar PDFs de pagos a proveedores",
+    },
+    {
+        "code": "payment_provider.edit",
+        "description": "Gestionar proveedores y parametros de correo",
+    },
     {"code": "ledger.view", "description": "Ver libro mayor"},
     {"code": "ledger.export", "description": "Exportar libro mayor"},
     {"code": "ledger.sync", "description": "Sincronizar libro mayor"},
@@ -193,6 +217,9 @@ ROLES = [
     "Gastos Consulta",
     "Gastos Operador",
     "Gastos Admin",
+    "Pagos Proveedores Consulta",
+    "Pagos Proveedores Operador",
+    "Pagos Proveedores Admin",
     "Canales Venta Consulta",
     "Canales Venta Importador",
     "Canales Venta Admin",
@@ -292,6 +319,18 @@ ROLE_PERMISSIONS = {
         "expenses.edit_all",
         "expenses.review",
     },
+    "Pagos Proveedores Consulta": {
+        "payment_provider.view",
+    },
+    "Pagos Proveedores Operador": {
+        "payment_provider.view",
+        "payment_provider.process",
+    },
+    "Pagos Proveedores Admin": {
+        "payment_provider.view",
+        "payment_provider.process",
+        "payment_provider.edit",
+    },
     "Canales Venta Consulta": {
         SKU_VIEW_PERMISSION,
         PROMOTION_VIEW_PERMISSION,
@@ -346,6 +385,7 @@ class SeedService:
             self.ensure_user_role(admin_user, roles["Admin"])
             self.ensure_user_profile(admin_user)
             self.ensure_master_data()
+            self.ensure_mailing_parameters()
             self.ensure_provision_statuses()
 
             self.db.commit()
@@ -518,6 +558,29 @@ class SeedService:
 
         for item in CURRENCIES:
             self.ensure_currency(item)
+
+    def ensure_mailing_parameters(self):
+        for item in MAILING_PARAMETERS:
+            parameter = (
+                self.db.query(MailingParameter)
+                .filter(MailingParameter.name == item["name"])
+                .first()
+            )
+
+            if parameter:
+                # Se actualiza solo la base funcional; los destinatarios por
+                # proveedor se toman de PaymentProvider.emails_payments.
+                parameter.template = item["template"]
+                parameter.template_html = item["template_html"]
+                parameter.template_text = item["template_text"]
+                parameter.mp_from = item["mp_from"]
+                parameter.subject = item["subject"]
+                parameter.active = True
+                self.existing.append(f"mailing_parameter:{item['name']}")
+                continue
+
+            self.db.add(MailingParameter(**item, active=True))
+            self.created.append(f"mailing_parameter:{item['name']}")
 
     def ensure_company(self, item: dict):
         company = self.db.query(Company).filter(Company.code == item["code"]).first()
