@@ -20,6 +20,12 @@ MONTH_NAMES = {
     12: "DICIEMBRE",
 }
 
+CURRENCY_SYMBOLS = {
+    "PEN": "S/",
+    "USD": "US$",
+    "EUR": "EUR",
+}
+
 
 class PaymentProviderProcessor:
     """Agrupa pagos extraidos y los relaciona con proveedores conocidos."""
@@ -81,6 +87,7 @@ class PaymentProviderProcessor:
             "monto_texto": destination["monto_texto"],
             "monto_decimal": destination["monto_decimal"],
             "moneda": destination["moneda"],
+            "moneda_simbolo": currency_symbol(destination["moneda"]),
             "moneda_original": destination["moneda_original"],
             "titular": destination["titular"],
             "cuenta": destination["cuenta"],
@@ -103,6 +110,7 @@ class PaymentProviderProcessor:
         group["totales"] = [
             {
                 "moneda": currency,
+                "moneda_simbolo": currency_symbol(currency),
                 "total": str(total.quantize(Decimal("0.01"))),
             }
             for currency, total in group["totales"].items()
@@ -118,6 +126,12 @@ def build_pdf_filename(titular: str | None, fecha: str | None) -> str:
     provider_name = sanitize_filename_part(titular or "PROVEEDOR")
     date_label = build_date_label(fecha)
     return f"{provider_name}_{date_label}.pdf"
+
+
+def currency_symbol(currency_code: str | None) -> str:
+    if not currency_code:
+        return ""
+    return CURRENCY_SYMBOLS.get(currency_code, currency_code)
 
 
 def sanitize_filename_part(value: str) -> str:

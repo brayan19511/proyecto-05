@@ -151,7 +151,9 @@ def delete_currency(
 def get_mailing_parameters(
     search: str | None = None,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(require_any_permission("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.data.view", "master.data.edit"),
+    ),
 ):
     return service.get_mailing_parameters(search)
 
@@ -163,7 +165,9 @@ def get_mailing_parameters(
 def get_mailing_parameter_by_id(
     parameter_id: int,
     service: MasterService = Depends(get_master_service),
-    current_user=Depends(require_any_permission("master.data.edit")),
+    current_user=Depends(
+        require_any_permission("master.data.view", "master.data.edit"),
+    ),
 ):
     return service.get_mailing_parameter_by_id(parameter_id)
 

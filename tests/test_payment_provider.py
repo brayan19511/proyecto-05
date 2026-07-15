@@ -3,6 +3,7 @@ from decimal import Decimal
 from unittest.mock import Mock
 
 from app.api.finance.payment_provider.pdf_parser import (
+    PaymentPdfParser,
     extraer_monto,
     normalizar_texto,
     obtener_valor,
@@ -29,6 +30,24 @@ class PaymentProviderParsingTests(unittest.TestCase):
             build_pdf_filename("DARYZA S.A.C.", "03/01/2026"),
             "DARYZAS.A.C_ENERO_03.pdf",
         )
+
+    def test_extracts_transfer_section_when_destination_section_is_missing(self):
+        contenido = """
+        Datos de la transferencia
+        RUC 20378890161
+        Beneficiario CORPORACION PERU TONERS S.A.C.
+        Monto total S/ 4,324.70
+        Referencia F001-1342
+        Datos de envio de constancia
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["source_section"], "TRANSFER")
+        self.assertEqual(data["titular"], "CORPORACION PERU TONERS S.A.C.")
+        self.assertEqual(data["ruc"], "20378890161")
+        self.assertEqual(data["moneda"], "PEN")
+        self.assertEqual(data["monto_decimal"], Decimal("4324.70"))
 
 
 class PaymentProviderGroupingTests(unittest.TestCase):
@@ -73,6 +92,9 @@ class PaymentProviderGroupingTests(unittest.TestCase):
             result[0]["pagos"][0]["suggested_filename"],
             "PROVEEDORFORMALS.A.C_JULIO_10.pdf",
         )
+        self.assertEqual(result[0]["pagos"][0]["moneda_simbolo"], "S/")
+        self.assertEqual(result[0]["totales"][0]["moneda"], "PEN")
+        self.assertEqual(result[0]["totales"][0]["moneda_simbolo"], "S/")
 
     def test_group_marks_missing_payment_email(self):
         provider = Mock(

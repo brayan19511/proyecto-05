@@ -6,7 +6,7 @@ from app.core.config import settings
 celery_app = Celery(
     "finance",
     broker=settings.CELERY_BROKER_URL,
-    include=["app.workers.sap_tasks"],
+    include=["app.workers.sap_tasks", "app.workers.email_tasks"],
 )
 
 # RabbitMQ solo transporta mensajes pequenos para avisar "procesa este lote".
@@ -24,6 +24,7 @@ celery_app.conf.update(
     # de correos, reportes, exportaciones, etc.
     task_routes={
         "jobs.sap.process_batch": {"queue": "sap"},
+        "jobs.payment_provider.send_email_batch": {"queue": "email"},
     },
     timezone="America/Lima",
     enable_utc=True,

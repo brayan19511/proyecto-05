@@ -1,11 +1,16 @@
 from typing import Any
+from decimal import Decimal
 from uuid import UUID
+from uuid import uuid4
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import UploadFile
 from sqlalchemy.exc import IntegrityError
 
+from app.api.jobs.constants import JobType
+from app.api.jobs.service import JobService
 from app.api.master.master_repository import MasterRepository
 from app.api.finance.payment_provider.payment_provider_repository import (
     PaymentProviderRepository,
@@ -19,6 +24,8 @@ from app.api.finance.payment_provider.pdf_parser import normalizar_texto
 from app.api.finance.payment_provider.processor import PaymentProviderProcessor
 from app.core.db.integrity import raise_integrity_error
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.config import settings
+from app.workers.dispatcher import dispatch_job
 from app.models.finance.payment_provider_model import PaymentProvider
 from app.services.email import EmailAttachment, EmailService
 from app.services.email.email_service import parse_email_list
@@ -218,6 +225,58 @@ class PaymentProviderService:
             "errors": errors,
         }
 
+    def enqueue_payment_emails(
+        self,
+        files: list[UploadFile],
+        *,
+        current_user_id: UUID,
+        mailing_parameter_id: int | None = None,
+        mailing_parameter_name: str | None = None,
+        idempotency_key: str | None = None,
+        batch_size: int = 10,
+    ):
+        mailing_parameter = self._get_mailing_parameter(
+            mailing_parameter_id,
+            mailing_parameter_name,
+        )
+        preview = self.preview_files(files)
+        if not preview["ready_to_send"]:
+            raise ValidationError(
+                "Hay archivos con error, proveedores sin identificar o correos faltantes"
+            )
+
+        staging_id = str(uuid4())
+        file_path_by_name = self._save_uploaded_files(files, staging_id)
+        payloads = {}
+        references = []
+
+        for provider_group in preview["proveedores"]:
+            reference = self._build_email_job_reference(provider_group)
+            if reference in payloads:
+                reference = self._deduplicate_reference(reference, payloads)
+            references.append(reference)
+            payloads[reference] = self._make_json_safe(
+                self._build_email_job_payload(
+                    provider_group,
+                    mailing_parameter,
+                    file_path_by_name,
+                )
+            )
+
+        return JobService(self.db, dispatcher=dispatch_job).create_job(
+            job_type=JobType.PAYMENT_PROVIDER_EMAIL.value,
+            parameters={
+                "staging_id": staging_id,
+                "mailing_parameter_id": mailing_parameter.id,
+                "mailing_parameter_name": mailing_parameter.name,
+            },
+            references=references,
+            user_id=current_user_id,
+            batch_size=batch_size,
+            idempotency_key=idempotency_key,
+            item_payloads=payloads,
+        )
+
     def _get_mailing_parameter(
         self,
         parameter_id: int | None,
@@ -233,7 +292,7 @@ class PaymentProviderService:
             )
         else:
             parameter = self.master_repository.get_mailing_parameter_by_name(
-                "payment_provider_summary"
+                "send_provider"
             )
 
         if not parameter or not parameter.active:
@@ -274,10 +333,129 @@ class PaymentProviderService:
             )
         return attachments
 
+    def _build_email_job_payload(
+        self,
+        provider_group: dict[str, Any],
+        mailing_parameter,
+        file_path_by_name: dict[str, str],
+    ) -> dict[str, Any]:
+        return {
+            "provider_id": (
+                str(provider_group["provider_id"])
+                if provider_group["provider_id"]
+                else None
+            ),
+            "provider": provider_group["proveedor"],
+            "to": provider_group["emails_payments"]
+            + parse_email_list(mailing_parameter.to),
+            "cc": parse_email_list(mailing_parameter.cc),
+            "bcc": parse_email_list(mailing_parameter.bcc),
+            "subject": f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU",
+            "parameters": self._build_mail_parameters(provider_group),
+            "mailing_parameter": self._serialize_mailing_parameter(mailing_parameter),
+            "attachments": self._build_email_job_attachments(
+                provider_group,
+                file_path_by_name,
+            ),
+        }
+
+    def _build_email_job_attachments(
+        self,
+        provider_group: dict[str, Any],
+        file_path_by_name: dict[str, str],
+    ) -> list[dict[str, str]]:
+        attachments = []
+        used_names: set[str] = set()
+        for payment in provider_group["pagos"]:
+            file_path = file_path_by_name.get(payment["archivo"])
+            if not file_path:
+                continue
+            filename = self._deduplicate_filename(
+                payment["suggested_filename"],
+                used_names,
+            )
+            used_names.add(filename)
+            attachments.append(
+                {
+                    "file_path": file_path,
+                    "filename": filename,
+                    "content_type": "application/pdf",
+                }
+            )
+        return attachments
+
+    @staticmethod
+    def _serialize_mailing_parameter(mailing_parameter) -> dict[str, Any]:
+        return {
+            "name": mailing_parameter.name,
+            "template": mailing_parameter.template,
+            "template_html": mailing_parameter.template_html,
+            "template_text": mailing_parameter.template_text,
+            "mp_from": mailing_parameter.mp_from,
+            "to": mailing_parameter.to,
+            "subject": mailing_parameter.subject,
+            "cc": mailing_parameter.cc,
+            "bcc": mailing_parameter.bcc,
+        }
+
+    @staticmethod
+    def _save_uploaded_files(
+        files: list[UploadFile],
+        staging_id: str,
+    ) -> dict[str, str]:
+        target_dir = Path(settings.PAYMENT_PROVIDER_STORAGE_DIR) / staging_id
+        target_dir.mkdir(parents=True, exist_ok=True)
+        path_by_name = {}
+        for file in files:
+            file.file.seek(0)
+            extension = Path(file.filename or "document.pdf").suffix or ".pdf"
+            safe_name = f"{uuid4()}{extension.lower()}"
+            target_path = target_dir / safe_name
+            target_path.write_bytes(file.file.read())
+            path_by_name[file.filename] = str(target_path)
+            file.file.seek(0)
+        return path_by_name
+
+    @staticmethod
+    def _build_email_job_reference(provider_group: dict[str, Any]) -> str:
+        provider_name = (
+            provider_group.get("proveedor")
+            or provider_group.get("titular_pdf")
+            or "Proveedor sin nombre"
+        )
+        return f"Enviar correo - {provider_name}"[:120]
+
+    @staticmethod
+    def _deduplicate_reference(reference: str, payloads: dict) -> str:
+        max_base_length = 116
+        base = reference[:max_base_length]
+        counter = 2
+        while True:
+            candidate = f"{base} #{counter}"
+            if candidate not in payloads:
+                return candidate
+            counter += 1
+
+    @classmethod
+    def _make_json_safe(cls, value):
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, Decimal):
+            return str(value)
+        if isinstance(value, dict):
+            return {key: cls._make_json_safe(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [cls._make_json_safe(item) for item in value]
+        return value
+
     @staticmethod
     def _build_mail_parameters(provider_group: dict[str, Any]) -> dict[str, Any]:
         return {
-            "provider_id": provider_group["provider_id"],
+            "provider_id": (
+                str(provider_group["provider_id"])
+                if provider_group["provider_id"]
+                else None
+            ),
             "provider_tax_id": provider_group["provider_tax_id"],
             "proveedor": provider_group["proveedor"],
             "titular_pdf": provider_group["titular_pdf"],

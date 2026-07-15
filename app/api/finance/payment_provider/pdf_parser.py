@@ -25,7 +25,7 @@ def obtener_valor(contenido: str, campo: str) -> str | None:
     contenido_busqueda = normalizar_para_busqueda(contenido)
     campo_busqueda = normalizar_para_busqueda(campo)
     coincidencia = re.search(
-        rf"^{re.escape(campo_busqueda)}\s+(.+)$",
+        rf"^\s*{re.escape(campo_busqueda)}\s+(.+)$",
         contenido_busqueda,
         flags=re.IGNORECASE | re.MULTILINE,
     )
@@ -94,9 +94,8 @@ class PaymentPdfParser:
             self._validate_file(file)
             contenido = self._extract_pdf_text(file)
             datos_operacion = self._extract_operation_data(contenido)
-            datos_destino = self._extract_destination_data(contenido)
+            datos_destino = self._extract_payment_data(contenido)
             self._validate_extracted_data(datos_destino)
-            # TODO HAY CASOS DONDE EL PDF NO TIENE DATOS DE DESTINO,Y EN VEZ DE ESO LLEGA DATOS DE LA TRANSFERENCIA. HAY QUE VALIDAR ESO Y EXTRAER LOS DATOS DE LA TRANSFERENCIA SI ES EL CASO
             resultado.update(
                 {
                     "procesado": True,
@@ -169,6 +168,19 @@ class PaymentPdfParser:
             "fecha_proceso": obtener_valor(seccion, "Fecha de proceso"),
         }
 
+    def _extract_payment_data(self, contenido: str) -> dict[str, Any]:
+        destination_data = self._extract_destination_data(contenido)
+        if self._has_minimum_payment_data(destination_data):
+            return destination_data
+
+        transfer_data = self._extract_transfer_data(contenido)
+        if self._has_minimum_payment_data(transfer_data):
+            return transfer_data
+
+        # Devolvemos el primer intento para que el error liste los campos
+        # faltantes habituales de la constancia.
+        return destination_data
+
     def _extract_destination_data(self, contenido: str) -> dict[str, Any]:
         seccion = self._extract_section(
             contenido=contenido,
@@ -188,14 +200,21 @@ class PaymentPdfParser:
             "cuenta": obtener_valor(seccion, "Cuenta"),
             "tipo": obtener_valor(seccion, "Tipo"),
             "referencia": obtener_valor(seccion, "Referencia"),
+            "ruc": None,
+            "source_section": "DESTINATION_ACCOUNT",
         }
-    def _extract_transefer_data(self, contenido: str) -> dict[str, Any]:
+
+    def _extract_transfer_data(self, contenido: str) -> dict[str, Any]:
         seccion = self._extract_section(
             contenido=contenido,
             inicio="Datos de la transferencia",
             fin="Datos de envio de constancia",
         )
-        monto_original = obtener_valor(seccion, "Monto total")
+        monto_original = (
+            obtener_valor(seccion, "Monto total")
+            or obtener_valor(seccion, "Monto")
+            or obtener_valor(seccion, "Importe")
+        )
         monto_info = extraer_monto(monto_original)
         return {
             "monto_texto": monto_info["texto"] if monto_info else monto_original,
@@ -204,20 +223,46 @@ class PaymentPdfParser:
             "moneda_original": (
                 monto_info["moneda_original"] if monto_info else None
             ),
-            "titular": obtener_valor(seccion, "Titular"),
-            "cuenta": obtener_valor(seccion, "Cuenta"),
+            "titular": (
+                obtener_valor(seccion, "Titular")
+                or obtener_valor(seccion, "Beneficiario")
+                or obtener_valor(seccion, "Razon social")
+                or obtener_valor(seccion, "Razon social beneficiario")
+            ),
+            "cuenta": (
+                obtener_valor(seccion, "Cuenta")
+                or obtener_valor(seccion, "Cuenta destino")
+                or obtener_valor(seccion, "Cuenta beneficiario")
+            ),
             "tipo": obtener_valor(seccion, "Tipo"),
-            "referencia": obtener_valor(seccion, "Referencia"),
-            "ruc": obtener_valor(seccion, "RUC"),
+            "referencia": (
+                obtener_valor(seccion, "Referencia")
+                or obtener_valor(seccion, "Nro. operacion")
+                or obtener_valor(seccion, "Numero de operacion")
+                or obtener_valor(seccion, "Operacion")
+            ),
+            "ruc": (
+                obtener_valor(seccion, "RUC")
+                or obtener_valor(seccion, "Ruc")
+                or obtener_valor(seccion, "Documento")
+            ),
+            "source_section": "TRANSFER",
         }
+
+    @staticmethod
+    def _has_minimum_payment_data(data: dict) -> bool:
+        return bool(
+            data.get("titular")
+            and data.get("monto_texto")
+            and data.get("monto_decimal") is not None
+            and data.get("moneda")
+        )
 
     @staticmethod
     def _validate_extracted_data(datos_destino: dict) -> None:
         campos_faltantes = []
         if not datos_destino.get("titular"):
             campos_faltantes.append("titular")
-        if not datos_destino.get("cuenta"):
-            campos_faltantes.append("cuenta")
         if not datos_destino.get("monto_texto"):
             campos_faltantes.append("monto")
         if datos_destino.get("monto_decimal") is None:

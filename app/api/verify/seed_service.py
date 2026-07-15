@@ -94,6 +94,17 @@ CURRENCIES = [
 
 MAILING_PARAMETERS = [
     {
+        "name": "send_provider",
+        "template": "payment_provider_summary.html",
+        "template_html": None,
+        "template_text": None,
+        "mp_from": "Coolbox <no-reply@coolbox.com.pe>",
+        "to": None,
+        "subject": "CONSTANCIA DE PAGO {{ proveedor }} || RASH PERU",
+        "cc": None,
+        "bcc": None,
+    },
+    {
         "name": "payment_provider_summary",
         "template": "payment_provider_summary.html",
         "template_html": None,
@@ -121,6 +132,7 @@ PERMISSIONS = [
     {"code": "master.currency.edit", "description": "Gestionar monedas"},
     {"code": "master.area.view", "description": "Ver areas"},
     {"code": "master.area.edit", "description": "Gestionar areas"},
+    {"code": "master.data.view", "description": "Ver datos maestros generales"},
     {"code": "master.data.edit", "description": "Editar datos maestros"},
     {"code": "provisions.create", "description": "Crear provisiones"},
     {"code": "provisions.submit", "description": "Enviar provisiones a revision"},
@@ -224,6 +236,9 @@ ROLES = [
     "Canales Venta Importador",
     "Canales Venta Admin",
     "Asistencia Consulta",
+    "Tareas Consulta",
+    "Tareas Operador",
+    "Tareas Admin",
 ]
 
 ROLE_PERMISSIONS = {
@@ -244,6 +259,7 @@ ROLE_PERMISSIONS = {
         "master.company.view",
         "master.currency.view",
         "master.area.view",
+        "master.data.view",
     },
     "Master Admin": {
         "master.company.view",
@@ -252,6 +268,7 @@ ROLE_PERMISSIONS = {
         "master.currency.edit",
         "master.area.view",
         "master.area.edit",
+        "master.data.view",
         "master.data.edit",
     },
     "Contabilidad Consulta": {
@@ -321,15 +338,23 @@ ROLE_PERMISSIONS = {
     },
     "Pagos Proveedores Consulta": {
         "payment_provider.view",
+        JOBS_VIEW_PERMISSION,
     },
     "Pagos Proveedores Operador": {
         "payment_provider.view",
         "payment_provider.process",
+        JOBS_VIEW_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
     },
     "Pagos Proveedores Admin": {
         "payment_provider.view",
         "payment_provider.process",
         "payment_provider.edit",
+        JOBS_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+        JOBS_CANCEL_ALL_PERMISSION,
+        JOBS_RETRY_PERMISSION,
     },
     "Canales Venta Consulta": {
         SKU_VIEW_PERMISSION,
@@ -351,6 +376,20 @@ ROLE_PERMISSIONS = {
     },
     "Asistencia Consulta": {
         ATTENDANCE_MARKS_VIEW_PERMISSION,
+    },
+    "Tareas Consulta": {
+        JOBS_VIEW_PERMISSION,
+    },
+    "Tareas Operador": {
+        JOBS_VIEW_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+    },
+    "Tareas Admin": {
+        JOBS_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+        JOBS_CANCEL_ALL_PERMISSION,
+        JOBS_RETRY_PERMISSION,
     },
 }
 

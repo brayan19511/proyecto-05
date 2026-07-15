@@ -16,13 +16,13 @@
         {% for pago in pagos %}
         <tr>
           <td>{{  pago.archivo or pago.referencia }}</td>
-          <td align="right">{{ pago.moneda_original or pago.moneda }} {{ pago.monto_decimal }}</td>
+          <td align="right">{{ pago.moneda_simbolo or pago.moneda }} {{ pago.monto_decimal }}</td>
         </tr>
         {% endfor %}
         {% for total in totales %}
         <tr>
           <td align="right" style="border-top: 1px solid #202124; font-weight: bold;">
-            {{ total.moneda }}
+            {{ total.moneda_simbolo or total.moneda }}
           </td>
           <td align="right" style="border-top: 1px solid #202124; font-weight: bold;">
             {{ total.total }}

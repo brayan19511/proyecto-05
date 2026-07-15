@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "Rash Peru"
     SMTP_USE_TLS: bool = True
     EMAIL_TEMPLATE_DIR: str = "app/templates/emails"
+    PAYMENT_PROVIDER_STORAGE_DIR: str = "var/payment-provider-jobs"
 
     DB_OFISIS_HOST: Optional[str] = None
     DB_OFISIS_PORT: int = 1433

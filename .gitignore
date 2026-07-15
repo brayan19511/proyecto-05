@@ -2,4 +2,5 @@ enviroment
 .env
 __pycache__
 *.pyc
+var/
 # .env.template
