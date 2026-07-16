@@ -7,6 +7,8 @@ from uuid6 import uuid7
 from app.api.security.auth.auth_repository import AuthRepository
 from app.api.security.auth.auth_schemas import (
     LoginRequest,
+    PasswordChangeRequest,
+    PasswordResetRequest,
     TokenResponse,
     UserRegisterSchema,
     UserTokenResponse,
@@ -60,6 +62,29 @@ class AuthService:
 
     def get_by_email(self, email: str):
         return self.auth_repository.get_by_email(email)
+
+    def change_my_password(self, user, request: PasswordChangeRequest):
+        if not verify_password(request.current_password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La contrasena actual no es correcta",
+            )
+
+        user.password_hash = hash_password(request.new_password)
+        self.auth_repository.commit()
+        return {"message": "Contrasena actualizada"}
+
+    def reset_user_password(self, user_id, request: PasswordResetRequest):
+        user = self.auth_repository.get_by_id(str(user_id))
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuario no encontrado",
+            )
+
+        user.password_hash = hash_password(request.new_password)
+        self.auth_repository.commit()
+        return {"message": "Contrasena restablecida"}
 
     def register_user(self, data: UserRegisterSchema):
         email = data.email.strip().lower()

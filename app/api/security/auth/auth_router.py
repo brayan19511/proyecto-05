@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from app.api.security.auth.auth_schemas import *
 from app.api.security.auth.auth_service import AuthService
+from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
 from app.core.security import get_current_user
 
@@ -38,3 +39,24 @@ def get_me(
             for p in current_user.permissions
         ]
     )
+
+
+@router.post("/me/password")
+def change_my_password(
+    request: PasswordChangeRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    auth_service = AuthService(db)
+    return auth_service.change_my_password(current_user, request)
+
+
+@router.post("/users/{user_id}/password-reset")
+def reset_user_password(
+    user_id: UUID,
+    request: PasswordResetRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(require_any_permission("security.users.edit")),
+):
+    auth_service = AuthService(db)
+    return auth_service.reset_user_password(user_id, request)

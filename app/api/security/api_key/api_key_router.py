@@ -18,6 +18,7 @@ from app.api.security.api_key.api_key_schemas import (
     ApiKeyCreateRequest,
     ApiKeyCreatedResponse,
     ApiKeyResponse,
+    ApiKeyUpdateRequest,
 )
 
 router = APIRouter(
@@ -54,6 +55,44 @@ def get_my_keys(
     return service.get_my_keys(
         current_user.id
     )
+
+
+@router.patch(
+    "/{api_key_id}",
+    response_model=ApiKeyResponse
+)
+def update_key(
+    api_key_id: UUID,
+    data: ApiKeyUpdateRequest,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = ApiKeyService(db)
+
+    return service.update_key(
+        api_key_id=api_key_id,
+        user_id=current_user.id,
+        data=data.model_dump(exclude_unset=True),
+    )
+
+
+@router.post(
+    "/{api_key_id}/rotate",
+    response_model=ApiKeyCreatedResponse
+)
+def rotate_key(
+    api_key_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = ApiKeyService(db)
+
+    return service.rotate_key(
+        api_key_id=api_key_id,
+        user_id=current_user.id,
+    )
+
+
 @router.delete("/{api_key_id}")
 def deactivate_key(
     api_key_id: UUID,
@@ -63,5 +102,6 @@ def deactivate_key(
     service = ApiKeyService(db)
 
     return service.deactivate_key(
-        api_key_id
+        api_key_id,
+        current_user.id,
     )

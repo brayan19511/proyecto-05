@@ -16,6 +16,13 @@ class ApiKeyRepository:
     def get_by_id(self, api_key_id: UUID):
         return self.db.query(ApiKey).filter(ApiKey.id == api_key_id).first()
 
+    def get_by_id_and_user(self, api_key_id: UUID, user_id: UUID):
+        return (
+            self.db.query(ApiKey)
+            .filter(ApiKey.id == api_key_id, ApiKey.user_id == user_id)
+            .first()
+        )
+
     def get_by_hash(self, key_hash: str):
         return (
             self.db.query(ApiKey)

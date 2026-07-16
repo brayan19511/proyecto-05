@@ -9,6 +9,12 @@ class ApiKeyCreateRequest(BaseModel):
     expires_at: datetime | None = None
 
 
+class ApiKeyUpdateRequest(BaseModel):
+    name: str | None = None
+    expires_at: datetime | None = None
+    active: bool | None = None
+
+
 class ApiKeyResponse(BaseModel):
     id: UUID
     name: str
