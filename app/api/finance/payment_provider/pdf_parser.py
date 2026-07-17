@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import UploadFile
 
+from app.core.config import settings
+
 
 def normalizar_para_busqueda(valor: str) -> str:
     sin_tildes = "".join(
@@ -25,7 +27,7 @@ def obtener_valor(contenido: str, campo: str) -> str | None:
     contenido_busqueda = normalizar_para_busqueda(contenido)
     campo_busqueda = normalizar_para_busqueda(campo)
     coincidencia = re.search(
-        rf"^\s*{re.escape(campo_busqueda)}\s+(.+)$",
+        rf"^\s*{re.escape(campo_busqueda)}[^\S\r\n]+(.+)$",
         contenido_busqueda,
         flags=re.IGNORECASE | re.MULTILINE,
     )
@@ -119,8 +121,23 @@ class PaymentPdfParser:
         if content_type != "application/pdf" and not filename.endswith(".pdf"):
             raise ValueError("El archivo no es un PDF")
 
+    def _extract_pdf_text(self, file: UploadFile) -> str:
+        contenido = self._extract_pdf_text_with_pdfplumber(file)
+        if self._has_enough_text(contenido):
+            return contenido
+
+        if settings.PAYMENT_PROVIDER_ENABLE_OCR:
+            contenido_ocr = self._extract_pdf_text_with_ocr(file)
+            if self._has_enough_text(contenido_ocr):
+                return contenido_ocr
+
+        raise ValueError(
+            "No se pudo extraer texto del PDF. "
+            "Es posible que sea un documento escaneado o ilegible."
+        )
+
     @staticmethod
-    def _extract_pdf_text(file: UploadFile) -> str:
+    def _extract_pdf_text_with_pdfplumber(file: UploadFile) -> str:
         try:
             import pdfplumber
         except ModuleNotFoundError as exc:
@@ -129,17 +146,55 @@ class PaymentPdfParser:
             ) from exc
 
         paginas = []
+        file.file.seek(0)
         with pdfplumber.open(file.file) as pdf:
             for pagina in pdf.pages:
                 paginas.append(pagina.extract_text() or "")
 
-        contenido = "\n".join(paginas).strip()
-        if not contenido:
-            raise ValueError(
-                "No se pudo extraer texto del PDF. "
-                "Es posible que sea un documento escaneado."
+        file.file.seek(0)
+        return "\n".join(paginas).strip()
+
+    @staticmethod
+    def _extract_pdf_text_with_ocr(file: UploadFile) -> str:
+        try:
+            from pdf2image import convert_from_bytes
+            import pytesseract
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "Falta instalar pdf2image/pytesseract para aplicar OCR"
+            ) from exc
+
+        file.file.seek(0)
+        contenido_pdf = file.file.read()
+        file.file.seek(0)
+
+        try:
+            imagenes = convert_from_bytes(
+                contenido_pdf,
+                dpi=settings.PAYMENT_PROVIDER_OCR_DPI,
             )
-        return contenido
+        except Exception as exc:
+            raise RuntimeError(
+                "No se pudo convertir el PDF a imagen para OCR. "
+                "Verifica que poppler-utils este instalado en Docker."
+            ) from exc
+
+        paginas = []
+        for imagen in imagenes:
+            paginas.append(
+                pytesseract.image_to_string(
+                    imagen,
+                    lang=settings.PAYMENT_PROVIDER_OCR_LANG,
+                )
+            )
+        return "\n".join(paginas).strip()
+
+    @staticmethod
+    def _has_enough_text(contenido: str | None) -> bool:
+        return bool(
+            contenido
+            and len(contenido.strip()) >= settings.PAYMENT_PROVIDER_MIN_TEXT_LENGTH
+        )
 
     @staticmethod
     def _extract_section(contenido: str, inicio: str, fin: str) -> str:
@@ -161,11 +216,58 @@ class PaymentPdfParser:
             inicio="Datos de la operacion",
             fin="Datos de la cuenta de origen",
         )
+        if not seccion:
+            seccion = self._extract_section(
+                contenido=contenido,
+                inicio="Datos de la operacion",
+                fin="Datos de procesos de la operacion",
+            )
+        column_values = self._extract_operation_column_values(seccion)
         return {
             "fecha_envio": obtener_valor(seccion, "Fecha de envio"),
-            "estado": obtener_valor(seccion, "Estado"),
-            "tipo_operacion": obtener_valor(seccion, "Tipo de operación"),
-            "fecha_proceso": obtener_valor(seccion, "Fecha de proceso"),
+            "estado": obtener_valor(seccion, "Estado") or column_values.get("estado"),
+            "tipo_operacion": (
+                obtener_valor(seccion, "Tipo de operacion")
+                or obtener_valor(seccion, "Tipo de operación")
+                or column_values.get("tipo_operacion")
+            ),
+            "fecha_proceso": (
+                obtener_valor(seccion, "Fecha de proceso")
+                or column_values.get("fecha_proceso")
+            ),
+            "numero_operacion": (
+                obtener_valor(seccion, "Numero de operacion")
+                or obtener_valor(seccion, "Número de operación")
+                or column_values.get("numero_operacion")
+            ),
+        }
+
+    @staticmethod
+    def _extract_operation_column_values(seccion: str) -> dict[str, str | None]:
+        lines = [line.strip() for line in seccion.splitlines() if line.strip()]
+        normalized_lines = [normalizar_para_busqueda(line) for line in lines]
+        label_indexes = [
+            index
+            for index, line in enumerate(normalized_lines)
+            if line in {
+                "TIPO DE OPERACION",
+                "ESTADO",
+                "NUMERO DE OPERACION",
+                "FECHA DE PROCESO",
+            }
+        ]
+        if not label_indexes:
+            return {}
+
+        values = lines[max(label_indexes) + 1 :]
+        if len(values) < 4:
+            return {}
+
+        return {
+            "tipo_operacion": values[0],
+            "estado": values[1].replace("•", "").replace("e ", "").strip(),
+            "numero_operacion": values[2],
+            "fecha_proceso": values[3],
         }
 
     def _extract_payment_data(self, contenido: str) -> dict[str, Any]:
@@ -176,6 +278,10 @@ class PaymentPdfParser:
         transfer_data = self._extract_transfer_data(contenido)
         if self._has_minimum_payment_data(transfer_data):
             return transfer_data
+
+        service_payment_data = self._extract_service_payment_data(contenido)
+        if self._has_minimum_payment_data(service_payment_data):
+            return service_payment_data
 
         # Devolvemos el primer intento para que el error liste los campos
         # faltantes habituales de la constancia.
@@ -248,6 +354,126 @@ class PaymentPdfParser:
             ),
             "source_section": "TRANSFER",
         }
+
+    def _extract_service_payment_data(self, contenido: str) -> dict[str, Any]:
+        seccion = self._extract_section(
+            contenido=contenido,
+            inicio="Datos del pago",
+            fin="Datos de la cuenta de cargo",
+        )
+        monto_original = (
+            obtener_valor(seccion, "Monto a pagar")
+            or obtener_valor(seccion, "Monto pagado")
+        )
+        column_values = self._extract_service_payment_column_values(seccion)
+        monto_info = extraer_monto(monto_original)
+        if not monto_info:
+            monto_original = column_values.get("monto")
+            monto_info = extraer_monto(monto_original)
+        empresa_proveedora = (
+            obtener_valor(seccion, "Empresa proveedora")
+            or obtener_valor(seccion, "EM. PROVEEDORA")
+            or column_values.get("empresa_proveedora")
+        )
+        codigo_servicio = (
+            obtener_valor(seccion, "Codigo de servicio")
+            or obtener_valor(seccion, "Código de servicio")
+            or obtener_valor(seccion, "Cod. servicio")
+            or column_values.get("codigo_servicio")
+        )
+        servicio = (
+            obtener_valor(seccion, "Servicio a pagar")
+            or obtener_valor(seccion, "Servico a pagar")
+            or column_values.get("servicio")
+        )
+        return {
+            "monto_texto": monto_info["texto"] if monto_info else monto_original,
+            "monto_decimal": monto_info["monto"] if monto_info else None,
+            "moneda": monto_info["moneda"] if monto_info else None,
+            "moneda_original": (
+                monto_info["moneda_original"] if monto_info else None
+            ),
+            "titular": empresa_proveedora,
+            "cuenta": codigo_servicio,
+            "tipo": servicio or obtener_valor(seccion, "Tipo"),
+            "referencia": (
+                codigo_servicio
+                or obtener_valor(seccion, "N° DOC. PAGO")
+                or obtener_valor(seccion, "N DOC. PAGO")
+            ),
+            "ruc": None,
+            "source_section": "SERVICE_PAYMENT",
+        }
+
+    @staticmethod
+    def _extract_service_payment_column_values(seccion: str) -> dict[str, str | None]:
+        """Lee constancias OCR donde etiquetas y valores salen en columnas.
+
+        En algunos PDFs escaneados el OCR devuelve primero todas las etiquetas
+        del bloque "Datos del pago" y luego sus valores. Este fallback toma los
+        valores cercanos al codigo de servicio y al monto, sin afectar PDFs que
+        ya vienen en texto normal.
+        """
+
+        lines = [line.strip() for line in seccion.splitlines() if line.strip()]
+        normalized_lines = [normalizar_para_busqueda(line) for line in lines]
+        label_indexes = [
+            index
+            for index, line in enumerate(normalized_lines)
+            if line in {
+                "EMPRESA PROVEEDORA",
+                "SERVICIO A PAGAR",
+                "SERVICO A PAGAR",
+                "TITULAR DEL SERVICIO",
+                "CODIGO DE SERVICIO",
+                "MONTO A PAGAR",
+            }
+        ]
+        search_start = max(label_indexes) + 1 if label_indexes else 0
+
+        amount_index = None
+        amount_value = None
+        for index in range(search_start, len(lines)):
+            amount_info = extraer_monto(lines[index])
+            if amount_info:
+                amount_index = index
+                amount_value = amount_info["texto"]
+                break
+
+        search_end = amount_index if amount_index is not None else len(lines)
+        code_index = None
+        code_value = None
+        for index in range(search_end - 1, search_start - 1, -1):
+            if re.search(r"\b\d{6,}[A-Z0-9]*\b", normalized_lines[index]):
+                code_index = index
+                code_value = lines[index]
+                break
+
+        if code_index is None:
+            return {"empresa_proveedora": None, "servicio": None, "codigo_servicio": None, "monto": amount_value}
+
+        candidate_lines = [
+            line
+            for line in lines[search_start:code_index]
+            if not PaymentPdfParser._looks_like_noise_service_value(line)
+        ]
+        value_block = candidate_lines[-3:]
+
+        return {
+            "empresa_proveedora": value_block[0] if value_block else None,
+            "servicio": value_block[1] if len(value_block) > 1 else None,
+            "codigo_servicio": code_value,
+            "monto": amount_value,
+        }
+
+    @staticmethod
+    def _looks_like_noise_service_value(value: str) -> bool:
+        normalized = normalizar_para_busqueda(value)
+        if re.search(r"\d{1,2}/\d{1,2}/\d{2,4}", normalized):
+            return True
+        if re.fullmatch(r"\d+", normalized):
+            return True
+        return False
 
     @staticmethod
     def _has_minimum_payment_data(data: dict) -> bool:

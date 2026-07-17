@@ -1,6 +1,6 @@
 import unittest
 from decimal import Decimal
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from app.api.finance.payment_provider.pdf_parser import (
     PaymentPdfParser,
@@ -54,6 +54,122 @@ class PaymentProviderParsingTests(unittest.TestCase):
         self.assertEqual(data["ruc"], "20378890161")
         self.assertEqual(data["moneda"], "PEN")
         self.assertEqual(data["monto_decimal"], Decimal("4324.70"))
+
+    def test_extracts_service_payment_section_when_provider_is_company(self):
+        contenido = """
+        Datos de la operación
+        Tipo de operacion Pago de servicios
+        Estado Procesada
+        Número de operación 100105
+        Fecha de proceso 11/02/2025 - 03:59 p. m.
+        Datos del pago
+        Empresa proveedora SAT - LIMA
+        Servicio a pagar IMPUESTO VEHICULAR
+        Titular del servicio 23******BA*** AL****
+        Código de servicio 0203381289v25
+        Monto a pagar S/ 2,898.04
+        Datos de la cuenta de cargo
+        Titular RASH PERU S.R.L.
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["source_section"], "SERVICE_PAYMENT")
+        self.assertEqual(data["titular"], "SAT - LIMA")
+        self.assertEqual(data["tipo"], "IMPUESTO VEHICULAR")
+        self.assertEqual(data["cuenta"], "0203381289v25")
+        self.assertEqual(data["referencia"], "0203381289v25")
+        self.assertEqual(data["moneda"], "PEN")
+        self.assertEqual(data["monto_decimal"], Decimal("2898.04"))
+
+    def test_extracts_service_payment_section_from_column_ocr(self):
+        contenido = """
+        Datos del pago
+
+        Empresa proveedora
+        Servico a pagar
+        Titular del servicio
+        Código de servicio
+        Monto a pagar
+
+        31578282
+        YESSICA EDIMAR GARCIA ROSALES
+        11/02/2025 - 12:44 p. m.
+        HECTOR MARCELO BAZAN ALVAREZ
+        MIGUEL MONGILARDI FUCHS
+        YESSICA EDIMAR GARCIA ROSALES
+        11/02/2025 - 03:59 p. m.
+        SAT - LIMA
+        IMPUESTO VEHICULAR
+        YE olaaa = Y - Velada Apu
+        0203381289v25
+        S/ 2,898.04
+
+        Datos de la cuenta de cargo
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["source_section"], "SERVICE_PAYMENT")
+        self.assertEqual(data["titular"], "SAT - LIMA")
+        self.assertEqual(data["tipo"], "IMPUESTO VEHICULAR")
+        self.assertEqual(data["cuenta"], "0203381289v25")
+        self.assertEqual(data["moneda"], "PEN")
+        self.assertEqual(data["monto_decimal"], Decimal("2898.04"))
+
+    def test_extracts_operation_data_from_column_ocr(self):
+        contenido = """
+        Datos de la operación
+
+        Tipo de operacion
+        Estado
+        Número de operación
+        Fecha de proceso
+
+        Pago de servicios
+        e Procesada
+        100105
+        11/02/2025 - 03:59 p. m.
+
+        Datos de procesos de la operación
+        """
+
+        data = PaymentPdfParser()._extract_operation_data(contenido)
+
+        self.assertEqual(data["tipo_operacion"], "Pago de servicios")
+        self.assertEqual(data["estado"], "Procesada")
+        self.assertEqual(data["numero_operacion"], "100105")
+        self.assertEqual(data["fecha_proceso"], "11/02/2025 - 03:59 p. m.")
+
+    def test_pdf_text_extraction_skips_ocr_when_pdf_has_text(self):
+        parser = PaymentPdfParser()
+        file = Mock()
+        contenido = "texto extraido correctamente " * 5
+
+        with patch.object(
+            parser,
+            "_extract_pdf_text_with_pdfplumber",
+            return_value=contenido,
+        ), patch.object(parser, "_extract_pdf_text_with_ocr") as ocr:
+            self.assertEqual(parser._extract_pdf_text(file), contenido)
+
+        ocr.assert_not_called()
+
+    def test_pdf_text_extraction_uses_ocr_when_pdf_has_no_text(self):
+        parser = PaymentPdfParser()
+        file = Mock()
+        contenido_ocr = "texto extraido por ocr en espanol " * 5
+
+        with patch.object(
+            parser,
+            "_extract_pdf_text_with_pdfplumber",
+            return_value="",
+        ), patch.object(
+            parser,
+            "_extract_pdf_text_with_ocr",
+            return_value=contenido_ocr,
+        ):
+            self.assertEqual(parser._extract_pdf_text(file), contenido_ocr)
 
 
 class PaymentProviderGroupingTests(unittest.TestCase):

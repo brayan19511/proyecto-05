@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     EMAIL_TEMPLATE_DIR: str = "app/templates/emails"
     PAYMENT_PROVIDER_STORAGE_DIR: str = "var/payment-provider-jobs"
+    PAYMENT_PROVIDER_ENABLE_OCR: bool = True
+    PAYMENT_PROVIDER_OCR_LANG: str = "spa"
+    PAYMENT_PROVIDER_OCR_DPI: int = 250
+    PAYMENT_PROVIDER_MIN_TEXT_LENGTH: int = 80
 
     DB_OFISIS_HOST: Optional[str] = None
     DB_OFISIS_PORT: int = 1433

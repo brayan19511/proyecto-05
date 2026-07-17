@@ -41,6 +41,9 @@ RUN apt-get update \
         libgssapi-krb5-2 \
         libpq5 \
         msodbcsql17 \
+        poppler-utils \
+        tesseract-ocr \
+        tesseract-ocr-spa \
         unixodbc \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/* \
