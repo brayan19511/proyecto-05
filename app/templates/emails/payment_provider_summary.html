@@ -15,7 +15,7 @@
       <tbody>
         {% for pago in pagos %}
         <tr>
-          <td>{{  pago.archivo or pago.referencia }}</td>
+          <td>{{  pago.suggested_filename or pago.archivo }}</td>
           <td align="right">{{ pago.moneda_simbolo or pago.moneda }} {{ pago.monto_decimal }}</td>
         </tr>
         {% endfor %}

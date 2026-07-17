@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from email.message import EmailMessage as MimeEmailMessage
 from email.utils import formataddr, parseaddr
+from html import escape
 import mimetypes
 from pathlib import Path
 import smtplib
@@ -62,10 +63,11 @@ class EmailService:
         cc: str | list[str] | None = None,
         bcc: str | list[str] | None = None,
         subject: str | None = None,
+        body_override: str | None = None,
         attachments: list[EmailAttachment] | None = None,
     ) -> EmailMessage:
         values = parameters or {}
-        body, is_html = self._render_body(template, values)
+        body, is_html = self._render_body(template, values, body_override)
         subject_template = subject or _get_attr(template, "subject")
         return EmailMessage(
             to=parse_email_list(to)
@@ -143,7 +145,13 @@ class EmailService:
         self,
         template,
         parameters: dict[str, Any],
+        body_override: str | None = None,
     ) -> tuple[str, bool]:
+        if body_override and body_override.strip():
+            # El mensaje personalizado viene del usuario. Lo renderizamos con
+            # variables permitidas y lo escapamos para tratarlo como texto seguro.
+            return render_user_message(body_override, parameters), True
+
         html_value = _get_attr(template, "template_html")
         text_value = _get_attr(template, "template_text")
         template_value = _get_attr(template, "template")
@@ -201,6 +209,12 @@ def _looks_like_html(value: str) -> bool:
 
 def render_jinja_template(template: str, parameters: dict[str, Any]) -> str:
     return Environment(autoescape=False).from_string(template).render(**parameters)
+
+
+def render_user_message(template: str, parameters: dict[str, Any]) -> str:
+    rendered = render_template(template, parameters)
+    safe_lines = [escape(line) for line in rendered.splitlines()]
+    return "<br>".join(safe_lines)
 
 
 def _get_attr(source, *names: str):

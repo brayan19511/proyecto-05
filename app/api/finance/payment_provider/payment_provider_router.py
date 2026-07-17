@@ -150,6 +150,8 @@ async def send_payment_emails(
     files: list[UploadFile] = File(...),
     mailing_parameter_id: int | None = Form(default=None),
     mailing_parameter_name: str | None = Form(default=None),
+    subject_override: str | None = Form(default=None),
+    message_override: str | None = Form(default=None),
     service: PaymentProviderService = Depends(get_payment_provider_service),
     current_user=Depends(
         require_any_permission("payment_provider.process", "payment_provider.edit"),
@@ -162,6 +164,8 @@ async def send_payment_emails(
         files,
         mailing_parameter_id=mailing_parameter_id,
         mailing_parameter_name=mailing_parameter_name,
+        subject_override=subject_override,
+        message_override=message_override,
     )
 
 
@@ -170,6 +174,8 @@ async def enqueue_payment_emails(
     files: list[UploadFile] = File(...),
     mailing_parameter_id: int | None = Form(default=None),
     mailing_parameter_name: str | None = Form(default=None),
+    subject_override: str | None = Form(default=None),
+    message_override: str | None = Form(default=None),
     batch_size: int = Form(default=10),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     service: PaymentProviderService = Depends(get_payment_provider_service),
@@ -185,6 +191,8 @@ async def enqueue_payment_emails(
         current_user_id=current_user.id,
         mailing_parameter_id=mailing_parameter_id,
         mailing_parameter_name=mailing_parameter_name,
+        subject_override=subject_override,
+        message_override=message_override,
         idempotency_key=idempotency_key,
         batch_size=batch_size,
     )

@@ -28,7 +28,13 @@ class PaymentProviderParsingTests(unittest.TestCase):
     def test_builds_suggested_pdf_filename(self):
         self.assertEqual(
             build_pdf_filename("DARYZA S.A.C.", "03/01/2026"),
-            "DARYZAS.A.C_ENERO_03.pdf",
+            "DARYZA_S.A.C_ENERO_03.pdf",
+        )
+
+    def test_builds_readable_filename_for_provider_with_spaces(self):
+        self.assertEqual(
+            build_pdf_filename("ELEONORA PATRICIA BIGATTON DEL CARPIO", "03/01/2026"),
+            "ELEONORA_PATRICIA_BIGATTON_DEL_CARPIO_ENERO_03.pdf",
         )
 
     def test_extracts_transfer_section_when_destination_section_is_missing(self):
@@ -90,7 +96,7 @@ class PaymentProviderGroupingTests(unittest.TestCase):
         self.assertEqual(result[0]["emails_payments"], ["pagos@proveedor.pe"])
         self.assertEqual(
             result[0]["pagos"][0]["suggested_filename"],
-            "PROVEEDORFORMALS.A.C_JULIO_10.pdf",
+            "PROVEEDOR_FORMAL_S.A.C_JULIO_10.pdf",
         )
         self.assertEqual(result[0]["pagos"][0]["moneda_simbolo"], "S/")
         self.assertEqual(result[0]["totales"][0]["moneda"], "PEN")

@@ -7,6 +7,7 @@ from app.services.email import (
     parse_email_list,
     render_template,
 )
+from app.services.email.email_service import render_user_message
 
 
 class EmailServiceTests(unittest.TestCase):
@@ -131,6 +132,41 @@ class EmailServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(message.subject, "Constancias de pago - Daryza")
+
+    def test_build_from_template_allows_user_message_override(self):
+        template = Mock(
+            to=None,
+            cc=None,
+            bcc=None,
+            subject="Pago",
+            template="Este cuerpo no debe usarse",
+            template_html=None,
+            template_text=None,
+            mp_from=None,
+            mail_to=None,
+            mail_from=None,
+        )
+
+        message = EmailService().build_from_template(
+            template,
+            to=["pagos@proveedor.pe"],
+            body_override="Buenas tardes\nEnvio constancia de {{ proveedor }}",
+            parameters={"proveedor": "Daryza"},
+        )
+
+        self.assertTrue(message.is_html)
+        self.assertEqual(
+            message.body,
+            "Buenas tardes<br>Envio constancia de Daryza",
+        )
+
+    def test_render_user_message_escapes_html(self):
+        self.assertEqual(
+            render_user_message("Hola <script>{{ proveedor }}</script>", {
+                "proveedor": "Daryza",
+            }),
+            "Hola &lt;script&gt;Daryza&lt;/script&gt;",
+        )
 
     @patch("app.services.email.email_service.settings")
     @patch("app.services.email.email_service.smtplib.SMTP")

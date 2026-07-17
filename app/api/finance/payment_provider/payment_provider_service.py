@@ -164,6 +164,8 @@ class PaymentProviderService:
         *,
         mailing_parameter_id: int | None = None,
         mailing_parameter_name: str | None = None,
+        subject_override: str | None = None,
+        message_override: str | None = None,
     ) -> dict[str, Any]:
         """Envia un correo por proveedor usando la misma lectura del preview.
 
@@ -194,8 +196,13 @@ class PaymentProviderService:
                 message = self.email_service.build_from_template(
                     mailing_parameter,
                     parameters=self._build_mail_parameters(provider_group),
-                    subject=f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU",
-                    to=provider_group["emails_payments"] + parse_email_list(mailing_parameter.to),
+                    subject=self._build_email_subject(
+                        provider_group,
+                        subject_override,
+                    ),
+                    body_override=message_override,
+                    to=provider_group["emails_payments"]
+                    + parse_email_list(mailing_parameter.to),
                     bcc=parse_email_list(mailing_parameter.bcc),
                     cc=parse_email_list(mailing_parameter.cc),
                     attachments=attachments,
@@ -232,6 +239,8 @@ class PaymentProviderService:
         current_user_id: UUID,
         mailing_parameter_id: int | None = None,
         mailing_parameter_name: str | None = None,
+        subject_override: str | None = None,
+        message_override: str | None = None,
         idempotency_key: str | None = None,
         batch_size: int = 10,
     ):
@@ -260,6 +269,8 @@ class PaymentProviderService:
                     provider_group,
                     mailing_parameter,
                     file_path_by_name,
+                    subject_override=subject_override,
+                    message_override=message_override,
                 )
             )
 
@@ -338,6 +349,9 @@ class PaymentProviderService:
         provider_group: dict[str, Any],
         mailing_parameter,
         file_path_by_name: dict[str, str],
+        *,
+        subject_override: str | None = None,
+        message_override: str | None = None,
     ) -> dict[str, Any]:
         return {
             "provider_id": (
@@ -350,7 +364,8 @@ class PaymentProviderService:
             + parse_email_list(mailing_parameter.to),
             "cc": parse_email_list(mailing_parameter.cc),
             "bcc": parse_email_list(mailing_parameter.bcc),
-            "subject": f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU",
+            "subject": self._build_email_subject(provider_group, subject_override),
+            "message_override": self._clean_optional_text(message_override),
             "parameters": self._build_mail_parameters(provider_group),
             "mailing_parameter": self._serialize_mailing_parameter(mailing_parameter),
             "attachments": self._build_email_job_attachments(
@@ -463,6 +478,23 @@ class PaymentProviderService:
             "totales": provider_group["totales"],
             "pagos": provider_group["pagos"],
         }
+
+    @classmethod
+    def _build_email_subject(
+        cls,
+        provider_group: dict[str, Any],
+        subject_override: str | None,
+    ) -> str:
+        clean_subject = cls._clean_optional_text(subject_override)
+        if clean_subject:
+            return clean_subject
+        return f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU"
+
+    @staticmethod
+    def _clean_optional_text(value: str | None) -> str | None:
+        if not value or not value.strip():
+            return None
+        return value.strip()
 
     @staticmethod
     def _deduplicate_filename(filename: str, used_names: set[str]) -> str:

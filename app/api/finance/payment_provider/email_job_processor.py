@@ -145,6 +145,7 @@ class PaymentProviderEmailJobProcessor:
                 template=PayloadMailingParameter(payload["mailing_parameter"]),
                 parameters=payload["parameters"],
                 subject=payload.get("subject"),
+                body_override=payload.get("message_override"),
                 to=payload["to"],
                 cc=payload.get("cc"),
                 bcc=payload.get("bcc"),

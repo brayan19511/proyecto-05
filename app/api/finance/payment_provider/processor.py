@@ -136,10 +136,10 @@ def currency_symbol(currency_code: str | None) -> str:
 
 def sanitize_filename_part(value: str) -> str:
     normalized = normalizar_texto(value)
-    # El ejemplo esperado mantiene puntos, pero evita espacios y caracteres
+    # Mantiene el nombre legible para el usuario y evita caracteres
     # problematicos para Windows/Linux al descargar el ZIP.
-    normalized = normalized.replace(" ", "")
-    normalized = re.sub(r"[^A-Z0-9._-]", "", normalized)
+    normalized = re.sub(r"[^A-Z0-9.]+", "_", normalized)
+    normalized = re.sub(r"_+", "_", normalized)
     normalized = normalized.rstrip("._-")
     return normalized or "PROVEEDOR"
 
