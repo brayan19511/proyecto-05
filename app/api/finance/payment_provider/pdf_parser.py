@@ -27,13 +27,13 @@ def obtener_valor(contenido: str, campo: str) -> str | None:
     contenido_busqueda = normalizar_para_busqueda(contenido)
     campo_busqueda = normalizar_para_busqueda(campo)
     coincidencia = re.search(
-        rf"^\s*{re.escape(campo_busqueda)}[^\S\r\n]+(.+)$",
+        rf"^\s*{re.escape(campo_busqueda)}:?[^\S\r\n]+(.+)$",
         contenido_busqueda,
         flags=re.IGNORECASE | re.MULTILINE,
     )
     if not coincidencia:
         return None
-    return contenido[coincidencia.start(1) : coincidencia.end(1)].strip()
+    return contenido[coincidencia.start(1): coincidencia.end(1)].strip()
 
 
 def normalizar_moneda(moneda: str) -> str:
@@ -208,7 +208,7 @@ class PaymentPdfParser:
         )
         if not coincidencia:
             return ""
-        return contenido[coincidencia.start(1) : coincidencia.end(1)].strip()
+        return contenido[coincidencia.start(1): coincidencia.end(1)].strip()
 
     def _extract_operation_data(self, contenido: str) -> dict[str, str | None]:
         seccion = self._extract_section(
@@ -222,17 +222,23 @@ class PaymentPdfParser:
                 inicio="Datos de la operacion",
                 fin="Datos de procesos de la operacion",
             )
+        if not seccion:
+            seccion = self._extract_section(
+                contenido=contenido,
+                inicio="Datos de operacion",
+                fin="Datos de orinen",
+            )
         column_values = self._extract_operation_column_values(seccion)
         return {
-            "fecha_envio": obtener_valor(seccion, "Fecha de envio"),
+            "fecha_envio": (obtener_valor(seccion, "Fecha de envio") or obtener_valor(seccion, "Fecha de operacion")),
             "estado": obtener_valor(seccion, "Estado") or column_values.get("estado"),
             "tipo_operacion": (
                 obtener_valor(seccion, "Tipo de operacion")
-                or obtener_valor(seccion, "Tipo de operación")
                 or column_values.get("tipo_operacion")
             ),
             "fecha_proceso": (
                 obtener_valor(seccion, "Fecha de proceso")
+                or obtener_valor(seccion, "Fecha de operacion")
                 or column_values.get("fecha_proceso")
             ),
             "numero_operacion": (
@@ -259,7 +265,7 @@ class PaymentPdfParser:
         if not label_indexes:
             return {}
 
-        values = lines[max(label_indexes) + 1 :]
+        values = lines[max(label_indexes) + 1:]
         if len(values) < 4:
             return {}
 
@@ -282,6 +288,15 @@ class PaymentPdfParser:
         service_payment_data = self._extract_service_payment_data(contenido)
         if self._has_minimum_payment_data(service_payment_data):
             return service_payment_data
+
+        beneficiario_data = self._extract_beneficiario_data(contenido)
+        if self._has_minimum_payment_data(beneficiario_data):
+            return beneficiario_data
+
+        banco_beneficiario_data = self._extract_banco_beneficiario_data(
+            contenido)
+        if self._has_minimum_payment_data(banco_beneficiario_data):
+            return banco_beneficiario_data
 
         # Devolvemos el primer intento para que el error liste los campos
         # faltantes habituales de la constancia.
@@ -405,6 +420,102 @@ class PaymentPdfParser:
             "source_section": "SERVICE_PAYMENT",
         }
 
+    def _extract_banco_beneficiario_data(self, contenido: str) -> dict[str, Any]:
+        seccion = self._extract_section(
+            contenido=contenido,
+            inicio="Datos del banco beneficiario",
+            fin="Datos de la cuenta de cargo",
+        )
+        monto_original = (
+            obtener_valor(seccion, "Monto total")
+            or obtener_valor(seccion, "Monto pagado")
+        )
+        column_values = self._extract_service_payment_column_values(seccion)
+        monto_info = extraer_monto(monto_original)
+        if not monto_info:
+            monto_original = column_values.get("monto")
+            monto_info = extraer_monto(monto_original)
+        empresa_proveedora = (
+            obtener_valor(seccion, "Nombre del beneficiario")
+            or column_values.get("empresa_proveedora")
+        )
+        codigo_servicio = (
+            obtener_valor(seccion, "Referencia")
+            or obtener_valor(seccion, "Código de servicio")
+            or obtener_valor(seccion, "Cod. servicio")
+            or column_values.get("codigo_servicio")
+        )
+        servicio = (
+            obtener_valor(seccion, "Servicio a pagar")
+            or obtener_valor(seccion, "Servico a pagar")
+            or column_values.get("servicio")
+        )
+        return {
+            "monto_texto": monto_info["texto"] if monto_info else monto_original,
+            "monto_decimal": monto_info["monto"] if monto_info else None,
+            "moneda": monto_info["moneda"] if monto_info else None,
+            "moneda_original": (
+                monto_info["moneda_original"] if monto_info else None
+            ),
+            "titular": empresa_proveedora,
+            "cuenta": codigo_servicio,
+            "tipo": servicio or obtener_valor(seccion, "Tipo"),
+            "referencia": (
+                codigo_servicio
+                or obtener_valor(seccion, "N° DOC. PAGO")
+                or obtener_valor(seccion, "N DOC. PAGO")
+            ),
+            "ruc": None,
+            "source_section": "SERVICE_PAYMENT",
+        }
+
+    def _extract_beneficiario_data(self, contenido: str) -> dict[str, Any]:
+        seccion = self._extract_section(
+            contenido=contenido,
+            inicio="Datos del beneficiario",
+            fin="Datos de la cuenta de cargo",
+        )
+        monto_original = (
+            obtener_valor(seccion, "Monto")
+            or obtener_valor(seccion, "Monto pagado")
+        )
+        column_values = self._extract_service_payment_column_values(seccion)
+        monto_info = extraer_monto(monto_original)
+        if not monto_info:
+            monto_original = column_values.get("monto")
+            monto_info = extraer_monto(monto_original)
+        beneficiario = (
+            obtener_valor(seccion, "Beneficiario")
+            or obtener_valor(seccion, "EM. PROVEEDORA")
+            or column_values.get("beneficiario")
+        )
+        codigo_servicio = (
+            obtener_valor(seccion, "Codigo de servicio")
+            or "Transferencia a cuentas de terceros BCP local"
+        )
+        servicio = (
+            obtener_valor(seccion, "Servicio a pagar")
+            or "Transferencia a cuentas de terceros BCP local"
+        )
+        return {
+            "monto_texto": monto_info["texto"] if monto_info else monto_original,
+            "monto_decimal": monto_info["monto"] if monto_info else None,
+            "moneda": monto_info["moneda"] if monto_info else None,
+            "moneda_original": (
+                monto_info["moneda_original"] if monto_info else None
+            ),
+            "titular": beneficiario,
+            "cuenta": codigo_servicio,
+            "tipo": servicio or obtener_valor(seccion, "Tipo"),
+            "referencia": (
+                codigo_servicio
+                or obtener_valor(seccion, "N° DOC. PAGO")
+                or obtener_valor(seccion, "N DOC. PAGO")
+            ),
+            "ruc": None,
+            "source_section": "SERVICE_PAYMENT",
+        }
+
     @staticmethod
     def _extract_service_payment_column_values(seccion: str) -> dict[str, str | None]:
         """Lee constancias OCR donde etiquetas y valores salen en columnas.
@@ -421,7 +532,7 @@ class PaymentPdfParser:
             index
             for index, line in enumerate(normalized_lines)
             if line in {
-                "EMPRESA PROVEEDORA",
+                "BENEFICIARIO",
                 "SERVICIO A PAGAR",
                 "SERVICO A PAGAR",
                 "TITULAR DEL SERVICIO",
