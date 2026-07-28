@@ -21,6 +21,7 @@ from app.api.jobs.constants import (
     JobBatchStatus,
     JobItemStatus,
     JobStatus,
+    JobTriggerSource,
     ScheduledJobScheduleKind,
 )
 from app.core.db.db_postgres import Base
@@ -43,6 +44,10 @@ class Job(Base, AuditMixin):
             f"status IN ({_enum_values(JobStatus)})",
             name="ck_jobs_status",
         ),
+        CheckConstraint(
+            f"trigger_source IN ({_enum_values(JobTriggerSource)})",
+            name="ck_jobs_trigger_source",
+        ),
         UniqueConstraint(
             "created_by",
             "job_type",
@@ -54,6 +59,7 @@ class Job(Base, AuditMixin):
         Index("ix_jobs_parent_job_id", "parent_job_id"),
         Index("ix_jobs_scheduled_job_id", "scheduled_job_id"),
         Index("ix_jobs_status_created_at", "status", "created_at"),
+        Index("ix_jobs_trigger_source_created_at", "trigger_source", "created_at"),
         {"schema": "jobs"},
     )
 
@@ -65,6 +71,11 @@ class Job(Base, AuditMixin):
     scheduled_job_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("jobs.scheduled_jobs.id", ondelete="SET NULL"),
         nullable=True,
+    )
+    trigger_source: Mapped[str] = mapped_column(
+        String(30),
+        default=JobTriggerSource.API.value,
+        nullable=False,
     )
     job_type: Mapped[str] = mapped_column(String(60), nullable=False)
     status: Mapped[str] = mapped_column(

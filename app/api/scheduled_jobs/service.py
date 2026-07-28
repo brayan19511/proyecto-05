@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.finance.libro_mayor.service.libro_mayor_job_service import (
     LibroMayorJobService,
 )
-from app.api.jobs.constants import JobType
+from app.api.jobs.constants import JobTriggerSource, JobType
 from app.api.scheduled_jobs.repository import ScheduledJobRepository
 from app.api.scheduled_jobs.schedule import (
     calculate_next_run,
@@ -115,13 +115,14 @@ class ScheduledJobService:
             raise ConflictError("Ya existe una tarea programada con ese nombre") from error
         return scheduled_job
 
-    def run_now(self, scheduled_job_id: UUID) -> Job:
+    def run_now(self, scheduled_job_id: UUID, *, user_id: UUID) -> Job:
         scheduled_job = self.get(scheduled_job_id)
         scheduled_job.last_run_at = datetime.now(timezone.utc)
         return self._create_execution(
             scheduled_job,
             due_at=scheduled_job.last_run_at,
             manual=True,
+            user_id=user_id,
         )
 
     def run_due(self, *, limit: int = 20) -> int:
@@ -156,15 +157,26 @@ class ScheduledJobService:
         *,
         due_at: datetime,
         manual: bool,
+        user_id: UUID | None = None,
     ) -> Job:
         if not scheduled_job.created_by:
             raise ValidationError("La tarea programada no tiene usuario creador")
 
         idempotency_key = self._build_idempotency_key(scheduled_job, due_at, manual)
+        # Una ejecucion manual se atribuye al usuario que la forzo. La ejecucion
+        # automatica usa el creador de la programacion como usuario funcional.
+        execution_user_id = user_id if manual and user_id else scheduled_job.created_by
+        trigger_source = (
+            JobTriggerSource.SCHEDULED_MANUAL.value
+            if manual
+            else JobTriggerSource.SCHEDULED.value
+        )
         try:
             job = self._dispatch_scheduled_job(
                 scheduled_job,
                 idempotency_key=idempotency_key,
+                user_id=execution_user_id,
+                trigger_source=trigger_source,
             )
             scheduled_job.last_job_id = job.id
             scheduled_job.last_status = job.status
@@ -184,6 +196,8 @@ class ScheduledJobService:
         scheduled_job: ScheduledJob,
         *,
         idempotency_key: str,
+        user_id: UUID,
+        trigger_source: str,
     ) -> Job:
         parameters = scheduled_job.parameters or {}
         operation = parameters.get("operation")
@@ -192,19 +206,21 @@ class ScheduledJobService:
         if scheduled_job.job_type == JobType.LEDGER_SYNC_DELTA.value:
             if operation == "sync_delta_all":
                 return service.enqueue_sync_delta_all(
-                    user_id=scheduled_job.created_by,
+                    user_id=user_id,
                     idempotency_key=idempotency_key,
                     batch_size=scheduled_job.batch_size,
                     scheduled_job_id=scheduled_job.id,
+                    trigger_source=trigger_source,
                 )
             return service.enqueue_sync_delta(
                 account=parameters["account"],
                 start_date=self._parse_date(parameters.get("start_date")),
                 end_date=self._parse_date(parameters.get("end_date")),
-                user_id=scheduled_job.created_by,
+                user_id=user_id,
                 idempotency_key=idempotency_key,
                 batch_size=scheduled_job.batch_size,
                 scheduled_job_id=scheduled_job.id,
+                trigger_source=trigger_source,
             )
 
         if scheduled_job.job_type == JobType.LEDGER_SYNC.value:
@@ -212,10 +228,11 @@ class ScheduledJobService:
                 account=parameters["account"],
                 start_date=self._parse_required_date(parameters.get("start_date")),
                 end_date=self._parse_required_date(parameters.get("end_date")),
-                user_id=scheduled_job.created_by,
+                user_id=user_id,
                 idempotency_key=idempotency_key,
                 batch_size=scheduled_job.batch_size,
                 scheduled_job_id=scheduled_job.id,
+                trigger_source=trigger_source,
             )
 
         if scheduled_job.job_type == JobType.LEDGER_REPROCESS.value:
@@ -223,10 +240,11 @@ class ScheduledJobService:
                 account=parameters["account"],
                 start_date=self._parse_required_date(parameters.get("start_date")),
                 end_date=self._parse_required_date(parameters.get("end_date")),
-                user_id=scheduled_job.created_by,
+                user_id=user_id,
                 idempotency_key=idempotency_key,
                 batch_size=scheduled_job.batch_size,
                 scheduled_job_id=scheduled_job.id,
+                trigger_source=trigger_source,
             )
 
         raise ValidationError("Tipo de tarea programada no soportado")

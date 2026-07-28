@@ -11,6 +11,7 @@ from app.api.jobs.constants import (
     JobBatchStatus,
     JobItemStatus,
     JobStatus,
+    JobTriggerSource,
     JobType,
     SCHEDULED_JOBS_EDIT_PERMISSION,
     SCHEDULED_JOBS_RUN_PERMISSION,
@@ -61,6 +62,7 @@ class JobServiceTests(unittest.TestCase):
 
         self.assertEqual(result.total_items, 5)
         self.assertEqual(result.total_batches, 3)
+        self.assertEqual(result.trigger_source, JobTriggerSource.API.value)
         self.assertEqual(
             [
                 item.reference
@@ -71,6 +73,38 @@ class JobServiceTests(unittest.TestCase):
         )
         dispatcher.assert_called_once_with(result.id)
         db.commit.assert_called_once()
+
+    def test_retry_job_marks_child_as_retry_source(self):
+        user_id = uuid4()
+        parent = Job(
+            id=uuid4(),
+            job_type=JobType.SAP_DOCUMENT_ACTION.value,
+            status=JobStatus.FAILED.value,
+            parameters={"operation": "cancel"},
+            encrypted_secrets="encrypted",
+            scheduled_job_id=uuid4(),
+            created_by=user_id,
+        )
+        service = JobService(Mock())
+        service.get_job = Mock(return_value=parent)
+        service.repository = Mock()
+        service.repository.get_dispatchable_batches.return_value = []
+        service.repository.get_failed_references.return_value = ["doc-1"]
+        service.repository.get_failed_item_payloads.return_value = {}
+        service.create_job = Mock(return_value="retry-job")
+
+        result = service.retry_job(
+            parent.id,
+            user_id=user_id,
+            can_retry_all=True,
+            batch_size=1,
+        )
+
+        self.assertEqual(result, "retry-job")
+        self.assertEqual(
+            service.create_job.call_args.kwargs["trigger_source"],
+            JobTriggerSource.RETRY.value,
+        )
 
     def test_existing_idempotency_key_returns_same_job(self):
         db = Mock()

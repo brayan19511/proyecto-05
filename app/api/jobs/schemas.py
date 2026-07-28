@@ -8,6 +8,7 @@ from app.api.jobs.constants import (
     JobBatchStatus,
     JobItemStatus,
     JobStatus,
+    JobTriggerSource,
     JobType,
 )
 
@@ -35,6 +36,7 @@ class JobSummaryResponse(BaseModel):
     id: UUID
     parent_job_id: UUID | None
     scheduled_job_id: UUID | None
+    trigger_source: JobTriggerSource
     job_type: JobType
     status: JobStatus
     created_by: UUID | None

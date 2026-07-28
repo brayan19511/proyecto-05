@@ -80,4 +80,4 @@ def run_scheduled_job_now(
     service: ScheduledJobService = Depends(get_scheduled_job_service),
     current_user=Depends(require_any_permission(SCHEDULED_JOBS_RUN_PERMISSION)),
 ):
-    return service.run_now(scheduled_job_id)
+    return service.run_now(scheduled_job_id, user_id=current_user.id)

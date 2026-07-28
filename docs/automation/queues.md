@@ -143,6 +143,17 @@ consulta con:
 GET /api/jobs?scheduled_job_id=<id>
 ```
 
+La trazabilidad queda separada en dos niveles:
+
+- `audit.logs` registra acciones HTTP, como crear una programacion o ejecutar
+  manualmente `POST /api/scheduled-jobs/{id}/run`.
+- `jobs.jobs`, `jobs.job_batches` y `jobs.job_items` registran la ejecucion
+  operativa, incluyendo ejecuciones automaticas que no pasan por HTTP.
+
+En `jobs.jobs.trigger_source` se distingue el origen: `API`, `SCHEDULED`,
+`SCHEDULED_MANUAL` o `RETRY`. El usuario de la ejecucion queda en `created_by`,
+campo heredado de `AuditMixin`.
+
 ## Cancelacion
 
 La cancelacion es cooperativa:

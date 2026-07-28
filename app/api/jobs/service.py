@@ -11,6 +11,7 @@ from app.api.jobs.constants import (
     JobBatchStatus,
     JobItemStatus,
     JobStatus,
+    JobTriggerSource,
     TERMINAL_JOB_STATUSES,
 )
 from app.api.jobs.repository import JobRepository
@@ -49,6 +50,7 @@ class JobService:
         idempotency_key: str | None = None,
         parent_job_id: UUID | None = None,
         scheduled_job_id: UUID | None = None,
+        trigger_source: str = JobTriggerSource.API.value,
         encrypted_secrets: str | None = None,
         item_payloads: dict[str, dict | list | str] | None = None,
     ) -> Job:
@@ -77,6 +79,7 @@ class JobService:
             id=uuid4(),
             parent_job_id=parent_job_id,
             scheduled_job_id=scheduled_job_id,
+            trigger_source=trigger_source,
             job_type=job_type,
             status=JobStatus.CREATED.value,
             parameters=parameters,
@@ -292,6 +295,7 @@ class JobService:
             batch_size=batch_size,
             parent_job_id=job.id,
             scheduled_job_id=job.scheduled_job_id,
+            trigger_source=JobTriggerSource.RETRY.value,
             encrypted_secrets=job.encrypted_secrets,
             item_payloads=item_payloads or None,
         )

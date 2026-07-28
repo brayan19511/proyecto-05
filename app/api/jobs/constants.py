@@ -10,6 +10,13 @@ class JobType(StrEnum):
     LEDGER_REPROCESS = "LEDGER_REPROCESS"
 
 
+class JobTriggerSource(StrEnum):
+    API = "API"
+    SCHEDULED = "SCHEDULED"
+    SCHEDULED_MANUAL = "SCHEDULED_MANUAL"
+    RETRY = "RETRY"
+
+
 class ScheduledJobScheduleKind(StrEnum):
     DAILY = "DAILY"
     INTERVAL_MINUTES = "INTERVAL_MINUTES"

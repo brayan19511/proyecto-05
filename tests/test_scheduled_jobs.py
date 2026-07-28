@@ -1,9 +1,13 @@
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 from uuid import uuid4
 
-from app.api.jobs.constants import JobType, ScheduledJobScheduleKind
+from app.api.jobs.constants import (
+    JobTriggerSource,
+    JobType,
+    ScheduledJobScheduleKind,
+)
 from app.api.scheduled_jobs.service import ScheduledJobService
 from app.models.jobs import ScheduledJob
 
@@ -95,6 +99,8 @@ class ScheduledJobServiceTests(unittest.TestCase):
             result = service._dispatch_scheduled_job(
                 scheduled_job,
                 idempotency_key="scheduled-key",
+                user_id=scheduled_job.created_by,
+                trigger_source=JobTriggerSource.SCHEDULED.value,
             )
 
         self.assertEqual(result, "job")
@@ -103,6 +109,43 @@ class ScheduledJobServiceTests(unittest.TestCase):
             idempotency_key="scheduled-key",
             batch_size=1,
             scheduled_job_id=scheduled_job.id,
+            trigger_source=JobTriggerSource.SCHEDULED.value,
+        )
+
+    def test_manual_run_uses_current_user_as_job_creator(self):
+        scheduled_job = ScheduledJob(
+            id=uuid4(),
+            name="Libro mayor delta",
+            job_type=JobType.LEDGER_SYNC_DELTA.value,
+            schedule_kind=ScheduledJobScheduleKind.DAILY.value,
+            schedule_config={"times": ["04:00"]},
+            parameters={"operation": "sync_delta_all"},
+            batch_size=1,
+            timezone="America/Lima",
+            next_run_at=datetime(2026, 7, 28, 9, 0, tzinfo=timezone.utc),
+            created_by=uuid4(),
+        )
+        executor_id = uuid4()
+        db = Mock()
+        service = ScheduledJobService(db)
+
+        with patch.object(service, "get", return_value=scheduled_job), patch(
+            "app.api.scheduled_jobs.service.LibroMayorJobService"
+        ) as job_service_class:
+            job_service = job_service_class.return_value
+            job_service.enqueue_sync_delta_all.return_value = Mock(
+                id=uuid4(),
+                status="QUEUED",
+            )
+
+            service.run_now(scheduled_job.id, user_id=executor_id)
+
+        job_service.enqueue_sync_delta_all.assert_called_once_with(
+            user_id=executor_id,
+            idempotency_key=ANY,
+            batch_size=1,
+            scheduled_job_id=scheduled_job.id,
+            trigger_source=JobTriggerSource.SCHEDULED_MANUAL.value,
         )
 
 

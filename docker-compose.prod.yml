@@ -39,6 +39,15 @@ services:
     networks:
       - finance-network
 
+  payment-provider-storage-init:
+    image: busybox:1.36
+    restart: "no"
+    command: ["sh", "-c", "mkdir -p /storage && chown -R 10001:10001 /storage"]
+    volumes:
+      - payment-provider-jobs:/storage
+    networks:
+      - finance-network
+
   api:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
@@ -51,9 +60,14 @@ services:
       ENV: prod
       SQL_ECHO: "false"
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      PAYMENT_PROVIDER_STORAGE_DIR: /app/var/payment-provider-jobs
+    volumes:
+      - payment-provider-jobs:/app/var/payment-provider-jobs
     ports:
       - "${API_PORT}:8000"
     depends_on:
+      payment-provider-storage-init:
+        condition: service_completed_successfully
       db-postgres:
         condition: service_healthy
       rabbitmq:
@@ -87,6 +101,7 @@ services:
       ENV: prod
       SQL_ECHO: "false"
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      PAYMENT_PROVIDER_STORAGE_DIR: /app/var/payment-provider-jobs
     command:
       [
         "celery",
@@ -101,10 +116,14 @@ services:
     healthcheck:
       disable: true
     depends_on:
+      payment-provider-storage-init:
+        condition: service_completed_successfully
       db-postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - payment-provider-jobs:/app/var/payment-provider-jobs
     networks:
       - finance-network
 
@@ -231,6 +250,7 @@ volumes:
   postgres-db:
   pgadmin-data:
   rabbitmq-data:
+  payment-provider-jobs:
 
 networks:
   finance-network:
