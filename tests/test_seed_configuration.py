@@ -1,6 +1,9 @@
 import unittest
 
 from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
+from app.api.finance.payment_provider.constants import (
+    DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
+)
 from app.api.sales_channel.permissions import (
     PROMOTION_EDIT_PERMISSION,
     PROMOTION_IMPORT_PERMISSION,
@@ -9,7 +12,12 @@ from app.api.sales_channel.permissions import (
     SKU_IMPORT_PERMISSION,
     SKU_VIEW_PERMISSION,
 )
-from app.api.verify.seed_service import PERMISSIONS, ROLE_PERMISSIONS, ROLES
+from app.api.verify.seed_service import (
+    MAILING_PARAMETERS,
+    PERMISSIONS,
+    ROLE_PERMISSIONS,
+    ROLES,
+)
 
 
 class SeedConfigurationTests(unittest.TestCase):
@@ -61,6 +69,15 @@ class SeedConfigurationTests(unittest.TestCase):
         self.assertEqual(
             ROLE_PERMISSIONS["Asistencia Consulta"],
             {ATTENDANCE_MARKS_VIEW_PERMISSION},
+        )
+
+    def test_payment_provider_mailing_parameter_is_single_default(self):
+        names = [item["name"] for item in MAILING_PARAMETERS]
+
+        self.assertEqual(names, [DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER])
+        self.assertEqual(
+            MAILING_PARAMETERS[0]["template"],
+            "payment_provider_summary.html",
         )
 
 

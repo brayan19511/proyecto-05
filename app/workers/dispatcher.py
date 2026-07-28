@@ -5,18 +5,54 @@ from app.api.jobs.repository import JobRepository
 from app.api.sap.handlers import get_sap_item_handler
 from app.core.db.db_postgres import SessionLocal
 from app.workers.email_tasks import process_payment_provider_email_batch
+from app.workers.ledger_tasks import process_ledger_batch
 from app.workers.sap_tasks import process_sap_batch
 
 
+QUEUE_LIGHT = "light"
+QUEUE_HEAVY = "heavy"
+QUEUE_EMAIL = "email"
+LEDGER_LIGHT_MAX_ITEMS = 1
+
 JOB_TASKS = {
-    JobType.SAP_DOCUMENT_ACTION.value: (process_sap_batch, "sap"),
-    JobType.SAP_RECONCILIATION.value: (process_sap_batch, "sap"),
-    JobType.PAYMENT_PROVIDER_EMAIL.value: (
-        process_payment_provider_email_batch,
-        "email",
-    ),
+    JobType.SAP_DOCUMENT_ACTION.value: process_sap_batch,
+    JobType.SAP_RECONCILIATION.value: process_sap_batch,
+    JobType.PAYMENT_PROVIDER_EMAIL.value: process_payment_provider_email_batch,
+    JobType.LEDGER_SYNC.value: process_ledger_batch,
+    JobType.LEDGER_SYNC_DELTA.value: process_ledger_batch,
+    JobType.LEDGER_REPROCESS.value: process_ledger_batch,
 }
 
+
+def resolve_job_queue(job) -> str:
+    """Define la cola por perfil de carga, no por nombre del modulo."""
+    if job.job_type == JobType.PAYMENT_PROVIDER_EMAIL.value:
+        return QUEUE_EMAIL
+
+    if job.job_type in {
+        JobType.SAP_DOCUMENT_ACTION.value,
+        JobType.SAP_RECONCILIATION.value,
+        JobType.LEDGER_REPROCESS.value,
+    }:
+        return QUEUE_HEAVY
+
+    if job.job_type in {
+        JobType.LEDGER_SYNC.value,
+        JobType.LEDGER_SYNC_DELTA.value,
+    }:
+        # Un dia/cuenta es corto; rangos mas grandes van a heavy para no
+        # quitar capacidad a tareas rapidas.
+        if job.total_items <= LEDGER_LIGHT_MAX_ITEMS:
+            return QUEUE_LIGHT
+        return QUEUE_HEAVY
+
+    return QUEUE_LIGHT
+
+
+JOB_TYPES_WITH_SAP_HANDLER = {
+    JobType.SAP_DOCUMENT_ACTION.value,
+    JobType.SAP_RECONCILIATION.value,
+}
 
 def dispatch_job(job_id: UUID) -> None:
     """Publica en RabbitMQ los lotes pendientes de un job."""
@@ -26,11 +62,11 @@ def dispatch_job(job_id: UUID) -> None:
         if not job:
             raise ValueError("Tarea no encontrada")
 
-        task_config = JOB_TASKS.get(job.job_type)
-        if not task_config:
+        task = JOB_TASKS.get(job.job_type)
+        if not task:
             raise ValueError(f"Tipo de tarea no soportado: {job.job_type}")
-        task, queue = task_config
-        if queue == "sap":
+        queue = resolve_job_queue(job)
+        if job.job_type in JOB_TYPES_WITH_SAP_HANDLER:
             # SAP mantiene validacion adicional por handler de negocio.
             get_sap_item_handler(job.job_type)
 

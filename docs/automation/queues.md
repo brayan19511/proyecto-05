@@ -8,7 +8,7 @@ notificaciones. PostgreSQL conserva el estado funcional para la API y la UX.
 
 ```text
 Frontend -> FastAPI -> PostgreSQL (jobs, lotes, items)
-                    -> RabbitMQ -> worker SAP -> SAP Service Layer
+                    -> RabbitMQ -> worker light/heavy/email
 ```
 
 - FastAPI valida, registra el job y responde `202 Accepted`.
@@ -83,6 +83,28 @@ POST /api/jobs/{job_id}/retry
 `retry` vuelve a publicar un job con error de despacho. Para un job procesado,
 crea un job hijo que contiene solamente los items fallidos.
 
+### Libro mayor programado
+
+Para tareas programadas no uses el endpoint sincronico. Usa el endpoint async
+para que la peticion HTTP solo cree el job y el worker procese en segundo plano.
+
+```http
+POST /api/libro-mayor/sync-delta-all-async?batch_size=1
+X-API-Key: <api-key>
+Idempotency-Key: libro-mayor-delta-all-20260728-04
+```
+
+En Windows Task Scheduler puedes usar un solo comando, sin crear scripts
+adicionales:
+
+```powershell
+-ExecutionPolicy Bypass -Command "$slot = Get-Date -Format 'yyyyMMdd-HH'; Invoke-RestMethod -Uri 'http://192.168.32.25:8080/api/libro-mayor/sync-delta-all-async?batch_size=1' -Method Post -Headers @{'X-API-Key'='<api-key>'; 'Idempotency-Key'=\"libro-mayor-delta-all-$slot\"}"
+```
+
+La clave idempotente cambia por hora (`yyyyMMdd-HH`). Asi una
+ejecucion de las 04:00 y otra de las 08:00 pueden crear jobs distintos, pero un
+reintento de la misma hora reutiliza el job ya creado.
+
 ## Cancelacion
 
 La cancelacion es cooperativa:
@@ -106,21 +128,27 @@ una llamada SAP cuyo resultado ya no sea verificable.
 
 ## Colas y escalado
 
-El worker actual consume solamente la cola `sap` con concurrencia 4 y prefetch
-1. Otros dominios deben usar tareas y colas separadas, por ejemplo `exports` o
-`notifications`, aunque compartan imagen e infraestructura.
+Las colas se separan por perfil operativo:
 
-Para escalar, aumentar replicas o concurrencia solo despues de medir la
-capacidad de SAP. No combinar varios procesos Celery con pools de threads
-internos sin calcular la concurrencia total.
+- `light`: tareas cortas o de bajo volumen.
+- `heavy`: SAP, libro mayor por rango y reprocesos largos.
+- `email`: correos y adjuntos, aislados de las cargas pesadas.
+
+El dispatcher decide la cola antes de publicar el mensaje. Por ejemplo, un
+delta de libro mayor de un solo dia/cuenta puede ir a `light`; rangos mayores y
+reprocesos van a `heavy`.
+
+Para escalar, aumenta replicas o concurrencia solo despues de medir la capacidad
+de SAP y PostgreSQL. No combines varios workers con concurrencias altas sin
+calcular la concurrencia total.
 
 ## Operacion
 
 ```bash
 docker compose up -d rabbitmq
 docker compose run --rm api alembic upgrade head
-docker compose up -d api worker-sap
-docker compose logs -f worker-sap
+docker compose up -d api worker-light worker-heavy worker-email
+docker compose logs -f worker-heavy
 ```
 
 RabbitMQ Management se publica solamente en desarrollo en el puerto configurado

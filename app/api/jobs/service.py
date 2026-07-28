@@ -278,6 +278,7 @@ class JobService:
         references = self.repository.get_failed_references(job.id)
         if not references:
             raise ConflictError("La tarea no tiene elementos fallidos para reintentar")
+        item_payloads = self.repository.get_failed_item_payloads(job.id)
 
         return self.create_job(
             job_type=job.job_type,
@@ -287,6 +288,7 @@ class JobService:
             batch_size=batch_size,
             parent_job_id=job.id,
             encrypted_secrets=job.encrypted_secrets,
+            item_payloads=item_payloads or None,
         )
 
     def refresh_progress(self, job_id: UUID) -> None:

@@ -40,7 +40,7 @@ services:
       - finance
 
   api:
-    image: ${BACKEND_IMAGE}
+    image: ${BACKEND_IMAGE:-backend-finance:latest}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -71,8 +71,8 @@ services:
     networks:
       - finance
 
-  worker-sap:
-    image: ${BACKEND_IMAGE}
+  worker-heavy:
+    image: ${BACKEND_IMAGE:-backend-finance:latest}
     restart: unless-stopped
     env_file:
       - path: .env
@@ -90,9 +90,75 @@ services:
         "app.workers.celery_app:celery_app",
         "worker",
         "--loglevel=INFO",
-        "--queues=sap",
+        "--queues=heavy",
+        "--concurrency=2",
+        "--hostname=heavy@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance
+
+  worker-light:
+    image: ${BACKEND_IMAGE:-backend-finance:latest}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=light",
         "--concurrency=4",
-        "--hostname=sap@%h",
+        "--hostname=light@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance
+
+  worker-email:
+    image: ${BACKEND_IMAGE:-backend-finance:latest}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=email",
+        "--concurrency=2",
+        "--hostname=email@%h",
       ]
     healthcheck:
       disable: true
@@ -105,7 +171,7 @@ services:
       - finance
 
   migrate:
-    image: ${BACKEND_IMAGE}
+    image: ${BACKEND_IMAGE:-backend-finance:latest}
     restart: "no"
     profiles: ["operations"]
     env_file:
@@ -123,7 +189,7 @@ services:
       - finance
 
   frontend:
-    image: ${FRONTEND_IMAGE}
+    image: ${FRONTEND_IMAGE:-frontend-finance:latest}
     restart: unless-stopped
     networks:
       - finance

@@ -28,21 +28,16 @@ class AttachmentRepository:
 
     def create(self, attachment: Attachment):
         self.db.add(attachment)
-        self.db.commit()
-        self.db.refresh(attachment)
         return attachment
 
     def update(self, attachment: Attachment, data: dict):
         for key, value in data.items():
             setattr(attachment, key, value)
 
-        self.db.commit()
-        self.db.refresh(attachment)
         return attachment
 
     def delete(self, attachment: Attachment):
         self.db.delete(attachment)
-        self.db.commit()
 
     def delete_by_entity(
         self,
@@ -54,5 +49,13 @@ class AttachmentRepository:
         for attachment in attachments:
             self.db.delete(attachment)
 
-        self.db.commit()
         return len(attachments)
+
+    def commit(self):
+        self.db.commit()
+
+    def rollback(self):
+        self.db.rollback()
+
+    def refresh(self, attachment: Attachment):
+        self.db.refresh(attachment)

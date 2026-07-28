@@ -12,6 +12,9 @@ from sqlalchemy.exc import IntegrityError
 from app.api.jobs.constants import JobType
 from app.api.jobs.service import JobService
 from app.api.master.master_repository import MasterRepository
+from app.api.finance.payment_provider.constants import (
+    DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
+)
 from app.api.finance.payment_provider.payment_provider_repository import (
     PaymentProviderRepository,
 )
@@ -196,10 +199,7 @@ class PaymentProviderService:
                 message = self.email_service.build_from_template(
                     mailing_parameter,
                     parameters=self._build_mail_parameters(provider_group),
-                    subject=self._build_email_subject(
-                        provider_group,
-                        subject_override,
-                    ),
+                    subject=self._build_email_subject(subject_override),
                     body_override=message_override,
                     to=provider_group["emails_payments"]
                     + parse_email_list(mailing_parameter.to),
@@ -303,7 +303,7 @@ class PaymentProviderService:
             )
         else:
             parameter = self.master_repository.get_mailing_parameter_by_name(
-                "send_provider"
+                DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER
             )
 
         if not parameter or not parameter.active:
@@ -364,7 +364,7 @@ class PaymentProviderService:
             + parse_email_list(mailing_parameter.to),
             "cc": parse_email_list(mailing_parameter.cc),
             "bcc": parse_email_list(mailing_parameter.bcc),
-            "subject": self._build_email_subject(provider_group, subject_override),
+            "subject": self._build_email_subject(subject_override),
             "message_override": self._clean_optional_text(message_override),
             "parameters": self._build_mail_parameters(provider_group),
             "mailing_parameter": self._serialize_mailing_parameter(mailing_parameter),
@@ -480,15 +480,9 @@ class PaymentProviderService:
         }
 
     @classmethod
-    def _build_email_subject(
-        cls,
-        provider_group: dict[str, Any],
-        subject_override: str | None,
-    ) -> str:
-        clean_subject = cls._clean_optional_text(subject_override)
-        if clean_subject:
-            return clean_subject
-        return f"Constancias de pago - {provider_group['titular_pdf']} || RASHPERU"
+    def _build_email_subject(cls, subject_override: str | None) -> str | None:
+        # Sin override, EmailService usa el subject configurado en mailing_parameter.
+        return cls._clean_optional_text(subject_override)
 
     @staticmethod
     def _clean_optional_text(value: str | None) -> str | None:

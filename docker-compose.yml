@@ -57,57 +57,18 @@ services:
       context: .
       target: runtime
     restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - .:/app
       - payment-provider-jobs:/app/var/payment-provider-jobs
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
       DB_HOST: db-postgres
       DB_PORT: 5432
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_ALG: ${JWT_ALG}
-      JWT_EXPIRES_MIN: ${JWT_EXPIRES_MIN}
-      DB_SAP_USER: ${DB_SAP_USER}
-      DB_SAP_PASSWORD: ${DB_SAP_PASSWORD}
-      DB_SAP_HOST: ${DB_SAP_HOST}
-      DB_SAP_PORT: ${DB_SAP_PORT}
-      SAP_URL: ${SAP_URL}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
-      DB_OFISIS_PORT: ${DB_OFISIS_PORT:-1433}
-      DB_OFISIS_HOST: ${DB_OFISIS_HOST}
-      DB_OFISIS_USER: ${DB_OFISIS_USER}
-      DB_OFISIS_PASSWORD: ${DB_OFISIS_PASSWORD}
-      DB_OFISIS_DRIVER: ${DB_OFISIS_DRIVER:-ODBC Driver 17 for SQL Server}
-      DB_OFISIS_ENCRYPT: ${DB_OFISIS_ENCRYPT:-false}
-      DB_OFISIS_TRUST_SERVER_CERTIFICATE: ${DB_OFISIS_TRUST_SERVER_CERTIFICATE:-false}
-      DB_OFISIS_ECOMM_DATABASE: ${DB_OFISIS_ECOMM_DATABASE:-EcommDB}
-      DB_CIC_HOST: ${DB_CIC_HOST}
-      DB_CIC_PORT: ${DB_CIC_PORT:-1433}
-      DB_CIC_USER: ${DB_CIC_USER}
-      DB_CIC_PASSWORD: ${DB_CIC_PASSWORD}
-      DB_CIC_DRIVER: ${DB_CIC_DRIVER:-ODBC Driver 17 for SQL Server}
-      DB_CIC_ENCRYPT: ${DB_CIC_ENCRYPT:-false}
-      DB_CIC_TRUST_SERVER_CERTIFICATE: ${DB_CIC_TRUST_SERVER_CERTIFICATE:-false}
-      DB_CIC_DATABASE: ${DB_CIC_DATABASE:-dbcoolbox}
-      SMTP_HOST: ${SMTP_HOST:-192.168.30.199}
-      SMTP_PORT: ${SMTP_PORT:-25}
-      SMTP_USER: ${SMTP_USER:-no-reply@coolbox.com.pe}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@coolbox.com.pe}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Coolbox}
-      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
-      EMAIL_TEMPLATE_DIR: ${EMAIL_TEMPLATE_DIR:-app/templates/emails}
       PAYMENT_PROVIDER_STORAGE_DIR: ${PAYMENT_PROVIDER_STORAGE_DIR:-/app/var/payment-provider-jobs}
-      PAYMENT_PROVIDER_ENABLE_OCR: ${PAYMENT_PROVIDER_ENABLE_OCR:-true}
-      PAYMENT_PROVIDER_OCR_LANG: ${PAYMENT_PROVIDER_OCR_LANG:-spa}
-      PAYMENT_PROVIDER_OCR_DPI: ${PAYMENT_PROVIDER_OCR_DPI:-250}
-      PAYMENT_PROVIDER_MIN_TEXT_LENGTH: ${PAYMENT_PROVIDER_MIN_TEXT_LENGTH:-80}
-      ENV: ${ENV}
-      PROJECT_NAME: ${PROJECT_NAME}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173}
-      SQL_ECHO: ${SQL_ECHO:-false}
     ports:
       - "${API_PORT}:8000"
     depends_on:
@@ -120,13 +81,14 @@ services:
     networks:
       - finance-network
 
-  worker-sap:
+  worker-heavy:
     build:
       context: .
       target: runtime
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432
@@ -138,9 +100,44 @@ services:
         "app.workers.celery_app:celery_app",
         "worker",
         "--loglevel=INFO",
-        "--queues=sap",
+        "--queues=heavy",
+        "--concurrency=2",
+        "--hostname=heavy@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - finance-network
+
+  worker-light:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=light",
         "--concurrency=4",
-        "--hostname=sap@%h",
+        "--hostname=light@%h",
       ]
     healthcheck:
       disable: true
@@ -160,7 +157,8 @@ services:
       target: runtime
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432

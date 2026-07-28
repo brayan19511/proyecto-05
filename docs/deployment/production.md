@@ -90,7 +90,7 @@ docker compose up -d
 ```bash
 docker compose ps
 docker compose logs --tail=100 api
-docker compose logs --tail=100 worker-sap
+docker compose logs --tail=100 worker-heavy
 curl -f http://localhost:8080/health/ready
 ```
 

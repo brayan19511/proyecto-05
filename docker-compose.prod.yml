@@ -43,7 +43,8 @@ services:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432
@@ -72,11 +73,12 @@ services:
     networks:
       - finance-network
 
-  worker-sap:
+  worker-heavy:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432
@@ -90,9 +92,75 @@ services:
         "app.workers.celery_app:celery_app",
         "worker",
         "--loglevel=INFO",
-        "--queues=sap",
+        "--queues=heavy",
+        "--concurrency=2",
+        "--hostname=heavy@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance-network
+
+  worker-light:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=light",
         "--concurrency=4",
-        "--hostname=sap@%h",
+        "--hostname=light@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance-network
+
+  worker-email:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=email",
+        "--concurrency=2",
+        "--hostname=email@%h",
       ]
     healthcheck:
       disable: true

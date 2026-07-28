@@ -18,6 +18,9 @@ from app.api.finance.provisions.constants import (
     REJECTED_FINAL_STATUS,
     REJECTED_FOR_EDIT_STATUS,
 )
+from app.api.finance.payment_provider.constants import (
+    DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
+)
 from app.api.sales_channel.permissions import (
     PROMOTION_EDIT_PERMISSION,
     PROMOTION_IMPORT_PERMISSION,
@@ -92,20 +95,11 @@ CURRENCIES = [
     },
 ]
 
+# Cada flujo debe tener un unico parametro por defecto para evitar aliases
+# silenciosos y facilitar que el frontend sepa que configuracion esta usando.
 MAILING_PARAMETERS = [
     {
-        "name": "send_provider",
-        "template": "payment_provider_summary.html",
-        "template_html": None,
-        "template_text": None,
-        "mp_from": "Coolbox <no-reply@coolbox.com.pe>",
-        "to": None,
-        "subject": "CONSTANCIA DE PAGO {{ proveedor }} || RASH PERU",
-        "cc": None,
-        "bcc": None,
-    },
-    {
-        "name": "payment_provider_summary",
+        "name": DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
         "template": "payment_provider_summary.html",
         "template_html": None,
         "template_text": None,

@@ -24,6 +24,7 @@ from app.core.secret_cipher import (
 )
 from app.models.jobs import Job, JobBatch, JobItem
 from app.workers.celery_app import celery_app
+from app.workers.dispatcher import resolve_job_queue
 
 
 class JobServiceTests(unittest.TestCase):
@@ -167,6 +168,49 @@ class JobServiceTests(unittest.TestCase):
             [["1", "2"], ["3", "4"], ["5"]],
         )
 
+    def test_retry_preserves_failed_item_payloads(self):
+        user_id = uuid4()
+        job = Job(
+            id=uuid4(),
+            job_type=JobType.LEDGER_SYNC_DELTA.value,
+            status=JobStatus.FAILED.value,
+            parameters={"operation": "sync_delta"},
+            total_items=1,
+            created_by=user_id,
+        )
+        service = JobService(Mock())
+        service.get_job = Mock(return_value=job)
+        service.repository = Mock()
+        service.repository.get_dispatchable_batches.return_value = []
+        service.repository.get_failed_references.return_value = [
+            "sync_delta:95:2026-07-25"
+        ]
+        service.repository.get_failed_item_payloads.return_value = {
+            "sync_delta:95:2026-07-25": {
+                "operation": "sync_delta",
+                "account": "95",
+            }
+        }
+        service.create_job = Mock(return_value="retry-job")
+
+        result = service.retry_job(
+            job.id,
+            user_id=user_id,
+            can_retry_all=False,
+            batch_size=1,
+        )
+
+        self.assertEqual(result, "retry-job")
+        self.assertEqual(
+            service.create_job.call_args.kwargs["item_payloads"],
+            {
+                "sync_delta:95:2026-07-25": {
+                    "operation": "sync_delta",
+                    "account": "95",
+                }
+            },
+        )
+
 
 class SapJobContractTests(unittest.TestCase):
     def test_request_accepts_user_credentials(self):
@@ -204,11 +248,40 @@ class SapJobContractTests(unittest.TestCase):
                 documentos=[0, -1],
             )
 
-    def test_worker_uses_dedicated_sap_queue(self):
+    def test_worker_routes_sap_jobs_to_heavy_queue(self):
         route = celery_app.conf.task_routes["jobs.sap.process_batch"]
-        self.assertEqual(route["queue"], "sap")
+        self.assertEqual(route["queue"], "heavy")
         self.assertTrue(celery_app.conf.task_ignore_result)
         self.assertEqual(celery_app.conf.worker_prefetch_multiplier, 1)
+
+    def test_celery_direct_ledger_route_defaults_to_heavy_queue(self):
+        route = celery_app.conf.task_routes["jobs.ledger.process_batch"]
+        self.assertEqual(route["queue"], "heavy")
+        self.assertEqual(celery_app.conf.task_default_queue, "light")
+
+    def test_dispatcher_routes_small_ledger_job_to_light_queue(self):
+        job = Mock(
+            job_type=JobType.LEDGER_SYNC_DELTA.value,
+            total_items=1,
+        )
+
+        self.assertEqual(resolve_job_queue(job), "light")
+
+    def test_dispatcher_routes_large_ledger_job_to_heavy_queue(self):
+        job = Mock(
+            job_type=JobType.LEDGER_SYNC_DELTA.value,
+            total_items=2,
+        )
+
+        self.assertEqual(resolve_job_queue(job), "heavy")
+
+    def test_dispatcher_keeps_email_jobs_isolated(self):
+        job = Mock(
+            job_type=JobType.PAYMENT_PROVIDER_EMAIL.value,
+            total_items=1,
+        )
+
+        self.assertEqual(resolve_job_queue(job), "email")
 
     def test_safe_error_has_bounded_size(self):
         self.assertEqual(len(safe_sap_error("x" * 3000)), 2000)

@@ -93,6 +93,19 @@ class JobRepository:
             )
         ]
 
+    def get_failed_item_payloads(self, job_id: UUID) -> dict[str, dict | list | str]:
+        rows = (
+            self.db.query(JobItem.reference, JobItem.result_data)
+            .filter(
+                JobItem.job_id == job_id,
+                JobItem.status == "FAILED",
+                JobItem.result_data.isnot(None),
+            )
+            .order_by(JobItem.created_at)
+            .all()
+        )
+        return {reference: payload for reference, payload in rows}
+
     def get_dispatchable_batches(self, job_id: UUID) -> list[JobBatch]:
         return (
             self.db.query(JobBatch)
