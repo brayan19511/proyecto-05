@@ -34,6 +34,7 @@ class JobSummaryResponse(BaseModel):
 
     id: UUID
     parent_job_id: UUID | None
+    scheduled_job_id: UUID | None
     job_type: JobType
     status: JobStatus
     created_by: UUID | None

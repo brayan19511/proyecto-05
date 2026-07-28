@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     SAP_JOB_TIME_LIMIT: int = 3900
 
     CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
+    CELERY_SCHEDULER_INTERVAL_SECONDS: int = 60
+    CELERY_WORKER_MAX_TASKS_PER_CHILD: int = 50
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD_KB: int = 512000
     JOB_CREDENTIALS_KEY: Optional[str] = None
 
     SMTP_HOST: Optional[str] = None

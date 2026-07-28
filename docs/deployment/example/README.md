@@ -27,8 +27,8 @@ docker compose ps
 curl -f http://localhost:8080/health/ready
 ```
 
-La migracion debe ejecutarse antes de actualizar `api` y los workers, porque
-todos esperan las tablas del schema `jobs`.
+La migracion debe ejecutarse antes de actualizar `api`, `scheduler` y los
+workers, porque todos esperan las tablas del schema `jobs`.
 
 PgAdmin es opcional y no se publica mediante Nginx:
 

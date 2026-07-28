@@ -32,6 +32,7 @@ class LibroMayorJobService:
         user_id: UUID,
         idempotency_key: str | None = None,
         batch_size: int = 1,
+        scheduled_job_id: UUID | None = None,
     ):
         self._validate_account(account)
         payloads = self._build_daily_payloads(
@@ -52,6 +53,7 @@ class LibroMayorJobService:
             user_id=user_id,
             idempotency_key=idempotency_key,
             batch_size=batch_size,
+            scheduled_job_id=scheduled_job_id,
         )
 
     def enqueue_sync_delta(
@@ -63,6 +65,7 @@ class LibroMayorJobService:
         user_id: UUID,
         idempotency_key: str | None = None,
         batch_size: int = 1,
+        scheduled_job_id: UUID | None = None,
     ):
         self._validate_account(account)
         resolved_start = self._resolve_delta_start(account, start_date)
@@ -85,6 +88,7 @@ class LibroMayorJobService:
             user_id=user_id,
             idempotency_key=idempotency_key,
             batch_size=batch_size,
+            scheduled_job_id=scheduled_job_id,
         )
 
     def enqueue_sync_delta_all(
@@ -93,6 +97,7 @@ class LibroMayorJobService:
         user_id: UUID,
         idempotency_key: str | None = None,
         batch_size: int = 1,
+        scheduled_job_id: UUID | None = None,
     ):
         payloads = {}
         parameters = {"operation": "sync_delta_all", "accounts": []}
@@ -122,6 +127,7 @@ class LibroMayorJobService:
             user_id=user_id,
             idempotency_key=idempotency_key,
             batch_size=batch_size,
+            scheduled_job_id=scheduled_job_id,
         )
 
     def enqueue_reprocess_date_range(
@@ -133,6 +139,7 @@ class LibroMayorJobService:
         user_id: UUID,
         idempotency_key: str | None = None,
         batch_size: int = 1,
+        scheduled_job_id: UUID | None = None,
     ):
         self._validate_account(account)
         payloads = self._build_daily_payloads(
@@ -153,6 +160,7 @@ class LibroMayorJobService:
             user_id=user_id,
             idempotency_key=idempotency_key,
             batch_size=batch_size,
+            scheduled_job_id=scheduled_job_id,
         )
 
     def _create_job(
@@ -164,6 +172,7 @@ class LibroMayorJobService:
         user_id: UUID,
         idempotency_key: str | None,
         batch_size: int,
+        scheduled_job_id: UUID | None = None,
     ):
         return JobService(self.db, dispatcher=dispatch_job).create_job(
             job_type=job_type,
@@ -172,6 +181,7 @@ class LibroMayorJobService:
             user_id=user_id,
             batch_size=batch_size,
             idempotency_key=idempotency_key,
+            scheduled_job_id=scheduled_job_id,
             item_payloads=payloads,
         )
 

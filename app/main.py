@@ -10,6 +10,7 @@ from app.api.master import master_router
 from app.api.finance.provisions import provisions_router
 from app.api.sales_channel import router as sales_channel_router
 from app.api.sap import sap_router
+from app.api.scheduled_jobs import router as scheduled_jobs_router
 from app.api.security import security_router
 from app.api.storage import attachments_router
 from app.api.user import user_router
@@ -46,6 +47,7 @@ register_exception_handlers(app)
 # 4. RUTAS (ROUTERS)
 # =========================================================
 app.include_router(prefix="/api", router=sap_router.router)
+app.include_router(prefix="/api", router=scheduled_jobs_router.router)
 app.include_router(prefix="/api", router=web_router.router)
 app.include_router(prefix="/api", router=finance_router)
 app.include_router(prefix="/api", router=master_router.router)

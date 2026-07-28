@@ -45,6 +45,7 @@ def get_jobs(
     mine: bool = Query(default=True),
     job_type: JobType | None = Query(default=None),
     status: JobStatus | None = Query(default=None),
+    scheduled_job_id: UUID | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     service: JobService = Depends(get_job_service),
@@ -58,6 +59,7 @@ def get_jobs(
         mine=mine,
         job_type=job_type.value if job_type else None,
         status=status.value if status else None,
+        scheduled_job_id=scheduled_job_id,
         limit=limit,
         offset=offset,
     )

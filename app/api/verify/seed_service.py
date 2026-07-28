@@ -9,7 +9,13 @@ from app.api.jobs.constants import (
     JOBS_RETRY_PERMISSION,
     JOBS_VIEW_ALL_PERMISSION,
     JOBS_VIEW_PERMISSION,
+    JobType,
+    SCHEDULED_JOBS_EDIT_PERMISSION,
+    SCHEDULED_JOBS_RUN_PERMISSION,
+    SCHEDULED_JOBS_VIEW_PERMISSION,
+    ScheduledJobScheduleKind,
 )
+from app.api.scheduled_jobs.schedule import calculate_next_run
 from app.api.finance.provisions.constants import (
     APPROVED_STATUS,
     CANCELLED_STATUS,
@@ -39,6 +45,7 @@ from app.models.auth.security_model import (
 )
 from app.models.auth.user_model import Information
 from app.models.finance.provision_model import ProvisionStatus
+from app.models.jobs import ScheduledJob
 from app.models.master.mailing_parameter_model import MailingParameter
 from app.models.master.master_model import Area, Company, Currency
 
@@ -210,6 +217,18 @@ PERMISSIONS = [
         "description": "Cancelar tareas de todos los usuarios",
     },
     {"code": JOBS_RETRY_PERMISSION, "description": "Reintentar tareas"},
+    {
+        "code": SCHEDULED_JOBS_VIEW_PERMISSION,
+        "description": "Ver tareas programadas",
+    },
+    {
+        "code": SCHEDULED_JOBS_EDIT_PERMISSION,
+        "description": "Gestionar tareas programadas",
+    },
+    {
+        "code": SCHEDULED_JOBS_RUN_PERMISSION,
+        "description": "Ejecutar tareas programadas manualmente",
+    },
 ]
 
 ROLES = [
@@ -349,6 +368,9 @@ ROLE_PERMISSIONS = {
         JOBS_CANCEL_PERMISSION,
         JOBS_CANCEL_ALL_PERMISSION,
         JOBS_RETRY_PERMISSION,
+        SCHEDULED_JOBS_VIEW_PERMISSION,
+        SCHEDULED_JOBS_EDIT_PERMISSION,
+        SCHEDULED_JOBS_RUN_PERMISSION,
     },
     "Canales Venta Consulta": {
         SKU_VIEW_PERMISSION,
@@ -384,6 +406,9 @@ ROLE_PERMISSIONS = {
         JOBS_CANCEL_PERMISSION,
         JOBS_CANCEL_ALL_PERMISSION,
         JOBS_RETRY_PERMISSION,
+        SCHEDULED_JOBS_VIEW_PERMISSION,
+        SCHEDULED_JOBS_EDIT_PERMISSION,
+        SCHEDULED_JOBS_RUN_PERMISSION,
     },
 }
 
@@ -398,6 +423,24 @@ PROVISION_STATUSES = [
     {"code": CANCELLED_STATUS, "name": "Cancelado"},
     {"code": "POSTED_SAP", "name": "Registrado en SAP"},
     {"code": "SAP_ERROR", "name": "Error SAP"},
+]
+
+DEFAULT_SCHEDULED_JOBS = [
+    {
+        "name": "Libro mayor delta laboral",
+        "job_type": JobType.LEDGER_SYNC_DELTA.value,
+        "enabled": True,
+        "schedule_kind": ScheduledJobScheduleKind.WINDOW_INTERVAL.value,
+        "schedule_config": {
+            "weekdays": [0, 1, 2, 3, 4],
+            "start_time": "08:00",
+            "end_time": "18:00",
+            "minutes": 240,
+        },
+        "parameters": {"operation": "sync_delta_all"},
+        "batch_size": 1,
+        "timezone": "America/Lima",
+    },
 ]
 
 
@@ -420,6 +463,7 @@ class SeedService:
             self.ensure_master_data()
             self.ensure_mailing_parameters()
             self.ensure_provision_statuses()
+            self.ensure_scheduled_jobs(admin_user)
 
             self.db.commit()
 
@@ -685,3 +729,43 @@ class SeedService:
                 )
             )
             self.created.append(f"provision_status:{item['code']}")
+
+    # =====================================================
+    # SCHEDULED JOBS
+    # =====================================================
+    def ensure_scheduled_jobs(self, admin_user: Auth):
+        for item in DEFAULT_SCHEDULED_JOBS:
+            scheduled_job = (
+                self.db.query(ScheduledJob)
+                .filter(ScheduledJob.name == item["name"])
+                .first()
+            )
+            next_run_at = calculate_next_run(
+                schedule_kind=item["schedule_kind"],
+                schedule_config=item["schedule_config"],
+                tz_name=item["timezone"],
+            )
+
+            if scheduled_job:
+                # El seed mantiene la definicion base, pero no borra historial
+                # ni el ultimo job asociado a esta programacion.
+                scheduled_job.job_type = item["job_type"]
+                scheduled_job.enabled = item["enabled"]
+                scheduled_job.schedule_kind = item["schedule_kind"]
+                scheduled_job.schedule_config = item["schedule_config"]
+                scheduled_job.parameters = item["parameters"]
+                scheduled_job.batch_size = item["batch_size"]
+                scheduled_job.timezone = item["timezone"]
+                if not scheduled_job.next_run_at:
+                    scheduled_job.next_run_at = next_run_at
+                self.existing.append(f"scheduled_job:{item['name']}")
+                continue
+
+            self.db.add(
+                ScheduledJob(
+                    **item,
+                    next_run_at=next_run_at,
+                    created_by=admin_user.id,
+                )
+            )
+            self.created.append(f"scheduled_job:{item['name']}")

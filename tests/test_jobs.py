@@ -12,6 +12,9 @@ from app.api.jobs.constants import (
     JobItemStatus,
     JobStatus,
     JobType,
+    SCHEDULED_JOBS_EDIT_PERMISSION,
+    SCHEDULED_JOBS_RUN_PERMISSION,
+    SCHEDULED_JOBS_VIEW_PERMISSION,
 )
 from app.api.jobs.service import JobService, chunked
 from app.api.sap.sap_schema import SapServiceDocumentos
@@ -319,6 +322,9 @@ class JobModelAndSeedTests(unittest.TestCase):
         self.assertIn(JOBS_VIEW_ALL_PERMISSION, permissions)
         self.assertIn(JOBS_CANCEL_ALL_PERMISSION, permissions)
         self.assertIn(JOBS_RETRY_PERMISSION, permissions)
+        self.assertIn(SCHEDULED_JOBS_VIEW_PERMISSION, permissions)
+        self.assertIn(SCHEDULED_JOBS_EDIT_PERMISSION, permissions)
+        self.assertIn(SCHEDULED_JOBS_RUN_PERMISSION, permissions)
 
 
 if __name__ == "__main__":

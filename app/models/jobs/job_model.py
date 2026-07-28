@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -20,6 +21,7 @@ from app.api.jobs.constants import (
     JobBatchStatus,
     JobItemStatus,
     JobStatus,
+    ScheduledJobScheduleKind,
 )
 from app.core.db.db_postgres import Base
 from app.models.common.mixin_model import AuditMixin
@@ -50,6 +52,7 @@ class Job(Base, AuditMixin):
         Index("ix_jobs_created_by_created_at", "created_by", "created_at"),
         Index("ix_jobs_job_type", "job_type"),
         Index("ix_jobs_parent_job_id", "parent_job_id"),
+        Index("ix_jobs_scheduled_job_id", "scheduled_job_id"),
         Index("ix_jobs_status_created_at", "status", "created_at"),
         {"schema": "jobs"},
     )
@@ -57,6 +60,10 @@ class Job(Base, AuditMixin):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     parent_job_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("jobs.jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    scheduled_job_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("jobs.scheduled_jobs.id", ondelete="SET NULL"),
         nullable=True,
     )
     job_type: Mapped[str] = mapped_column(String(60), nullable=False)
@@ -126,6 +133,10 @@ class Job(Base, AuditMixin):
         back_populates="job",
         cascade="all, delete-orphan",
         passive_deletes=True,
+    )
+    scheduled_job: Mapped["ScheduledJob | None"] = relationship(
+        back_populates="runs",
+        foreign_keys=lambda: [Job.scheduled_job_id],
     )
 
     @property
@@ -272,3 +283,65 @@ class JobItem(Base):
     )
 
     batch: Mapped[JobBatch] = relationship(back_populates="items")
+
+
+class ScheduledJob(Base, AuditMixin):
+    """Definicion de calendario; cada ejecucion real vive en jobs.jobs."""
+
+    __tablename__ = "scheduled_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            f"schedule_kind IN ({_enum_values(ScheduledJobScheduleKind)})",
+            name="ck_scheduled_jobs_schedule_kind",
+        ),
+        UniqueConstraint("name", name="uq_scheduled_jobs_name"),
+        Index("ix_scheduled_jobs_enabled_next_run", "enabled", "next_run_at"),
+        Index("ix_scheduled_jobs_job_type", "job_type"),
+        {"schema": "jobs"},
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    job_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    schedule_kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    schedule_config: Mapped[dict] = mapped_column(
+        JSONB,
+        default=dict,
+        nullable=False,
+    )
+    parameters: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    batch_size: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    timezone: Mapped[str] = mapped_column(
+        String(60),
+        default="America/Lima",
+        nullable=False,
+    )
+    next_run_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    last_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    last_job_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("jobs.jobs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    last_job: Mapped[Job | None] = relationship(
+        foreign_keys=[last_job_id],
+        post_update=True,
+    )
+    runs: Mapped[list[Job]] = relationship(
+        back_populates="scheduled_job",
+        foreign_keys=lambda: [Job.scheduled_job_id],
+    )

@@ -13,6 +13,7 @@ from app.api.sales_channel.permissions import (
     SKU_VIEW_PERMISSION,
 )
 from app.api.verify.seed_service import (
+    DEFAULT_SCHEDULED_JOBS,
     MAILING_PARAMETERS,
     PERMISSIONS,
     ROLE_PERMISSIONS,
@@ -79,6 +80,22 @@ class SeedConfigurationTests(unittest.TestCase):
             MAILING_PARAMETERS[0]["template"],
             "payment_provider_summary.html",
         )
+
+    def test_default_ledger_scheduled_job_is_business_window(self):
+        [scheduled_job] = DEFAULT_SCHEDULED_JOBS
+
+        self.assertEqual(scheduled_job["name"], "Libro mayor delta laboral")
+        self.assertEqual(scheduled_job["schedule_kind"], "WINDOW_INTERVAL")
+        self.assertEqual(
+            scheduled_job["schedule_config"],
+            {
+                "weekdays": [0, 1, 2, 3, 4],
+                "start_time": "08:00",
+                "end_time": "18:00",
+                "minutes": 240,
+            },
+        )
+        self.assertEqual(scheduled_job["parameters"], {"operation": "sync_delta_all"})
 
 
 if __name__ == "__main__":

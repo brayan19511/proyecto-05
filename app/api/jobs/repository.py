@@ -38,6 +38,7 @@ class JobRepository:
         user_id: UUID | None,
         job_type: str | None,
         status: str | None,
+        scheduled_job_id: UUID | None,
         limit: int,
         offset: int,
     ) -> tuple[list[Job], int]:
@@ -48,6 +49,8 @@ class JobRepository:
             query = query.filter(Job.job_type == job_type)
         if status is not None:
             query = query.filter(Job.status == status)
+        if scheduled_job_id is not None:
+            query = query.filter(Job.scheduled_job_id == scheduled_job_id)
 
         total = query.count()
         items = (

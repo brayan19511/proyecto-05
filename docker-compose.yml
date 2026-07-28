@@ -86,6 +86,8 @@ services:
       context: .
       target: runtime
     restart: unless-stopped
+    mem_limit: ${WORKER_HEAVY_MEM_LIMIT:-2g}
+    cpus: "${WORKER_HEAVY_CPUS:-2.0}"
     env_file:
       - path: .env
         required: false
@@ -121,6 +123,8 @@ services:
       context: .
       target: runtime
     restart: unless-stopped
+    mem_limit: ${WORKER_LIGHT_MEM_LIMIT:-1g}
+    cpus: "${WORKER_LIGHT_CPUS:-2.0}"
     env_file:
       - path: .env
         required: false
@@ -156,6 +160,8 @@ services:
       context: .
       target: runtime
     restart: unless-stopped
+    mem_limit: ${WORKER_EMAIL_MEM_LIMIT:-1g}
+    cpus: "${WORKER_EMAIL_CPUS:-1.0}"
     env_file:
       - path: .env
         required: false
@@ -187,6 +193,41 @@ services:
     volumes:
       - .:/app
       - payment-provider-jobs:/app/var/payment-provider-jobs
+    networks:
+      - finance-network
+
+  scheduler:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    mem_limit: ${SCHEDULER_MEM_LIMIT:-512m}
+    cpus: "${SCHEDULER_CPUS:-0.5}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "beat",
+        "--loglevel=INFO",
+        "--schedule=/tmp/celerybeat-schedule",
+      ]
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    volumes:
+      - .:/app
     networks:
       - finance-network
 

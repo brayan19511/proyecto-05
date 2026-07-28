@@ -1,0 +1,272 @@
+from datetime import date, datetime, timezone
+from uuid import UUID
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.api.finance.libro_mayor.service.libro_mayor_job_service import (
+    LibroMayorJobService,
+)
+from app.api.jobs.constants import JobType
+from app.api.scheduled_jobs.repository import ScheduledJobRepository
+from app.api.scheduled_jobs.schedule import (
+    calculate_next_run,
+    validate_timezone,
+)
+from app.api.scheduled_jobs.schemas import (
+    ScheduledJobCreate,
+    ScheduledJobPageResponse,
+    ScheduledJobUpdate,
+)
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.models.jobs import Job, ScheduledJob
+
+
+class ScheduledJobService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.repository = ScheduledJobRepository(db)
+
+    def create(self, data: ScheduledJobCreate, *, user_id: UUID) -> ScheduledJob:
+        validate_timezone(data.timezone)
+        next_run_at = data.next_run_at or calculate_next_run(
+            schedule_kind=data.schedule_kind.value,
+            schedule_config=data.schedule_config,
+            tz_name=data.timezone,
+        )
+        scheduled_job = ScheduledJob(
+            name=data.name,
+            job_type=data.job_type.value,
+            enabled=data.enabled,
+            schedule_kind=data.schedule_kind.value,
+            schedule_config=data.schedule_config,
+            parameters=data.parameters,
+            batch_size=data.batch_size,
+            timezone=data.timezone,
+            next_run_at=next_run_at,
+            created_by=user_id,
+        )
+        self.db.add(scheduled_job)
+        try:
+            self.db.commit()
+        except IntegrityError as error:
+            self.db.rollback()
+            raise ConflictError("Ya existe una tarea programada con ese nombre") from error
+        return scheduled_job
+
+    def list_jobs(
+        self,
+        *,
+        enabled: bool | None,
+        limit: int,
+        offset: int,
+    ) -> ScheduledJobPageResponse:
+        items, total = self.repository.list_jobs(
+            enabled=enabled,
+            limit=limit,
+            offset=offset,
+        )
+        return ScheduledJobPageResponse(
+            items=items,
+            total=total,
+            limit=limit,
+            offset=offset,
+            has_more=offset + len(items) < total,
+        )
+
+    def get(self, scheduled_job_id: UUID) -> ScheduledJob:
+        scheduled_job = self.repository.get_by_id(scheduled_job_id)
+        if not scheduled_job:
+            raise NotFoundError("Tarea programada no encontrada")
+        return scheduled_job
+
+    def update(
+        self,
+        scheduled_job_id: UUID,
+        data: ScheduledJobUpdate,
+        *,
+        user_id: UUID,
+    ) -> ScheduledJob:
+        scheduled_job = self.get(scheduled_job_id)
+        updates = data.model_dump(exclude_unset=True)
+        if "timezone" in updates:
+            validate_timezone(updates["timezone"])
+
+        for field, value in updates.items():
+            normalized = value.value if hasattr(value, "value") else value
+            setattr(scheduled_job, field, normalized)
+
+        if "next_run_at" not in updates and {
+            "schedule_kind",
+            "schedule_config",
+            "timezone",
+        }.intersection(updates):
+            scheduled_job.next_run_at = calculate_next_run(
+                schedule_kind=scheduled_job.schedule_kind,
+                schedule_config=scheduled_job.schedule_config,
+                tz_name=scheduled_job.timezone,
+            )
+
+        scheduled_job.updated_by = user_id
+        try:
+            self.db.commit()
+        except IntegrityError as error:
+            self.db.rollback()
+            raise ConflictError("Ya existe una tarea programada con ese nombre") from error
+        return scheduled_job
+
+    def run_now(self, scheduled_job_id: UUID) -> Job:
+        scheduled_job = self.get(scheduled_job_id)
+        scheduled_job.last_run_at = datetime.now(timezone.utc)
+        return self._create_execution(
+            scheduled_job,
+            due_at=scheduled_job.last_run_at,
+            manual=True,
+        )
+
+    def run_due(self, *, limit: int = 20) -> int:
+        executed = 0
+        for _ in range(limit):
+            now = datetime.now(timezone.utc)
+            due_jobs = self.repository.list_due_jobs(now=now, limit=1)
+            if not due_jobs:
+                break
+            scheduled_job = due_jobs[0]
+            due_at = scheduled_job.next_run_at
+            scheduled_job.last_run_at = now
+            scheduled_job.next_run_at = calculate_next_run(
+                schedule_kind=scheduled_job.schedule_kind,
+                schedule_config=scheduled_job.schedule_config,
+                tz_name=scheduled_job.timezone,
+                after=now,
+            )
+            self.db.commit()
+            try:
+                self._create_execution(scheduled_job, due_at=due_at, manual=False)
+                executed += 1
+            except Exception:
+                # El error queda guardado en la tarea programada; las demas
+                # tareas vencidas deben seguir su curso.
+                continue
+        return executed
+
+    def _create_execution(
+        self,
+        scheduled_job: ScheduledJob,
+        *,
+        due_at: datetime,
+        manual: bool,
+    ) -> Job:
+        if not scheduled_job.created_by:
+            raise ValidationError("La tarea programada no tiene usuario creador")
+
+        idempotency_key = self._build_idempotency_key(scheduled_job, due_at, manual)
+        try:
+            job = self._dispatch_scheduled_job(
+                scheduled_job,
+                idempotency_key=idempotency_key,
+            )
+            scheduled_job.last_job_id = job.id
+            scheduled_job.last_status = job.status
+            scheduled_job.last_error = None
+            scheduled_job.consecutive_failures = 0
+            self.db.commit()
+            return job
+        except Exception as error:
+            scheduled_job.last_status = "FAILED"
+            scheduled_job.last_error = str(error)[:1000]
+            scheduled_job.consecutive_failures += 1
+            self.db.commit()
+            raise
+
+    def _dispatch_scheduled_job(
+        self,
+        scheduled_job: ScheduledJob,
+        *,
+        idempotency_key: str,
+    ) -> Job:
+        parameters = scheduled_job.parameters or {}
+        operation = parameters.get("operation")
+        service = LibroMayorJobService(self.db)
+
+        if scheduled_job.job_type == JobType.LEDGER_SYNC_DELTA.value:
+            if operation == "sync_delta_all":
+                return service.enqueue_sync_delta_all(
+                    user_id=scheduled_job.created_by,
+                    idempotency_key=idempotency_key,
+                    batch_size=scheduled_job.batch_size,
+                    scheduled_job_id=scheduled_job.id,
+                )
+            return service.enqueue_sync_delta(
+                account=parameters["account"],
+                start_date=self._parse_date(parameters.get("start_date")),
+                end_date=self._parse_date(parameters.get("end_date")),
+                user_id=scheduled_job.created_by,
+                idempotency_key=idempotency_key,
+                batch_size=scheduled_job.batch_size,
+                scheduled_job_id=scheduled_job.id,
+            )
+
+        if scheduled_job.job_type == JobType.LEDGER_SYNC.value:
+            return service.enqueue_sync(
+                account=parameters["account"],
+                start_date=self._parse_required_date(parameters.get("start_date")),
+                end_date=self._parse_required_date(parameters.get("end_date")),
+                user_id=scheduled_job.created_by,
+                idempotency_key=idempotency_key,
+                batch_size=scheduled_job.batch_size,
+                scheduled_job_id=scheduled_job.id,
+            )
+
+        if scheduled_job.job_type == JobType.LEDGER_REPROCESS.value:
+            return service.enqueue_reprocess_date_range(
+                account=parameters["account"],
+                start_date=self._parse_required_date(parameters.get("start_date")),
+                end_date=self._parse_required_date(parameters.get("end_date")),
+                user_id=scheduled_job.created_by,
+                idempotency_key=idempotency_key,
+                batch_size=scheduled_job.batch_size,
+                scheduled_job_id=scheduled_job.id,
+            )
+
+        raise ValidationError("Tipo de tarea programada no soportado")
+
+    @staticmethod
+    def calculate_next_run(
+        *,
+        schedule_kind: str,
+        schedule_config: dict,
+        tz_name: str,
+        after: datetime | None = None,
+    ) -> datetime:
+        return calculate_next_run(
+            schedule_kind=schedule_kind,
+            schedule_config=schedule_config,
+            tz_name=tz_name,
+            after=after,
+        )
+
+    @staticmethod
+    def _build_idempotency_key(
+        scheduled_job: ScheduledJob,
+        due_at: datetime,
+        manual: bool,
+    ) -> str:
+        prefix = "manual" if manual else "scheduled"
+        slot = due_at.astimezone(timezone.utc).strftime("%Y%m%d%H%M%S")
+        return f"{prefix}:{scheduled_job.id}:{slot}"
+
+    @staticmethod
+    def _parse_date(value) -> date | None:
+        if value is None:
+            return None
+        if isinstance(value, date):
+            return value
+        return date.fromisoformat(value)
+
+    @classmethod
+    def _parse_required_date(cls, value) -> date:
+        parsed = cls._parse_date(value)
+        if not parsed:
+            raise ValidationError("La fecha es obligatoria para esta tarea")
+        return parsed

@@ -10,6 +10,12 @@ class JobType(StrEnum):
     LEDGER_REPROCESS = "LEDGER_REPROCESS"
 
 
+class ScheduledJobScheduleKind(StrEnum):
+    DAILY = "DAILY"
+    INTERVAL_MINUTES = "INTERVAL_MINUTES"
+    WINDOW_INTERVAL = "WINDOW_INTERVAL"
+
+
 class JobStatus(StrEnum):
     CREATED = "CREATED"
     QUEUED = "QUEUED"
@@ -60,3 +66,6 @@ JOBS_VIEW_ALL_PERMISSION = "jobs.view_all"
 JOBS_CANCEL_PERMISSION = "jobs.cancel"
 JOBS_CANCEL_ALL_PERMISSION = "jobs.cancel_all"
 JOBS_RETRY_PERMISSION = "jobs.retry"
+SCHEDULED_JOBS_VIEW_PERMISSION = "scheduled_jobs.view"
+SCHEDULED_JOBS_EDIT_PERMISSION = "scheduled_jobs.edit"
+SCHEDULED_JOBS_RUN_PERMISSION = "scheduled_jobs.run"

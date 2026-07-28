@@ -76,6 +76,8 @@ services:
   worker-heavy:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
+    mem_limit: ${WORKER_HEAVY_MEM_LIMIT:-2g}
+    cpus: "${WORKER_HEAVY_CPUS:-2.0}"
     env_file:
       - path: .env
         required: false
@@ -109,6 +111,8 @@ services:
   worker-light:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
+    mem_limit: ${WORKER_LIGHT_MEM_LIMIT:-1g}
+    cpus: "${WORKER_LIGHT_CPUS:-2.0}"
     env_file:
       - path: .env
         required: false
@@ -142,6 +146,8 @@ services:
   worker-email:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
+    mem_limit: ${WORKER_EMAIL_MEM_LIMIT:-1g}
+    cpus: "${WORKER_EMAIL_CPUS:-1.0}"
     env_file:
       - path: .env
         required: false
@@ -169,6 +175,39 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    networks:
+      - finance-network
+
+  scheduler:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    mem_limit: ${SCHEDULER_MEM_LIMIT:-512m}
+    cpus: "${SCHEDULER_CPUS:-0.5}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "beat",
+        "--loglevel=INFO",
+        "--schedule=/tmp/celerybeat-schedule",
+      ]
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     networks:
       - finance-network
 

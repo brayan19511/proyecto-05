@@ -48,6 +48,7 @@ class JobService:
         batch_size: int,
         idempotency_key: str | None = None,
         parent_job_id: UUID | None = None,
+        scheduled_job_id: UUID | None = None,
         encrypted_secrets: str | None = None,
         item_payloads: dict[str, dict | list | str] | None = None,
     ) -> Job:
@@ -75,6 +76,7 @@ class JobService:
         job = Job(
             id=uuid4(),
             parent_job_id=parent_job_id,
+            scheduled_job_id=scheduled_job_id,
             job_type=job_type,
             status=JobStatus.CREATED.value,
             parameters=parameters,
@@ -141,6 +143,7 @@ class JobService:
         mine: bool,
         job_type: str | None,
         status: str | None,
+        scheduled_job_id: UUID | None,
         limit: int,
         offset: int,
     ) -> JobPageResponse:
@@ -149,6 +152,7 @@ class JobService:
             user_id=user_filter,
             job_type=job_type,
             status=status,
+            scheduled_job_id=scheduled_job_id,
             limit=limit,
             offset=offset,
         )
@@ -287,6 +291,7 @@ class JobService:
             user_id=user_id,
             batch_size=batch_size,
             parent_job_id=job.id,
+            scheduled_job_id=job.scheduled_job_id,
             encrypted_secrets=job.encrypted_secrets,
             item_payloads=item_payloads or None,
         )

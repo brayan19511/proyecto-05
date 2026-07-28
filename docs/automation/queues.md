@@ -85,8 +85,7 @@ crea un job hijo que contiene solamente los items fallidos.
 
 ### Libro mayor programado
 
-Para tareas programadas no uses el endpoint sincronico. Usa el endpoint async
-para que la peticion HTTP solo cree el job y el worker procese en segundo plano.
+Para tareas externas puedes usar el endpoint async directamente:
 
 ```http
 POST /api/libro-mayor/sync-delta-all-async?batch_size=1
@@ -104,6 +103,45 @@ adicionales:
 La clave idempotente cambia por hora (`yyyyMMdd-HH`). Asi una
 ejecucion de las 04:00 y otra de las 08:00 pueden crear jobs distintos, pero un
 reintento de la misma hora reutiliza el job ya creado.
+
+Si quieres que la aplicacion administre el calendario, crea una tarea
+programada. Por ahora este flujo esta pensado para libro mayor:
+
+```http
+POST /api/scheduled-jobs
+```
+
+```json
+{
+  "name": "Libro mayor delta laboral",
+  "job_type": "LEDGER_SYNC_DELTA",
+  "enabled": true,
+  "schedule_kind": "WINDOW_INTERVAL",
+  "schedule_config": {
+    "weekdays": [0, 1, 2, 3, 4],
+    "start_time": "08:00",
+    "end_time": "18:00",
+    "minutes": 240
+  },
+  "parameters": {"operation": "sync_delta_all"},
+  "batch_size": 1,
+  "timezone": "America/Lima"
+}
+```
+
+Tipos de calendario soportados:
+
+- `DAILY`: una o varias horas fijas, por ejemplo `{"times": ["12:00"]}`.
+- `INTERVAL_MINUTES`: cada cierto numero de minutos, por ejemplo `{"minutes": 135}` para cada 2h15.
+- `WINDOW_INTERVAL`: dentro de una ventana, por ejemplo lunes a viernes de 08:00 a 18:00 cada 4 horas.
+
+El servicio `scheduler` despierta cada minuto, busca tareas vencidas en
+`jobs.scheduled_jobs` y crea ejecuciones reales en `jobs.jobs`. El historico se
+consulta con:
+
+```http
+GET /api/jobs?scheduled_job_id=<id>
+```
 
 ## Cancelacion
 
@@ -142,12 +180,24 @@ Para escalar, aumenta replicas o concurrencia solo despues de medir la capacidad
 de SAP y PostgreSQL. No combines varios workers con concurrencias altas sin
 calcular la concurrencia total.
 
+Los workers tienen limites Docker configurables (`WORKER_HEAVY_MEM_LIMIT`,
+`WORKER_HEAVY_CPUS`, etc.) y Celery recicla procesos con
+`CELERY_WORKER_MAX_TASKS_PER_CHILD` y
+`CELERY_WORKER_MAX_MEMORY_PER_CHILD_KB`. Si una tarea consume demasiada memoria,
+Docker puede terminar solo ese worker; la API queda separada y el job conserva
+estado para revision/reintento.
+
+Si el mismo lote cae repetidamente por memoria, no conviene reintentarlo sin
+cambios. Baja la concurrencia o `batch_size`, divide mas el rango, o aumenta
+`WORKER_HEAVY_MEM_LIMIT` segun el servidor. El objetivo es fallar de forma
+aislada y observable, no dejar que el proceso tumbe toda la aplicacion.
+
 ## Operacion
 
 ```bash
 docker compose up -d rabbitmq
 docker compose run --rm api alembic upgrade head
-docker compose up -d api worker-light worker-heavy worker-email
+docker compose up -d api scheduler worker-light worker-heavy worker-email
 docker compose logs -f worker-heavy
 ```
 
