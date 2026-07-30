@@ -1,7 +1,7 @@
 # app/api/provisions/provision/provision_router.py
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.finance.provisions.provision.provision_schema import (
@@ -20,9 +20,9 @@ from app.api.finance.provisions.access import (
     can_view_all_provisions,
 )
 from app.api.finance.provisions.provision.provision_service import ProvisionService
-from app.core.access import get_permission_codes, is_admin
+from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
-from app.core.security import PermissionChecker, get_current_user
+from app.core.security import PermissionChecker
 
 router = APIRouter()
 
@@ -31,60 +31,29 @@ def get_service(db: Session = Depends(get_db)):
     return ProvisionService(db)
 
 
-def require_provision_view(current_user=Depends(get_current_user)):
-    permissions = get_permission_codes(current_user)
+# Checkers de permisos reutilizando el helper común (bypass de admin incluido).
+require_provision_view = require_any_permission(
+    "provisions.view",
+    "provisions.view_all",
+    "provisions.edit",
+    "provisions.edit_all",
+    "provisions.review",
+    detail="No tienes permisos para ver provisiones",
+)
 
-    if is_admin(current_user) or permissions.intersection(
-        {
-            "provisions.view",
-            "provisions.view_all",
-            "provisions.edit",
-            "provisions.edit_all",
-            "provisions.review",
-        }
-    ):
-        return current_user
+require_provision_edit = require_any_permission(
+    "provisions.edit",
+    "provisions.edit_all",
+    "provisions.documents.edit",
+    detail="No tienes permisos para editar provisiones",
+)
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="No tienes permisos para ver provisiones",
-    )
-
-
-def require_provision_edit(current_user=Depends(get_current_user)):
-    permissions = get_permission_codes(current_user)
-
-    if is_admin(current_user) or permissions.intersection(
-        {
-            "provisions.edit",
-            "provisions.edit_all",
-            "provisions.documents.edit",
-        }
-    ):
-        return current_user
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="No tienes permisos para editar provisiones",
-    )
-
-
-def require_provision_access_edit(current_user=Depends(get_current_user)):
-    permissions = get_permission_codes(current_user)
-
-    if is_admin(current_user) or permissions.intersection(
-        {
-            "provisions.edit",
-            "provisions.edit_all",
-            "provisions.access.edit",
-        }
-    ):
-        return current_user
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="No tienes permisos para administrar accesos de provisiones",
-    )
+require_provision_access_edit = require_any_permission(
+    "provisions.edit",
+    "provisions.edit_all",
+    "provisions.access.edit",
+    detail="No tienes permisos para administrar accesos de provisiones",
+)
 
 
 @router.post("", response_model=ProvisionSummaryResponse)

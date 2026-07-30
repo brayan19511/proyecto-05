@@ -6,6 +6,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
+from app.core.db.session import make_session_factory, session_scope
 
 
 @lru_cache
@@ -22,24 +23,12 @@ def get_ofisis_engine(database: str) -> Engine:
 @lru_cache
 def get_ofisis_session_factory(database: str) -> sessionmaker[Session]:
     """Reuse the session configuration associated with each engine."""
-    return sessionmaker(
-        bind=get_ofisis_engine(database),
-        autoflush=False,
-        autocommit=False,
-        expire_on_commit=False,
-    )
+    return make_session_factory(get_ofisis_engine(database))
 
 
 def get_db_ofisis(database: str) -> Generator[Session, None, None]:
     """Open one transactional session for the duration of a request."""
-    db = get_ofisis_session_factory(database)()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    yield from session_scope(get_ofisis_session_factory(database))
 
 
 def get_db_ofisis_ecomm() -> Generator[Session, None, None]:

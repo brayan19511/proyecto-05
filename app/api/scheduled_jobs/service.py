@@ -66,13 +66,7 @@ class ScheduledJobService:
             limit=limit,
             offset=offset,
         )
-        return ScheduledJobPageResponse(
-            items=items,
-            total=total,
-            limit=limit,
-            offset=offset,
-            has_more=offset + len(items) < total,
-        )
+        return ScheduledJobPageResponse.build(items, total, limit, offset)
 
     def get(self, scheduled_job_id: UUID) -> ScheduledJob:
         scheduled_job = self.repository.get_by_id(scheduled_job_id)

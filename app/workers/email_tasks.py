@@ -7,6 +7,7 @@ from app.api.finance.payment_provider.email_job_processor import (
 )
 from app.core.db.db_postgres import SessionLocal
 from app.workers.celery_app import celery_app
+from app.workers.common import retry_countdown
 
 
 @celery_app.task(
@@ -40,5 +41,5 @@ def process_payment_provider_email_batch(self, batch_id: str):
                 raise
             raise self.retry(
                 exc=exc,
-                countdown=min(30 * (2 ** self.request.retries), 180),
+                countdown=retry_countdown(self.request.retries, 180),
             )

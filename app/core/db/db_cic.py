@@ -6,6 +6,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
+from app.core.db.session import make_session_factory, session_scope
 
 
 @lru_cache
@@ -21,21 +22,9 @@ def get_cic_engine() -> Engine:
 
 @lru_cache
 def get_cic_session_factory() -> sessionmaker[Session]:
-    return sessionmaker(
-        bind=get_cic_engine(),
-        autoflush=False,
-        autocommit=False,
-        expire_on_commit=False,
-    )
+    return make_session_factory(get_cic_engine())
 
 
 def get_db_cic() -> Generator[Session, None, None]:
     """Open a request-scoped CIC session and always release its connection."""
-    db = get_cic_session_factory()()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    yield from session_scope(get_cic_session_factory())

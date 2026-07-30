@@ -1,16 +1,14 @@
-from app.core.access import get_permission_codes, is_admin
+from app.core.access import has_permission
 
 
 def can_view_all_provisions(user) -> bool:
-    permissions = get_permission_codes(user)
-    return (
-        is_admin(user)
-        or "provisions.view_all" in permissions
-        or "provisions.edit_all" in permissions
-        or "provisions.review" in permissions
+    return has_permission(
+        user,
+        "provisions.view_all",
+        "provisions.edit_all",
+        "provisions.review",
     )
 
 
 def can_edit_all_provisions(user) -> bool:
-    permissions = get_permission_codes(user)
-    return is_admin(user) or "provisions.edit_all" in permissions
+    return has_permission(user, "provisions.edit_all")

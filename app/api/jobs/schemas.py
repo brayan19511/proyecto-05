@@ -2,8 +2,6 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
-
 from app.api.jobs.constants import (
     JobBatchStatus,
     JobItemStatus,
@@ -11,11 +9,10 @@ from app.api.jobs.constants import (
     JobTriggerSource,
     JobType,
 )
+from app.core.schemas import ORMModel, PageResponse
 
 
-class JobBatchResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class JobBatchResponse(ORMModel):
     id: UUID
     sequence: int
     status: JobBatchStatus
@@ -30,9 +27,7 @@ class JobBatchResponse(BaseModel):
     error_summary: str | None
 
 
-class JobSummaryResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class JobSummaryResponse(ORMModel):
     id: UUID
     parent_job_id: UUID | None
     scheduled_job_id: UUID | None
@@ -61,17 +56,11 @@ class JobDetailResponse(JobSummaryResponse):
     batches: list[JobBatchResponse]
 
 
-class JobPageResponse(BaseModel):
-    items: list[JobSummaryResponse]
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
+# Listado paginado estándar (ver app/core/schemas.py).
+JobPageResponse = PageResponse[JobSummaryResponse]
 
 
-class JobItemResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class JobItemResponse(ORMModel):
     id: UUID
     batch_id: UUID
     reference: str
@@ -84,9 +73,4 @@ class JobItemResponse(BaseModel):
     finished_at: datetime | None
 
 
-class JobItemPageResponse(BaseModel):
-    items: list[JobItemResponse]
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
+JobItemPageResponse = PageResponse[JobItemResponse]

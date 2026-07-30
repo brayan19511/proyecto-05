@@ -28,28 +28,35 @@ def has_any_permission(user, permission_codes: Iterable[str]) -> bool:
     return bool(get_permission_codes(user).intersection(permission_codes))
 
 
+def has_permission(user, *permission_codes: str) -> bool:
+    """True si el usuario es admin o tiene alguno de los permisos indicados."""
+    return is_admin(user) or has_any_permission(user, permission_codes)
+
+
 class AnyPermissionChecker:
-    def __init__(self, *permission_codes: str):
+    def __init__(self, *permission_codes: str, detail: str | None = None):
         if not permission_codes:
             raise ValueError("At least one permission code is required")
 
         self.permission_codes = frozenset(permission_codes)
+        # Mensaje 403 personalizado; si no se indica se lista los permisos.
+        self.detail = detail or (
+            "No tienes ninguno de los permisos requeridos: "
+            f"{', '.join(sorted(self.permission_codes))}"
+        )
 
     def __call__(self, current_user=Depends(get_current_user)):
-        if is_admin(current_user) or has_any_permission(
-            current_user,
-            self.permission_codes,
-        ):
+        if has_permission(current_user, *self.permission_codes):
             return current_user
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "No tienes ninguno de los permisos requeridos: "
-                f"{', '.join(sorted(self.permission_codes))}"
-            ),
+            detail=self.detail,
         )
 
 
-def require_any_permission(*permission_codes: str) -> AnyPermissionChecker:
-    return AnyPermissionChecker(*permission_codes)
+def require_any_permission(
+    *permission_codes: str,
+    detail: str | None = None,
+) -> AnyPermissionChecker:
+    return AnyPermissionChecker(*permission_codes, detail=detail)

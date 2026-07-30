@@ -1,21 +1,11 @@
 from datetime import datetime
-from uuid import UUID
 
-from sqlalchemy.orm import Session
-
+from app.core.db.base_repository import BaseRepository
 from app.models.jobs import ScheduledJob
 
 
-class ScheduledJobRepository:
-    def __init__(self, db: Session):
-        self.db = db
-
-    def get_by_id(self, scheduled_job_id: UUID) -> ScheduledJob | None:
-        return (
-            self.db.query(ScheduledJob)
-            .filter(ScheduledJob.id == scheduled_job_id)
-            .first()
-        )
+class ScheduledJobRepository(BaseRepository[ScheduledJob]):
+    model = ScheduledJob
 
     def get_by_name(self, name: str) -> ScheduledJob | None:
         return self.db.query(ScheduledJob).filter(ScheduledJob.name == name).first()
@@ -30,14 +20,8 @@ class ScheduledJobRepository:
         query = self.db.query(ScheduledJob)
         if enabled is not None:
             query = query.filter(ScheduledJob.enabled == enabled)
-        total = query.count()
-        items = (
-            query.order_by(ScheduledJob.next_run_at, ScheduledJob.name)
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
-        return items, total
+        query = query.order_by(ScheduledJob.next_run_at, ScheduledJob.name)
+        return self.paginate(query, limit=limit, offset=offset)
 
     def list_due_jobs(self, *, now: datetime, limit: int) -> list[ScheduledJob]:
         return (

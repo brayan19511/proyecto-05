@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.db.db_postgres import SessionLocal
 from app.core.exceptions import SAPConnectionError
 from app.workers.celery_app import celery_app
+from app.workers.common import BATCH_TIMEOUT_MESSAGE, retry_countdown
 
 
 @celery_app.task(
@@ -35,14 +36,11 @@ def process_sap_batch(self, batch_id: str):
             processor.mark_retrying(parsed_batch_id, error)
             raise self.retry(
                 exc=exc,
-                countdown=min(30 * (2 ** self.request.retries), 300),
+                countdown=retry_countdown(self.request.retries, 300),
             )
         except SoftTimeLimitExceeded:
             # El limite evita que un lote se quede colgado indefinidamente.
-            processor.mark_failed(
-                parsed_batch_id,
-                "El lote excedio el tiempo permitido",
-            )
+            processor.mark_failed(parsed_batch_id, BATCH_TIMEOUT_MESSAGE)
             raise
         except Exception:
             # Se guarda un error seguro para el usuario y el detalle queda en

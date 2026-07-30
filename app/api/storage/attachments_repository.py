@@ -1,16 +1,11 @@
 from uuid import UUID
 
-from sqlalchemy.orm import Session
-
+from app.core.db.base_repository import BaseRepository
 from app.models.storage import Attachment
 
 
-class AttachmentRepository:
-    def __init__(self, db: Session):
-        self.db = db
-
-    def get_by_id(self, attachment_id: UUID):
-        return self.db.get(Attachment, attachment_id)
+class AttachmentRepository(BaseRepository[Attachment]):
+    model = Attachment
 
     def get_by_entity(
         self,
@@ -27,8 +22,7 @@ class AttachmentRepository:
         )
 
     def create(self, attachment: Attachment):
-        self.db.add(attachment)
-        return attachment
+        return self.add(attachment)
 
     def update(self, attachment: Attachment, data: dict):
         for key, value in data.items():
@@ -50,12 +44,6 @@ class AttachmentRepository:
             self.db.delete(attachment)
 
         return len(attachments)
-
-    def commit(self):
-        self.db.commit()
-
-    def rollback(self):
-        self.db.rollback()
 
     def refresh(self, attachment: Attachment):
         self.db.refresh(attachment)

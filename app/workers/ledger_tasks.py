@@ -8,6 +8,7 @@ from app.api.finance.libro_mayor.service.libro_mayor_job_processor import (
 from app.core.config import settings
 from app.core.db.db_postgres import SessionLocal
 from app.workers.celery_app import celery_app
+from app.workers.common import BATCH_TIMEOUT_MESSAGE
 
 
 @celery_app.task(
@@ -29,10 +30,7 @@ def process_ledger_batch(self, batch_id: str):
         try:
             return processor.process(parsed_batch_id, self.request.id)
         except SoftTimeLimitExceeded:
-            processor.mark_failed(
-                parsed_batch_id,
-                "El lote excedio el tiempo permitido",
-            )
+            processor.mark_failed(parsed_batch_id, BATCH_TIMEOUT_MESSAGE)
             raise
         except Exception:
             processor.mark_failed(

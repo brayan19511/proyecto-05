@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.core.schemas import ORMModel
+
 
 class ApiKeyCreateRequest(BaseModel):
     name: str
@@ -15,14 +17,11 @@ class ApiKeyUpdateRequest(BaseModel):
     active: bool | None = None
 
 
-class ApiKeyResponse(BaseModel):
+class ApiKeyResponse(ORMModel):
     id: UUID
     name: str
     active: bool
     expires_at: datetime | None
-
-    class Config:
-        from_attributes = True
 
 
 class ApiKeyCreatedResponse(BaseModel):

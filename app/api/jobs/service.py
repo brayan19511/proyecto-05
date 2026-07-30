@@ -159,13 +159,7 @@ class JobService:
             limit=limit,
             offset=offset,
         )
-        return JobPageResponse(
-            items=items,
-            total=total,
-            limit=limit,
-            offset=offset,
-            has_more=offset + len(items) < total,
-        )
+        return JobPageResponse.build(items, total, limit, offset)
 
     def get_job(
         self,
@@ -197,13 +191,7 @@ class JobService:
             limit=limit,
             offset=offset,
         )
-        return JobItemPageResponse(
-            items=items,
-            total=total,
-            limit=limit,
-            offset=offset,
-            has_more=offset + len(items) < total,
-        )
+        return JobItemPageResponse.build(items, total, limit, offset)
 
     def cancel_job(
         self,

@@ -19,11 +19,7 @@ from app.api.jobs.schemas import (
     JobPageResponse,
 )
 from app.api.jobs.service import JobService
-from app.core.access import (
-    get_permission_codes,
-    is_admin,
-    require_any_permission,
-)
+from app.core.access import has_permission, require_any_permission
 from app.core.config import settings
 from app.core.db.db_postgres import get_db
 from app.workers.dispatcher import dispatch_job
@@ -34,10 +30,6 @@ router = APIRouter(prefix="/jobs", tags=["JOBS"])
 
 def get_job_service(db: Session = Depends(get_db)) -> JobService:
     return JobService(db, dispatcher=dispatch_job)
-
-
-def _has_permission(user, permission: str) -> bool:
-    return is_admin(user) or permission in get_permission_codes(user)
 
 
 @router.get("", response_model=JobPageResponse)
@@ -55,7 +47,7 @@ def get_jobs(
 ):
     return service.list_jobs(
         current_user_id=current_user.id,
-        can_view_all=_has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
+        can_view_all=has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
         mine=mine,
         job_type=job_type.value if job_type else None,
         status=status.value if status else None,
@@ -76,7 +68,7 @@ def get_job(
     return service.get_job(
         job_id,
         user_id=current_user.id,
-        can_view_all=_has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
+        can_view_all=has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
     )
 
 
@@ -94,7 +86,7 @@ def get_job_items(
     return service.list_items(
         job_id,
         user_id=current_user.id,
-        can_view_all=_has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
+        can_view_all=has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
         status=item_status.value if item_status else None,
         limit=limit,
         offset=offset,
@@ -115,7 +107,7 @@ def cancel_job(
     return service.cancel_job(
         job_id,
         user_id=current_user.id,
-        can_cancel_all=_has_permission(
+        can_cancel_all=has_permission(
             current_user,
             JOBS_CANCEL_ALL_PERMISSION,
         ),
@@ -131,6 +123,6 @@ def retry_job(
     return service.retry_job(
         job_id,
         user_id=current_user.id,
-        can_retry_all=_has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
+        can_retry_all=has_permission(current_user, JOBS_VIEW_ALL_PERMISSION),
         batch_size=settings.SAP_JOB_BATCH_SIZE,
     )

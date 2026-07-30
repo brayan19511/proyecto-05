@@ -1,20 +1,16 @@
 # app\api\security\api_key\api_key_repository.py
 
 from uuid import UUID
-from sqlalchemy.orm import Session
+
+from app.core.db.base_repository import BaseRepository
 from app.models.auth.security_model import ApiKey
 
 
-class ApiKeyRepository:
-    def __init__(self, db: Session):
-        self.db = db
+class ApiKeyRepository(BaseRepository[ApiKey]):
+    model = ApiKey
 
     def create(self, api_key: ApiKey):
-        self.db.add(api_key)
-        return api_key
-
-    def get_by_id(self, api_key_id: UUID):
-        return self.db.query(ApiKey).filter(ApiKey.id == api_key_id).first()
+        return self.add(api_key)
 
     def get_by_id_and_user(self, api_key_id: UUID, user_id: UUID):
         return (
@@ -32,9 +28,3 @@ class ApiKeyRepository:
 
     def get_by_user(self, user_id: UUID):
         return self.db.query(ApiKey).filter(ApiKey.user_id == user_id).all()
-
-    def commit(self):
-        self.db.commit()
-
-    def rollback(self):
-        self.db.rollback()

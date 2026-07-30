@@ -1,39 +1,25 @@
-# # app\api\libro_mayor\libro_mayor_schema.py
-# from datetime import date
-# from typing import List, Optional
-
-# from pydantic import BaseModel, Field, computed_field
-
-
-
-
-# class ReprocessDateRangeRequest(BaseModel):
-#     account: str
-#     start_date: date
-#     end_date: date
-
-#     @field_validator("account")
-#     @classmethod
-#     def validate_account(cls, value: str):
-#         if value not in {"95", "97"}:
-#             raise ValueError("Cuenta soportada: 95 o 97")
-#         return value
-
-#     @field_validator("end_date")
-#     @classmethod
-#     def validate_dates(cls, end_date: date, info):
-#         start_date = info.data.get("start_date")
-
-#         if start_date and end_date < start_date:
-#             raise ValueError("La fecha fin no puede ser menor a la fecha inicio")
-
-#         return end_date
 from datetime import date
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    Field,
+    computed_field,
+    field_validator,
+)
+
+from app.api.finance.libro_mayor.constants import SUPPORTED_ACCOUNTS
 
 
-from typing import Optional
+def _validar_cuenta(value: str) -> str:
+    if value not in SUPPORTED_ACCOUNTS:
+        raise ValueError("Cuenta soportada: 95 o 97")
+    return value
+
+
+# Tipo reutilizable: valida que la cuenta sea una de las soportadas (95/97).
+AccountCode = Annotated[str, AfterValidator(_validar_cuenta)]
 
 class LibroMayorSap(BaseModel):
     fecha_contabilizacion: str
@@ -141,42 +127,21 @@ class LibroMayorResponse(BaseModel):
 
 
 class SyncRequest(BaseModel):
-    account: str
+    account: AccountCode
     start_date: date
     end_date: date
-
-    @field_validator("account")
-    @classmethod
-    def validate_account(cls, value: str):
-        if value not in {"95", "97"}:
-            raise ValueError("Cuenta soportada: 95 o 97")
-        return value
 
 
 class SyncDeltaRequest(BaseModel):
-    account: str
+    account: AccountCode
     start_date: date | None = None
     end_date: date | None = None
 
-    @field_validator("account")
-    @classmethod
-    def validate_account(cls, value: str):
-        if value not in {"95", "97"}:
-            raise ValueError("Cuenta soportada: 95 o 97")
-        return value
-
 
 class ReprocessDateRangeRequest(BaseModel):
-    account: str
+    account: AccountCode
     start_date: date
     end_date: date
-
-    @field_validator("account")
-    @classmethod
-    def validate_account(cls, value: str):
-        if value not in {"95", "97"}:
-            raise ValueError("Cuenta soportada: 95 o 97")
-        return value
 
     @field_validator("end_date")
     @classmethod

@@ -2,9 +2,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.api.jobs.constants import JobType, ScheduledJobScheduleKind
+from app.core.schemas import ORMModel, PageResponse
 
 
 class ScheduledJobBase(BaseModel):
@@ -97,9 +98,7 @@ class ScheduledJobUpdate(BaseModel):
     next_run_at: datetime | None = None
 
 
-class ScheduledJobResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
+class ScheduledJobResponse(ORMModel):
     id: UUID
     name: str
     job_type: JobType
@@ -121,9 +120,4 @@ class ScheduledJobResponse(BaseModel):
     updated_at: datetime
 
 
-class ScheduledJobPageResponse(BaseModel):
-    items: list[ScheduledJobResponse]
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
+ScheduledJobPageResponse = PageResponse[ScheduledJobResponse]

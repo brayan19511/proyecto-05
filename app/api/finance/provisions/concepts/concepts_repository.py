@@ -1,15 +1,15 @@
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import joinedload
 
 from app.api.finance.provisions.concepts.concepts_schema import (
     ConceptCreateRequest,
     ConceptUpdateRequest,
 )
+from app.core.db.base_repository import BaseRepository
 from app.models.finance.provision_model import ProvisionConcept
 
 
-class ConceptsRepository:
-    def __init__(self, db: Session):
-        self.db = db
+class ConceptsRepository(BaseRepository[ProvisionConcept]):
+    model = ProvisionConcept
 
     def get_concepts(self, search: str | None = None):
         # Placeholder for fetching concepts from the database
@@ -46,8 +46,7 @@ class ConceptsRepository:
         new_concept = ProvisionConcept(
             **concept_data.model_dump(), created_by=current_user_id
         )
-        self.db.add(new_concept)
-        return new_concept
+        return self.add(new_concept)
 
     def update_concept(
         self, concept_id: int, concept_data: ConceptUpdateRequest, current_user_id: int
@@ -68,9 +67,3 @@ class ConceptsRepository:
             concept.updated_by = current_user_id
             return True
         return False
-
-    def commit(self):
-        self.db.commit()
-
-    def rollback(self):
-        self.db.rollback()
