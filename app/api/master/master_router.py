@@ -16,9 +16,12 @@ from app.api.master.master_schema import (
     CompanyUpdateRequest,
     CurrencyCreateRequest,
     CurrencyUpdateRequest,
+    MailingParameterCreateRequest,
+    MailingParameterResponse,
+    MailingParameterUpdateRequest,
 )
 
-router = APIRouter(prefix="/master", tags=["Master"])
+router = APIRouter(prefix="/master", tags=["MASTER"])
 
 
 def get_master_service(db=Depends(get_db)) -> MasterService:
@@ -142,6 +145,62 @@ def delete_currency(
     ),
 ):
     return service.delete_currency(currency_id, current_user.id)
+
+
+@router.get("/mailing-parameters", response_model=list[MailingParameterResponse])
+def get_mailing_parameters(
+    search: str | None = None,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.data.view", "master.data.edit"),
+    ),
+):
+    return service.get_mailing_parameters(search)
+
+
+@router.get(
+    "/mailing-parameters/{parameter_id}",
+    response_model=MailingParameterResponse,
+)
+def get_mailing_parameter_by_id(
+    parameter_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.data.view", "master.data.edit"),
+    ),
+):
+    return service.get_mailing_parameter_by_id(parameter_id)
+
+
+@router.post("/mailing-parameters", response_model=MailingParameterResponse)
+def create_mailing_parameter(
+    request: MailingParameterCreateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(require_any_permission("master.data.edit")),
+):
+    return service.create_mailing_parameter(request, current_user.id)
+
+
+@router.patch(
+    "/mailing-parameters/{parameter_id}",
+    response_model=MailingParameterResponse,
+)
+def update_mailing_parameter(
+    parameter_id: int,
+    request: MailingParameterUpdateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(require_any_permission("master.data.edit")),
+):
+    return service.update_mailing_parameter(parameter_id, request, current_user.id)
+
+
+@router.delete("/mailing-parameters/{parameter_id}")
+def delete_mailing_parameter(
+    parameter_id: int,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(require_any_permission("master.data.edit")),
+):
+    return service.delete_mailing_parameter(parameter_id, current_user.id)
 
 
 @router.get("/area")

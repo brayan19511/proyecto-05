@@ -49,6 +49,12 @@ DB_SAP_HOST=
 DB_SAP_PORT=
 SAP_URL=
 
+RABBITMQ_DEFAULT_USER=finance
+RABBITMQ_DEFAULT_PASS=change-me
+CELERY_BROKER_URL=amqp://finance:change-me@rabbitmq:5672//
+SAP_JOB_BATCH_SIZE=200
+JOB_CREDENTIALS_KEY=
+
 BACKEND_CORS_ORIGINS=https://finance.example.com
 ```
 
@@ -84,6 +90,8 @@ docker compose up -d
 ```bash
 docker compose ps
 docker compose logs --tail=100 api
+docker compose logs --tail=100 scheduler
+docker compose logs --tail=100 worker-heavy
 curl -f http://localhost:8080/health/ready
 ```
 

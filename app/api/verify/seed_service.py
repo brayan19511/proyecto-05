@@ -3,13 +3,29 @@ from sqlalchemy.orm import Session
 from uuid6 import uuid7
 
 from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
-from app.api.provisions.constants import (
+from app.api.jobs.constants import (
+    JOBS_CANCEL_ALL_PERMISSION,
+    JOBS_CANCEL_PERMISSION,
+    JOBS_RETRY_PERMISSION,
+    JOBS_VIEW_ALL_PERMISSION,
+    JOBS_VIEW_PERMISSION,
+    JobType,
+    SCHEDULED_JOBS_EDIT_PERMISSION,
+    SCHEDULED_JOBS_RUN_PERMISSION,
+    SCHEDULED_JOBS_VIEW_PERMISSION,
+    ScheduledJobScheduleKind,
+)
+from app.api.scheduled_jobs.schedule import calculate_next_run
+from app.api.finance.provisions.constants import (
     APPROVED_STATUS,
     CANCELLED_STATUS,
     PENDING_DETAIL_STATUS,
     READY_FOR_REVIEW_STATUS,
     REJECTED_FINAL_STATUS,
     REJECTED_FOR_EDIT_STATUS,
+)
+from app.api.finance.payment_provider.constants import (
+    DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
 )
 from app.api.sales_channel.permissions import (
     PROMOTION_EDIT_PERMISSION,
@@ -29,6 +45,8 @@ from app.models.auth.security_model import (
 )
 from app.models.auth.user_model import Information
 from app.models.finance.provision_model import ProvisionStatus
+from app.models.jobs import ScheduledJob
+from app.models.master.mailing_parameter_model import MailingParameter
 from app.models.master.master_model import Area, Company, Currency
 
 ADMIN_EMAIL = "admin@admin.com"
@@ -84,6 +102,22 @@ CURRENCIES = [
     },
 ]
 
+# Cada flujo debe tener un unico parametro por defecto para evitar aliases
+# silenciosos y facilitar que el frontend sepa que configuracion esta usando.
+MAILING_PARAMETERS = [
+    {
+        "name": DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
+        "template": "payment_provider_summary.html",
+        "template_html": None,
+        "template_text": None,
+        "mp_from": "Coolbox <no-reply@coolbox.com.pe>",
+        "to": None,
+        "subject": "CONSTANCIA DE PAGO {{ proveedor }} || RASH PERU",
+        "cc": None,
+        "bcc": None,
+    },
+]
+
 PERMISSIONS = [
     {"code": "sap.read", "description": "Ver datos de SAP"},
     {"code": "sap.write", "description": "Modificar datos en SAP"},
@@ -99,6 +133,7 @@ PERMISSIONS = [
     {"code": "master.currency.edit", "description": "Gestionar monedas"},
     {"code": "master.area.view", "description": "Ver areas"},
     {"code": "master.area.edit", "description": "Gestionar areas"},
+    {"code": "master.data.view", "description": "Ver datos maestros generales"},
     {"code": "master.data.edit", "description": "Editar datos maestros"},
     {"code": "provisions.create", "description": "Crear provisiones"},
     {"code": "provisions.submit", "description": "Enviar provisiones a revision"},
@@ -131,6 +166,15 @@ PERMISSIONS = [
     {"code": "expenses.review", "description": "Revisar gastos"},
     {"code": "expenses.view_all", "description": "Ver todos los gastos"},
     {"code": "expenses.edit_all", "description": "Editar todos los gastos"},
+    {"code": "payment_provider.view", "description": "Ver pagos a proveedores"},
+    {
+        "code": "payment_provider.process",
+        "description": "Procesar PDFs de pagos a proveedores",
+    },
+    {
+        "code": "payment_provider.edit",
+        "description": "Gestionar proveedores y parametros de correo",
+    },
     {"code": "ledger.view", "description": "Ver libro mayor"},
     {"code": "ledger.export", "description": "Exportar libro mayor"},
     {"code": "ledger.sync", "description": "Sincronizar libro mayor"},
@@ -162,6 +206,29 @@ PERMISSIONS = [
         "code": ATTENDANCE_MARKS_VIEW_PERMISSION,
         "description": "Ver registros de asistencia",
     },
+    {"code": JOBS_VIEW_PERMISSION, "description": "Ver tareas propias"},
+    {
+        "code": JOBS_VIEW_ALL_PERMISSION,
+        "description": "Ver tareas de todos los usuarios",
+    },
+    {"code": JOBS_CANCEL_PERMISSION, "description": "Cancelar tareas propias"},
+    {
+        "code": JOBS_CANCEL_ALL_PERMISSION,
+        "description": "Cancelar tareas de todos los usuarios",
+    },
+    {"code": JOBS_RETRY_PERMISSION, "description": "Reintentar tareas"},
+    {
+        "code": SCHEDULED_JOBS_VIEW_PERMISSION,
+        "description": "Ver tareas programadas",
+    },
+    {
+        "code": SCHEDULED_JOBS_EDIT_PERMISSION,
+        "description": "Gestionar tareas programadas",
+    },
+    {
+        "code": SCHEDULED_JOBS_RUN_PERMISSION,
+        "description": "Ejecutar tareas programadas manualmente",
+    },
 ]
 
 ROLES = [
@@ -175,10 +242,16 @@ ROLES = [
     "Gastos Consulta",
     "Gastos Operador",
     "Gastos Admin",
+    "Pagos Proveedores Consulta",
+    "Pagos Proveedores Operador",
+    "Pagos Proveedores Admin",
     "Canales Venta Consulta",
     "Canales Venta Importador",
     "Canales Venta Admin",
     "Asistencia Consulta",
+    "Tareas Consulta",
+    "Tareas Operador",
+    "Tareas Admin",
 ]
 
 ROLE_PERMISSIONS = {
@@ -189,11 +262,17 @@ ROLE_PERMISSIONS = {
         "sap.read",
         "sap.write",
         "sap.execute",
+        JOBS_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+        JOBS_CANCEL_ALL_PERMISSION,
+        JOBS_RETRY_PERMISSION,
     },
     "Master Consulta": {
         "master.company.view",
         "master.currency.view",
         "master.area.view",
+        "master.data.view",
     },
     "Master Admin": {
         "master.company.view",
@@ -202,6 +281,7 @@ ROLE_PERMISSIONS = {
         "master.currency.edit",
         "master.area.view",
         "master.area.edit",
+        "master.data.view",
         "master.data.edit",
     },
     "Contabilidad Consulta": {
@@ -269,6 +349,29 @@ ROLE_PERMISSIONS = {
         "expenses.edit_all",
         "expenses.review",
     },
+    "Pagos Proveedores Consulta": {
+        "payment_provider.view",
+        JOBS_VIEW_PERMISSION,
+    },
+    "Pagos Proveedores Operador": {
+        "payment_provider.view",
+        "payment_provider.process",
+        JOBS_VIEW_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+    },
+    "Pagos Proveedores Admin": {
+        "payment_provider.view",
+        "payment_provider.process",
+        "payment_provider.edit",
+        JOBS_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+        JOBS_CANCEL_ALL_PERMISSION,
+        JOBS_RETRY_PERMISSION,
+        SCHEDULED_JOBS_VIEW_PERMISSION,
+        SCHEDULED_JOBS_EDIT_PERMISSION,
+        SCHEDULED_JOBS_RUN_PERMISSION,
+    },
     "Canales Venta Consulta": {
         SKU_VIEW_PERMISSION,
         PROMOTION_VIEW_PERMISSION,
@@ -290,6 +393,23 @@ ROLE_PERMISSIONS = {
     "Asistencia Consulta": {
         ATTENDANCE_MARKS_VIEW_PERMISSION,
     },
+    "Tareas Consulta": {
+        JOBS_VIEW_PERMISSION,
+    },
+    "Tareas Operador": {
+        JOBS_VIEW_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+    },
+    "Tareas Admin": {
+        JOBS_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+        JOBS_CANCEL_ALL_PERMISSION,
+        JOBS_RETRY_PERMISSION,
+        SCHEDULED_JOBS_VIEW_PERMISSION,
+        SCHEDULED_JOBS_EDIT_PERMISSION,
+        SCHEDULED_JOBS_RUN_PERMISSION,
+    },
 }
 
 PROVISION_STATUSES = [
@@ -303,6 +423,24 @@ PROVISION_STATUSES = [
     {"code": CANCELLED_STATUS, "name": "Cancelado"},
     {"code": "POSTED_SAP", "name": "Registrado en SAP"},
     {"code": "SAP_ERROR", "name": "Error SAP"},
+]
+
+DEFAULT_SCHEDULED_JOBS = [
+    {
+        "name": "Libro mayor delta laboral",
+        "job_type": JobType.LEDGER_SYNC_DELTA.value,
+        "enabled": True,
+        "schedule_kind": ScheduledJobScheduleKind.WINDOW_INTERVAL.value,
+        "schedule_config": {
+            "weekdays": [0, 1, 2, 3, 4],
+            "start_time": "08:00",
+            "end_time": "18:00",
+            "minutes": 240,
+        },
+        "parameters": {"operation": "sync_delta_all"},
+        "batch_size": 1,
+        "timezone": "America/Lima",
+    },
 ]
 
 
@@ -323,7 +461,9 @@ class SeedService:
             self.ensure_user_role(admin_user, roles["Admin"])
             self.ensure_user_profile(admin_user)
             self.ensure_master_data()
+            self.ensure_mailing_parameters()
             self.ensure_provision_statuses()
+            self.ensure_scheduled_jobs(admin_user)
 
             self.db.commit()
 
@@ -496,6 +636,29 @@ class SeedService:
         for item in CURRENCIES:
             self.ensure_currency(item)
 
+    def ensure_mailing_parameters(self):
+        for item in MAILING_PARAMETERS:
+            parameter = (
+                self.db.query(MailingParameter)
+                .filter(MailingParameter.name == item["name"])
+                .first()
+            )
+
+            if parameter:
+                # Se actualiza solo la base funcional; los destinatarios por
+                # proveedor se toman de PaymentProvider.emails_payments.
+                parameter.template = item["template"]
+                parameter.template_html = item["template_html"]
+                parameter.template_text = item["template_text"]
+                parameter.mp_from = item["mp_from"]
+                parameter.subject = item["subject"]
+                parameter.active = True
+                self.existing.append(f"mailing_parameter:{item['name']}")
+                continue
+
+            self.db.add(MailingParameter(**item, active=True))
+            self.created.append(f"mailing_parameter:{item['name']}")
+
     def ensure_company(self, item: dict):
         company = self.db.query(Company).filter(Company.code == item["code"]).first()
 
@@ -566,3 +729,43 @@ class SeedService:
                 )
             )
             self.created.append(f"provision_status:{item['code']}")
+
+    # =====================================================
+    # SCHEDULED JOBS
+    # =====================================================
+    def ensure_scheduled_jobs(self, admin_user: Auth):
+        for item in DEFAULT_SCHEDULED_JOBS:
+            scheduled_job = (
+                self.db.query(ScheduledJob)
+                .filter(ScheduledJob.name == item["name"])
+                .first()
+            )
+            next_run_at = calculate_next_run(
+                schedule_kind=item["schedule_kind"],
+                schedule_config=item["schedule_config"],
+                tz_name=item["timezone"],
+            )
+
+            if scheduled_job:
+                # El seed mantiene la definicion base, pero no borra historial
+                # ni el ultimo job asociado a esta programacion.
+                scheduled_job.job_type = item["job_type"]
+                scheduled_job.enabled = item["enabled"]
+                scheduled_job.schedule_kind = item["schedule_kind"]
+                scheduled_job.schedule_config = item["schedule_config"]
+                scheduled_job.parameters = item["parameters"]
+                scheduled_job.batch_size = item["batch_size"]
+                scheduled_job.timezone = item["timezone"]
+                if not scheduled_job.next_run_at:
+                    scheduled_job.next_run_at = next_run_at
+                self.existing.append(f"scheduled_job:{item['name']}")
+                continue
+
+            self.db.add(
+                ScheduledJob(
+                    **item,
+                    next_run_at=next_run_at,
+                    created_by=admin_user.id,
+                )
+            )
+            self.created.append(f"scheduled_job:{item['name']}")

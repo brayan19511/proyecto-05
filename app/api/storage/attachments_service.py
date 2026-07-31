@@ -1,15 +1,17 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.provisions.provision.provision_service import ProvisionService
+from app.api.finance.provisions.provision.provision_service import ProvisionService
 from app.api.storage.attachments_repository import AttachmentRepository
 from app.api.storage.attachments_schema import (
     AttachmentCreateRequest,
     AttachmentUpdateRequest,
 )
 from app.api.storage.constants import ALLOWED_ATTACHMENT_ENTITY_TYPES
+from app.core.db.integrity import raise_integrity_error
 from app.models.storage import Attachment
 
 
@@ -81,7 +83,9 @@ class AttachmentService:
             created_by=user_id,
         )
 
-        return self.repository.create(attachment)
+        self.repository.create(attachment)
+        self._commit_attachment(attachment, "No se pudo crear el archivo")
+        return attachment
 
     def update(
         self,
@@ -101,7 +105,9 @@ class AttachmentService:
         data = request.model_dump(exclude_unset=True)
         attachment.updated_by = user_id
 
-        return self.repository.update(attachment, data)
+        self.repository.update(attachment, data)
+        self._commit_attachment(attachment, "No se pudo actualizar el archivo")
+        return attachment
 
     def delete(
         self,
@@ -118,6 +124,7 @@ class AttachmentService:
             can_edit_all=can_edit_all,
         )
         self.repository.delete(attachment)
+        self.repository.commit()
 
         return True
 
@@ -134,3 +141,19 @@ class AttachmentService:
             )
 
         return attachment
+
+    def _commit_attachment(self, attachment: Attachment, default_message: str) -> None:
+        try:
+            # Regla simple del proyecto: el service decide cuando confirmar cambios.
+            self.repository.commit()
+            self.repository.refresh(attachment)
+        except IntegrityError as exc:
+            self.repository.rollback()
+            raise_integrity_error(
+                exc,
+                invalid_references={
+                    "attachments_created_by_fkey": "El usuario creador no existe",
+                    "attachments_updated_by_fkey": "El usuario editor no existe",
+                },
+                default_message=default_message,
+            )

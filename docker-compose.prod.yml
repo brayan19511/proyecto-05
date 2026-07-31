@@ -1,4 +1,21 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4.2-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - finance-network
+
   db-postgres:
     image: postgres:16
     restart: unless-stopped
@@ -22,20 +39,38 @@ services:
     networks:
       - finance-network
 
+  payment-provider-storage-init:
+    image: busybox:1.36
+    restart: "no"
+    command: ["sh", "-c", "mkdir -p /storage && chown -R 10001:10001 /storage"]
+    volumes:
+      - payment-provider-jobs:/storage
+    networks:
+      - finance-network
+
   api:
     image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432
       ENV: prod
       SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      PAYMENT_PROVIDER_STORAGE_DIR: /app/var/payment-provider-jobs
+    volumes:
+      - payment-provider-jobs:/app/var/payment-provider-jobs
     ports:
       - "${API_PORT}:8000"
     depends_on:
+      payment-provider-storage-init:
+        condition: service_completed_successfully
       db-postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test:
@@ -49,6 +84,149 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    networks:
+      - finance-network
+
+  worker-heavy:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    mem_limit: ${WORKER_HEAVY_MEM_LIMIT:-2g}
+    cpus: "${WORKER_HEAVY_CPUS:-2.0}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      PAYMENT_PROVIDER_STORAGE_DIR: /app/var/payment-provider-jobs
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=heavy",
+        "--concurrency=2",
+        "--hostname=heavy@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      payment-provider-storage-init:
+        condition: service_completed_successfully
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - payment-provider-jobs:/app/var/payment-provider-jobs
+    networks:
+      - finance-network
+
+  worker-light:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    mem_limit: ${WORKER_LIGHT_MEM_LIMIT:-1g}
+    cpus: "${WORKER_LIGHT_CPUS:-2.0}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=light",
+        "--concurrency=4",
+        "--hostname=light@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance-network
+
+  worker-email:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    mem_limit: ${WORKER_EMAIL_MEM_LIMIT:-1g}
+    cpus: "${WORKER_EMAIL_CPUS:-1.0}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--queues=email",
+        "--concurrency=2",
+        "--hostname=email@%h",
+      ]
+    healthcheck:
+      disable: true
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - finance-network
+
+  scheduler:
+    image: ${BACKEND_IMAGE:-brayan1951/backend-finance:v2.1.0}
+    restart: unless-stopped
+    mem_limit: ${SCHEDULER_MEM_LIMIT:-512m}
+    cpus: "${SCHEDULER_CPUS:-0.5}"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DB_HOST: db-postgres
+      DB_PORT: 5432
+      ENV: prod
+      SQL_ECHO: "false"
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+    command:
+      [
+        "celery",
+        "-A",
+        "app.workers.celery_app:celery_app",
+        "beat",
+        "--loglevel=INFO",
+        "--schedule=/tmp/celerybeat-schedule",
+      ]
+    depends_on:
+      db-postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      disable: true
     networks:
       - finance-network
 
@@ -71,6 +249,8 @@ services:
 volumes:
   postgres-db:
   pgadmin-data:
+  rabbitmq-data:
+  payment-provider-jobs:
 
 networks:
   finance-network:

@@ -27,17 +27,21 @@ SENSITIVE_BODY_KEYS = {
     "refresh_token",
     "secret",
     "api_key",
-    # "document_number",
-    # "document_numbers",
+    "document_number",
+    "document_numbers",
+    "documentos",
+    "references",
 }
 
 SENSITIVE_QUERY_KEYS = {
-    # "document_number",
-    # "document_numbers"
+    "document_number",
+    "document_numbers",
 }
 
 REDACT_RESPONSE_BODY_PATH_PREFIXES = {
     "/api/attendance",
+    "/api/jobs",
+    "/api/sap",
 }
 
 FILE_CONTENT_KEYS = {

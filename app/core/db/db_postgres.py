@@ -1,9 +1,10 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from app.core.config import settings
+from app.core.db.session import make_session_factory, session_scope
 
 
 engine = create_engine(
@@ -12,12 +13,7 @@ engine = create_engine(
     pool_pre_ping=True,
 )
 
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-    expire_on_commit=False,
-)
+SessionLocal = make_session_factory(engine)
 
 
 class Base(DeclarativeBase):
@@ -25,11 +21,4 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    yield from session_scope(SessionLocal)

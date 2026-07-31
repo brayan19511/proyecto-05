@@ -3,7 +3,7 @@ import unittest
 
 import pandas as pd
 
-from app.api.libro_mayor.service.libro_mayor_rules_service import (
+from app.api.finance.libro_mayor.service.libro_mayor_rules_service import (
     LibroMayorRulesService,
 )
 

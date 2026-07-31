@@ -14,7 +14,7 @@ from app.core.access import require_any_permission
 from app.core.db.db_cic import get_db_cic
 
 
-router = APIRouter(prefix="/attendance", tags=["Attendance"])
+router = APIRouter(prefix="/attendance", tags=["ATTENDANCE"])
 
 
 def get_attendance_service(

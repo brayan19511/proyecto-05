@@ -6,6 +6,7 @@ from .provision_model import (
     ProvisionStatus,
 )
 from .libro_mayor_model import LibroMayor, ReglasGastos
+from .payment_provider_model import PaymentProvider
 
 __all__ = [
     "Provision",
@@ -15,4 +16,5 @@ __all__ = [
     "ProvisionStatus",
     "LibroMayor",
     "ReglasGastos",
+    "PaymentProvider",
 ]

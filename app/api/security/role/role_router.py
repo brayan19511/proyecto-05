@@ -13,7 +13,7 @@ from app.core.db.db_postgres import get_db
 from app.core.security import PermissionChecker
 
 
-router = APIRouter(prefix="/roles", tags=["roles"])
+router = APIRouter(prefix="/roles", tags=["ROLES"])
 
 
 @router.get("/", response_model=list[RoleResponse])

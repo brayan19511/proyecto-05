@@ -1,4 +1,7 @@
 # app/core/exceptions.py
+from typing import TypeVar
+
+
 class DomainError(Exception):
     pass
 
@@ -29,3 +32,13 @@ class SAPRequestError(SAPError):
         self.detail = detail
 
         super().__init__(f"SAP Error {status_code}")
+
+
+T = TypeVar("T")
+
+
+def get_or_404(entity: T | None, message: str) -> T:
+    """Devuelve la entidad o lanza NotFoundError (que handlers traduce a 404)."""
+    if entity is None:
+        raise NotFoundError(message)
+    return entity

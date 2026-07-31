@@ -13,7 +13,7 @@ from app.core.access import get_permission_codes, is_admin
 from app.core.db.db_postgres import get_db
 from app.core.security import get_current_user
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["USUARIOS"])
 
 
 def can_view_users(current_user) -> bool:

@@ -5,6 +5,7 @@ app/
 |-- api/             Routers, schemas, servicios y repositorios por dominio.
 |-- core/            Configuracion, seguridad, base de datos y middleware.
 |-- models/          Modelos SQLAlchemy agrupados por esquema o dominio.
+|-- workers/         Configuracion Celery, despacho y tareas de background.
 `-- services/        Servicios transversales, por ejemplo auditoria.
 
 alembic/
@@ -85,6 +86,10 @@ router -> service -> repository -> model
 
 Los modelos no deben importar routers o servicios. Los repositorios no deben
 depender de FastAPI. Evitar efectos secundarios en archivos `__init__.py`.
+
+Las tareas Celery deben ser adaptadores pequenos: abren sus recursos, llaman al
+servicio del dominio y actualizan el job. La logica funcional no debe vivir
+unicamente dentro del worker.
 
 ## Añadir un modulo
 

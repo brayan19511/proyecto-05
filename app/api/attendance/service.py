@@ -49,10 +49,4 @@ class AttendanceService:
             limit,
             offset,
         )
-        return AttendanceMarkPage(
-            items=items,
-            total=total,
-            limit=limit,
-            offset=offset,
-            has_more=offset + len(items) < total,
-        )
+        return AttendanceMarkPage.build(items, total, limit, offset)

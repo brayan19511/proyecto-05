@@ -9,7 +9,7 @@ from app.api.storage.attachments_schema import (
     AttachmentUpdateRequest,
 )
 from app.api.storage.attachments_service import AttachmentService
-from app.api.provisions.access import (
+from app.api.finance.provisions.access import (
     can_edit_all_provisions,
     can_view_all_provisions,
 )
@@ -17,7 +17,7 @@ from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
 from app.core.security import get_current_user
 
-router = APIRouter(prefix="/storage/attachments", tags=["Attachments"])
+router = APIRouter(prefix="/storage/attachments", tags=["ARCHIVOS"])
 
 
 def get_service(db=Depends(get_db)):

@@ -3,6 +3,8 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from app.core.schemas import PageResponse
+
 
 class MarkType(StrEnum):
     ENTRY = "INGRESO"
@@ -28,9 +30,4 @@ class AttendanceMarkSearch(BaseModel):
     offset: int = Field(default=0, ge=0)
 
 
-class AttendanceMarkPage(BaseModel):
-    items: list[AttendanceMarkResponse]
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
+AttendanceMarkPage = PageResponse[AttendanceMarkResponse]

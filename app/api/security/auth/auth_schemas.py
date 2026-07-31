@@ -33,6 +33,10 @@ class UserRegisterSchema(BaseModel):
 class PasswordChangeRequest(BaseModel):
     current_password: str
     new_password: str = Field(min_length=4)
+
+
+class PasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=4)
     
 class CurrentUserResponse(BaseModel):
     id: UUID

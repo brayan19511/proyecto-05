@@ -7,6 +7,7 @@ from app.models.master.master_model import (
     Area,
     Currency,
 )
+from app.models.master.mailing_parameter_model import MailingParameter
 
 
 class MasterRepository:
@@ -121,6 +122,30 @@ class MasterRepository:
 
         self.db.add(currency)
         return currency
+
+    # ==========================================
+    # MAILING PARAMETERS
+    # ==========================================
+
+    def get_mailing_parameters(self, search: str | None = None):
+        query = self.db.query(MailingParameter)
+        if search:
+            query = query.filter(MailingParameter.name.ilike(f"%{search}%"))
+        return query.order_by(MailingParameter.name).all()
+
+    def get_mailing_parameter_by_id(self, parameter_id: int):
+        return self.db.get(MailingParameter, parameter_id)
+
+    def get_mailing_parameter_by_name(self, name: str):
+        return (
+            self.db.query(MailingParameter)
+            .filter(MailingParameter.name == name)
+            .first()
+        )
+
+    def create_mailing_parameter(self, parameter: MailingParameter):
+        self.db.add(parameter)
+        return parameter
 
     # ==========================================
     # TRANSACTION

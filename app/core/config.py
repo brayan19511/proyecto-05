@@ -25,6 +25,30 @@ class Settings(BaseSettings):
     DB_SAP_USER: str
     DB_SAP_PASSWORD: str
     SAP_URL: str
+    SAP_JOB_BATCH_SIZE: int = 200
+    SAP_JOB_MAX_DOCUMENTS: int = 50_000
+    SAP_JOB_SOFT_TIME_LIMIT: int = 3600
+    SAP_JOB_TIME_LIMIT: int = 3900
+
+    CELERY_BROKER_URL: str = "amqp://guest:guest@localhost:5672//"
+    CELERY_SCHEDULER_INTERVAL_SECONDS: int = 60
+    CELERY_WORKER_MAX_TASKS_PER_CHILD: int = 50
+    CELERY_WORKER_MAX_MEMORY_PER_CHILD_KB: int = 512000
+    JOB_CREDENTIALS_KEY: Optional[str] = None
+
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = None
+    SMTP_FROM_NAME: str = "Rash Peru"
+    SMTP_USE_TLS: bool = True
+    EMAIL_TEMPLATE_DIR: str = "app/templates/emails"
+    PAYMENT_PROVIDER_STORAGE_DIR: str = "var/payment-provider-jobs"
+    PAYMENT_PROVIDER_ENABLE_OCR: bool = True
+    PAYMENT_PROVIDER_OCR_LANG: str = "spa"
+    PAYMENT_PROVIDER_OCR_DPI: int = 250
+    PAYMENT_PROVIDER_MIN_TEXT_LENGTH: int = 80
 
     DB_OFISIS_HOST: Optional[str] = None
     DB_OFISIS_PORT: int = 1433

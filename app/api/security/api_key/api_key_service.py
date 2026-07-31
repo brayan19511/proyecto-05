@@ -66,15 +66,61 @@ class ApiKeyService:
                 detail="No se pudo crear la API Key",
             ) from exc
 
+    @staticmethod
+    def _generate_raw_api_key() -> str:
+        return f"cb_live_{secrets.token_urlsafe(48)}"
+
+    @staticmethod
+    def _hash_api_key(raw_api_key: str) -> str:
+        return hashlib.sha256(raw_api_key.encode()).hexdigest()
+
     def get_my_keys(self, user_id):
         return self.repository.get_by_user(user_id)
+
+    def update_key(
+        self,
+        *,
+        api_key_id,
+        user_id,
+        data: dict,
+    ):
+        api_key = self.repository.get_by_id_and_user(api_key_id, user_id)
+        if not api_key:
+            raise HTTPException(status_code=404, detail="API Key no encontrada")
+
+        if "name" in data:
+            api_key.name = data["name"]
+        if "expires_at" in data:
+            api_key.expires_at = data["expires_at"]
+        if "active" in data:
+            api_key.active = data["active"]
+
+        self.repository.commit()
+        return api_key
+
+    def rotate_key(self, *, api_key_id, user_id):
+        api_key = self.repository.get_by_id_and_user(api_key_id, user_id)
+        if not api_key:
+            raise HTTPException(status_code=404, detail="API Key no encontrada")
+
+        raw_api_key = self._generate_raw_api_key()
+        api_key.key_hash = self._hash_api_key(raw_api_key)
+        api_key.active = True
+        self.repository.commit()
+
+        return {
+            "api_key": raw_api_key,
+            "key_info": api_key,
+        }
 
     def deactivate_key(
         self,
         api_key_id,
+        user_id,
     ):
-        api_key = self.repository.get_by_id(
-            api_key_id
+        api_key = self.repository.get_by_id_and_user(
+            api_key_id,
+            user_id,
         )
 
         if not api_key:

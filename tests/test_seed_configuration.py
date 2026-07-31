@@ -1,6 +1,9 @@
 import unittest
 
 from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
+from app.api.finance.payment_provider.constants import (
+    DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER,
+)
 from app.api.sales_channel.permissions import (
     PROMOTION_EDIT_PERMISSION,
     PROMOTION_IMPORT_PERMISSION,
@@ -9,7 +12,13 @@ from app.api.sales_channel.permissions import (
     SKU_IMPORT_PERMISSION,
     SKU_VIEW_PERMISSION,
 )
-from app.api.verify.seed_service import PERMISSIONS, ROLE_PERMISSIONS, ROLES
+from app.api.verify.seed_service import (
+    DEFAULT_SCHEDULED_JOBS,
+    MAILING_PARAMETERS,
+    PERMISSIONS,
+    ROLE_PERMISSIONS,
+    ROLES,
+)
 
 
 class SeedConfigurationTests(unittest.TestCase):
@@ -62,6 +71,31 @@ class SeedConfigurationTests(unittest.TestCase):
             ROLE_PERMISSIONS["Asistencia Consulta"],
             {ATTENDANCE_MARKS_VIEW_PERMISSION},
         )
+
+    def test_payment_provider_mailing_parameter_is_single_default(self):
+        names = [item["name"] for item in MAILING_PARAMETERS]
+
+        self.assertEqual(names, [DEFAULT_PAYMENT_PROVIDER_MAILING_PARAMETER])
+        self.assertEqual(
+            MAILING_PARAMETERS[0]["template"],
+            "payment_provider_summary.html",
+        )
+
+    def test_default_ledger_scheduled_job_is_business_window(self):
+        [scheduled_job] = DEFAULT_SCHEDULED_JOBS
+
+        self.assertEqual(scheduled_job["name"], "Libro mayor delta laboral")
+        self.assertEqual(scheduled_job["schedule_kind"], "WINDOW_INTERVAL")
+        self.assertEqual(
+            scheduled_job["schedule_config"],
+            {
+                "weekdays": [0, 1, 2, 3, 4],
+                "start_time": "08:00",
+                "end_time": "18:00",
+                "minutes": 240,
+            },
+        )
+        self.assertEqual(scheduled_job["parameters"], {"operation": "sync_delta_all"})
 
 
 if __name__ == "__main__":

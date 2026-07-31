@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -9,6 +8,7 @@ from app.models.master.master_model import (
     Area,
     Currency,
 )
+from app.models.master.mailing_parameter_model import MailingParameter
 
 from app.api.master.master_repository import (
     MasterRepository,
@@ -21,9 +21,11 @@ from app.api.master.master_schema import (
     AreaUpdateRequest,
     CurrencyCreateRequest,
     CurrencyUpdateRequest,
+    MailingParameterCreateRequest,
+    MailingParameterUpdateRequest,
 )
 from app.core.db.integrity import raise_integrity_error
-from app.core.exceptions import ConflictError
+from app.core.exceptions import ConflictError, ValidationError, get_or_404
 
 
 class MasterService:
@@ -50,13 +52,10 @@ class MasterService:
         return self.repository.get_companies(search)
 
     def get_company_by_id(self, company_id: int):
-
-        company = self.repository.get_company_by_id(company_id)
-
-        if not company:
-            raise HTTPException(status_code=404, detail="Company not found")
-
-        return company
+        return get_or_404(
+            self.repository.get_company_by_id(company_id),
+            "Company not found",
+        )
 
     def create_company(
         self,
@@ -81,9 +80,7 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        company = self.repository.get_company_by_id(company_id)
-        if not company:
-            raise HTTPException(status_code=404, detail="Company not found")
+        company = self.get_company_by_id(company_id)
 
         data = request.model_dump(exclude_unset=True)
         if "code" in data and data["code"] is not None:
@@ -105,10 +102,7 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        company = self.repository.get_company_by_id(company_id)
-
-        if not company:
-            raise HTTPException(status_code=404, detail="Company not found")
+        company = self.get_company_by_id(company_id)
 
         company.active = False
         company.updated_by = current_user_id
@@ -126,9 +120,8 @@ class MasterService:
 
         exchange_rate = data.get("exchange_rate_to_base")
         if exchange_rate is not None and exchange_rate <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Currency exchange rate must be greater than zero",
+            raise ValidationError(
+                "Currency exchange rate must be greater than zero",
             )
 
         return data
@@ -137,10 +130,10 @@ class MasterService:
         return self.repository.get_currencies(search)
 
     def get_currency_by_id(self, currency_id: int):
-        curreny = self.repository.get_currency_by_id(currency_id)
-        if not curreny:
-            raise HTTPException(status_code=404, detail="Currency not found")
-        return curreny
+        return get_or_404(
+            self.repository.get_currency_by_id(currency_id),
+            "Currency not found",
+        )
 
     def create_currency(
         self,
@@ -166,10 +159,7 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        currency = self.repository.get_currency_by_id(currency_id)
-
-        if not currency:
-            raise HTTPException(status_code=404, detail="Currency not found")
+        currency = self.get_currency_by_id(currency_id)
 
         data = self._normalize_currency_data(request.model_dump(exclude_unset=True))
         if "code" in data and data["code"] is not None:
@@ -193,16 +183,74 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        currency = self.repository.get_currency_by_id(currency_id)
-
-        if not currency:
-            raise HTTPException(status_code=404, detail="Currency not found")
+        currency = self.get_currency_by_id(currency_id)
 
         currency.active = False
         currency.updated_by = current_user_id
 
         self.repository.commit()
 
+        return True
+
+    # ==========================================
+    # MAILING PARAMETERS
+    # ==========================================
+
+    def get_mailing_parameters(self, search: str | None = None):
+        return self.repository.get_mailing_parameters(search)
+
+    def get_mailing_parameter_by_id(self, parameter_id: int):
+        return get_or_404(
+            self.repository.get_mailing_parameter_by_id(parameter_id),
+            "Mailing parameter not found",
+        )
+
+    def create_mailing_parameter(
+        self,
+        request: MailingParameterCreateRequest,
+        current_user_id: int | None,
+    ):
+        data = request.model_dump()
+        data["name"] = data["name"].strip()
+        if self.repository.get_mailing_parameter_by_name(data["name"]):
+            raise ConflictError("Ya existe un parametro de correo con este nombre")
+
+        parameter = MailingParameter(**data, created_by=current_user_id)
+        self.repository.create_mailing_parameter(parameter)
+        self._commit(
+            "uq_mailing_parameter_name",
+            "Ya existe un parametro de correo con este nombre",
+        )
+        return parameter
+
+    def update_mailing_parameter(
+        self,
+        parameter_id: int,
+        request: MailingParameterUpdateRequest,
+        current_user_id: int | None,
+    ):
+        parameter = self.get_mailing_parameter_by_id(parameter_id)
+        data = request.model_dump(exclude_unset=True)
+        if "name" in data and data["name"] is not None:
+            data["name"] = data["name"].strip()
+            existing = self.repository.get_mailing_parameter_by_name(data["name"])
+            if existing and existing.id != parameter_id:
+                raise ConflictError("Ya existe un parametro de correo con este nombre")
+
+        for key, value in data.items():
+            setattr(parameter, key, value)
+        parameter.updated_by = current_user_id
+        self._commit(
+            "uq_mailing_parameter_name",
+            "Ya existe un parametro de correo con este nombre",
+        )
+        return parameter
+
+    def delete_mailing_parameter(self, parameter_id: int, current_user_id: int | None):
+        parameter = self.get_mailing_parameter_by_id(parameter_id)
+        parameter.active = False
+        parameter.updated_by = current_user_id
+        self.repository.commit()
         return True
 
     # ==========================================
@@ -213,10 +261,10 @@ class MasterService:
         return self.repository.get_areas(search)
 
     def get_area_by_id(self, area_id: int):
-        area = self.repository.get_area_by_id(area_id)
-        if not area:
-            raise HTTPException(status_code=404, detail="Area not found")
-        return area
+        return get_or_404(
+            self.repository.get_area_by_id(area_id),
+            "Area not found",
+        )
 
     def create_area(
         self,
@@ -241,10 +289,7 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        area = self.repository.get_area_by_id(area_id)
-
-        if not area:
-            raise HTTPException(status_code=404, detail="Area not found")
+        area = self.get_area_by_id(area_id)
 
         data = request.model_dump(exclude_unset=True)
         if "code" in data and data["code"] is not None:
@@ -268,10 +313,7 @@ class MasterService:
         current_user_id: int|None,
     ):
 
-        area = self.repository.get_area_by_id(area_id)
-
-        if not area:
-            raise HTTPException(status_code=404, detail="Area not found")
+        area = self.get_area_by_id(area_id)
 
         area.active = False
         area.updated_by = current_user_id

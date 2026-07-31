@@ -8,7 +8,7 @@ from app.core.db.db_postgres import get_db
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/verify", tags=["Verify"])
+router = APIRouter(prefix="/verify", tags=["VERIFICACION"])
 
 
 @router.get("/seed")

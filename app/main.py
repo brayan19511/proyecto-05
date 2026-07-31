@@ -4,11 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.attendance import router as attendance_router
 from app.api.health import health_router
-from app.api.libro_mayor import libro_mayor_router
+from app.api.finance.router import router as finance_router
+from app.api.jobs.router import router as jobs_router
 from app.api.master import master_router
-from app.api.provisions import provisions_router
+from app.api.finance.provisions import provisions_router
 from app.api.sales_channel import router as sales_channel_router
 from app.api.sap import sap_router
+from app.api.scheduled_jobs import router as scheduled_jobs_router
 from app.api.security import security_router
 from app.api.storage import attachments_router
 from app.api.user import user_router
@@ -45,9 +47,9 @@ register_exception_handlers(app)
 # 4. RUTAS (ROUTERS)
 # =========================================================
 app.include_router(prefix="/api", router=sap_router.router)
+app.include_router(prefix="/api", router=scheduled_jobs_router.router)
 app.include_router(prefix="/api", router=web_router.router)
-app.include_router(prefix="/api", router=libro_mayor_router.router)
-app.include_router(prefix="/api", router=provisions_router.router)
+app.include_router(prefix="/api", router=finance_router)
 app.include_router(prefix="/api", router=master_router.router)
 app.include_router(prefix="/api", router=verify_router.router)
 app.include_router(prefix="/api", router=security_router.router)
@@ -55,4 +57,5 @@ app.include_router(prefix="/api", router=attachments_router.router)
 app.include_router(prefix="/api", router=user_router.router)
 app.include_router(prefix="/api", router=sales_channel_router.router)
 app.include_router(prefix="/api", router=attendance_router.router)
+app.include_router(prefix="/api", router=jobs_router)
 app.include_router(router=health_router.router)

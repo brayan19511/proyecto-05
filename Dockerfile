@@ -41,6 +41,9 @@ RUN apt-get update \
         libgssapi-krb5-2 \
         libpq5 \
         msodbcsql17 \
+        poppler-utils \
+        tesseract-ocr \
+        tesseract-ocr-spa \
         unixodbc \
     && apt-get purge -y --auto-remove curl gnupg \
     && rm -rf /var/lib/apt/lists/* \
@@ -53,6 +56,8 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --chown=app:app app ./app
 COPY --chown=app:app alembic ./alembic
 COPY --chown=app:app alembic.ini .
+RUN mkdir -p /app/var/payment-provider-jobs \
+    && chown -R app:app /app/var
 
 USER app
 
