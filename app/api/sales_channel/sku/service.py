@@ -23,6 +23,7 @@ class SkuModelConfig:
     updated_at_field: str
     channel_name: str
     promotion_model: type | None = None
+    external_id_matches_sku: bool = False
 
 
 class ManagedSkuService:
@@ -53,7 +54,12 @@ class ManagedSkuService:
         entity = self.config.model(
             sku=request.sku,
             is_active=True,
-            **{self.config.external_id_field: request.external_id},
+            **{
+                self.config.external_id_field: self._resolve_external_id(
+                    request.sku,
+                    request.external_id,
+                )
+            },
         )
         self.repository.add(entity)
         self._commit(entity)
@@ -66,7 +72,7 @@ class ManagedSkuService:
             setattr(
                 entity,
                 self.config.external_id_field,
-                data["external_id"],
+                self._resolve_external_id(entity.sku, data["external_id"]),
             )
         self._touch(entity)
         self._commit(entity)
@@ -109,13 +115,18 @@ class ManagedSkuService:
                 entity = self.config.model(
                     sku=item.sku,
                     is_active=item.active,
-                    **{self.config.external_id_field: None},
+                    **{
+                        self.config.external_id_field: (
+                            self._resolve_external_id(item.sku, None)
+                        )
+                    },
                 )
                 self.repository.add(entity)
                 existing_by_sku[item.sku.casefold()] = entity
                 result["created"] += 1
                 continue
 
+            self._sync_external_id(entity)
             current_active = bool(entity.is_active)
             if current_active == item.active:
                 result["unchanged"] += 1
@@ -177,6 +188,39 @@ class ManagedSkuService:
 
     def _touch(self, entity) -> None:
         setattr(entity, self.config.updated_at_field, func.getdate())
+
+    def _resolve_external_id(
+        self,
+        sku: str,
+        requested_external_id: str | None,
+    ) -> str | None:
+        if not self.config.external_id_matches_sku:
+            return requested_external_id
+
+        normalized_sku = sku.strip()
+        if (
+            requested_external_id is not None
+            and requested_external_id != normalized_sku
+        ):
+            raise ConflictError(
+                f"En {self.config.channel_name}, el identificador externo "
+                "debe ser igual al SKU"
+            )
+        return normalized_sku
+
+    def _sync_external_id(self, entity) -> None:
+        if not self.config.external_id_matches_sku:
+            return
+
+        current_external_id = getattr(entity, self.config.external_id_field)
+        expected_external_id = self._resolve_external_id(entity.sku, None)
+        if current_external_id != expected_external_id:
+            setattr(
+                entity,
+                self.config.external_id_field,
+                expected_external_id,
+            )
+            self._touch(entity)
 
     def _commit(self, entity) -> None:
         try:

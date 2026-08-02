@@ -1,5 +1,6 @@
 # app/models/__init__.py
 from app.core.db.db_postgres import Base # Importas tu Base
+from .analytics import AnalyticsIngestionItem, AnalyticsIngestionRun
 from .auth import Auth, Role, UserRole, Information, Permission, RolePermission
 from .audit import AuditLog, AuditLogDetail, AuditStep
 from .finance import Provision, ProvisionAccess, ProvisionConcept, ProvisionDocument, ProvisionStatus
@@ -12,6 +13,7 @@ from .tickets import Tickets
 # Esto asegura que ambas clases estén disponibles en el Registry de SQLAlchemy
 __all__ = [
     "Base", 
+    "AnalyticsIngestionItem", "AnalyticsIngestionRun",
     "Auth", "Role", "UserRole", "Information",
     "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission" , 
     "Provision", "ProvisionAccess", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus",

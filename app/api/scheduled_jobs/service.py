@@ -20,6 +20,7 @@ from app.api.scheduled_jobs.schemas import (
 )
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.jobs import Job, ScheduledJob
+from app.services.ingestion.orchestrator import AnalyticsIngestionService
 
 
 class ScheduledJobService:
@@ -234,6 +235,30 @@ class ScheduledJobService:
                 account=parameters["account"],
                 start_date=self._parse_required_date(parameters.get("start_date")),
                 end_date=self._parse_required_date(parameters.get("end_date")),
+                user_id=user_id,
+                idempotency_key=idempotency_key,
+                batch_size=scheduled_job.batch_size,
+                scheduled_job_id=scheduled_job.id,
+                trigger_source=trigger_source,
+            )
+
+        if scheduled_job.job_type == JobType.ANALYTICS_EXTRACT.value:
+            ingestion_service = AnalyticsIngestionService(self.db)
+            if parameters.get("table_group"):
+                table_names = ingestion_service.get_icg_table_names_by_group(
+                    parameters["table_group"]
+                )
+            elif parameters.get("table_names"):
+                table_names = parameters["table_names"]
+            else:
+                table_names = [parameters["table_name"]]
+
+            return ingestion_service.enqueue_icg_tables(
+                table_names=table_names,
+                mode=parameters.get("mode", "incremental"),
+                start_date=self._parse_date(parameters.get("start_date")),
+                end_date=self._parse_date(parameters.get("end_date")),
+                lookback_days=parameters.get("lookback_days"),
                 user_id=user_id,
                 idempotency_key=idempotency_key,
                 batch_size=scheduled_job.batch_size,

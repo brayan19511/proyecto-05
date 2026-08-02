@@ -16,6 +16,7 @@ SCHEMAS = (
     "storage",
     "master",
     "jobs",
+    "analytics",
 )
 
 config = context.config

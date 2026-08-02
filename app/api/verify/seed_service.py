@@ -4,6 +4,8 @@ from uuid6 import uuid7
 
 from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
 from app.api.jobs.constants import (
+    ANALYTICS_INGEST_RUN_PERMISSION,
+    ANALYTICS_INGEST_VIEW_PERMISSION,
     JOBS_CANCEL_ALL_PERMISSION,
     JOBS_CANCEL_PERMISSION,
     JOBS_RETRY_PERMISSION,
@@ -48,6 +50,7 @@ from app.models.finance.provision_model import ProvisionStatus
 from app.models.jobs import ScheduledJob
 from app.models.master.mailing_parameter_model import MailingParameter
 from app.models.master.master_model import Area, Company, Currency
+from app.services.ingestion.catalog import ICG_TABLES
 
 ADMIN_EMAIL = "admin@admin.com"
 ADMIN_PASSWORD = "admin123"
@@ -229,6 +232,14 @@ PERMISSIONS = [
         "code": SCHEDULED_JOBS_RUN_PERMISSION,
         "description": "Ejecutar tareas programadas manualmente",
     },
+    {
+        "code": ANALYTICS_INGEST_VIEW_PERMISSION,
+        "description": "Ver catalogo y ejecuciones analytics",
+    },
+    {
+        "code": ANALYTICS_INGEST_RUN_PERMISSION,
+        "description": "Ejecutar ingestas analytics",
+    },
 ]
 
 ROLES = [
@@ -252,6 +263,7 @@ ROLES = [
     "Tareas Consulta",
     "Tareas Operador",
     "Tareas Admin",
+    "Analytics Operador",
 ]
 
 ROLE_PERMISSIONS = {
@@ -410,6 +422,12 @@ ROLE_PERMISSIONS = {
         SCHEDULED_JOBS_EDIT_PERMISSION,
         SCHEDULED_JOBS_RUN_PERMISSION,
     },
+    "Analytics Operador": {
+        ANALYTICS_INGEST_VIEW_PERMISSION,
+        ANALYTICS_INGEST_RUN_PERMISSION,
+        JOBS_VIEW_PERMISSION,
+        JOBS_CANCEL_PERMISSION,
+    },
 }
 
 PROVISION_STATUSES = [
@@ -444,6 +462,60 @@ DEFAULT_SCHEDULED_JOBS = [
 ]
 
 
+ICG_TRANSACTIONAL_RECOVERY_TIME = "08:00"
+ICG_TRANSACTIONAL_CURRENT_DAY_TIMES = ["12:00", "16:00"]
+ICG_MASTER_LOAD_TIME = "07:00"
+
+
+def build_default_icg_scheduled_jobs() -> list[dict]:
+    return [
+        {
+            "name": "ICG transaccional incremental recuperacion",
+            "job_type": JobType.ANALYTICS_EXTRACT.value,
+            "enabled": True,
+            "schedule_kind": ScheduledJobScheduleKind.DAILY.value,
+            "schedule_config": {"times": [ICG_TRANSACTIONAL_RECOVERY_TIME]},
+            "parameters": {
+                "table_group": "transactional",
+                "mode": "incremental",
+                "lookback_days": 3,
+            },
+            "batch_size": 1,
+            "timezone": "America/Lima",
+        },
+        {
+            "name": "ICG transaccional incremental dia actual",
+            "job_type": JobType.ANALYTICS_EXTRACT.value,
+            "enabled": True,
+            "schedule_kind": ScheduledJobScheduleKind.DAILY.value,
+            "schedule_config": {"times": ICG_TRANSACTIONAL_CURRENT_DAY_TIMES},
+            "parameters": {
+                "table_group": "transactional",
+                "mode": "incremental",
+                "lookback_days": 0,
+            },
+            "batch_size": 1,
+            "timezone": "America/Lima",
+        },
+        {
+            "name": "ICG maestros snapshot diario",
+            "job_type": JobType.ANALYTICS_EXTRACT.value,
+            "enabled": True,
+            "schedule_kind": ScheduledJobScheduleKind.DAILY.value,
+            "schedule_config": {"times": [ICG_MASTER_LOAD_TIME]},
+            "parameters": {
+                "table_group": "master",
+                "mode": "snapshot",
+            },
+            "batch_size": 1,
+            "timezone": "America/Lima",
+        },
+    ]
+
+
+DEFAULT_SCHEDULED_JOBS.extend(build_default_icg_scheduled_jobs())
+
+
 class SeedService:
     def __init__(self, db: Session):
         self.db = db
@@ -464,6 +536,7 @@ class SeedService:
             self.ensure_mailing_parameters()
             self.ensure_provision_statuses()
             self.ensure_scheduled_jobs(admin_user)
+            self.disable_legacy_icg_scheduled_jobs()
 
             self.db.commit()
 
@@ -769,3 +842,24 @@ class SeedService:
                 )
             )
             self.created.append(f"scheduled_job:{item['name']}")
+
+    def disable_legacy_icg_scheduled_jobs(self):
+        grouped_names = {item["name"] for item in build_default_icg_scheduled_jobs()}
+        legacy_names = set()
+        for table in ICG_TABLES.values():
+            legacy_names.update(
+                {
+                    f"ICG {table.name} incremental recuperacion",
+                    f"ICG {table.name} incremental dia actual",
+                    f"ICG {table.name} snapshot diario",
+                }
+            )
+
+        for scheduled_job in (
+            self.db.query(ScheduledJob)
+            .filter(ScheduledJob.name.in_(legacy_names - grouped_names))
+            .all()
+        ):
+            if scheduled_job.enabled:
+                scheduled_job.enabled = False
+                self.existing.append(f"scheduled_job_disabled:{scheduled_job.name}")

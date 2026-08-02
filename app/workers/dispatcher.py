@@ -4,9 +4,11 @@ from app.api.jobs.constants import JobBatchStatus, JobType
 from app.api.jobs.repository import JobRepository
 from app.api.sap.handlers import get_sap_item_handler
 from app.core.db.db_postgres import SessionLocal
+from app.workers.analytics_tasks import process_analytics_batch
 from app.workers.email_tasks import process_payment_provider_email_batch
 from app.workers.ledger_tasks import process_ledger_batch
 from app.workers.sap_tasks import process_sap_batch
+from app.workers.silver_tasks import process_analytics_silver_batch
 
 
 QUEUE_LIGHT = "light"
@@ -21,6 +23,8 @@ JOB_TASKS = {
     JobType.LEDGER_SYNC.value: process_ledger_batch,
     JobType.LEDGER_SYNC_DELTA.value: process_ledger_batch,
     JobType.LEDGER_REPROCESS.value: process_ledger_batch,
+    JobType.ANALYTICS_EXTRACT.value: process_analytics_batch,
+    JobType.ANALYTICS_SILVER_BUILD.value: process_analytics_silver_batch,
 }
 
 
@@ -33,6 +37,8 @@ def resolve_job_queue(job) -> str:
         JobType.SAP_DOCUMENT_ACTION.value,
         JobType.SAP_RECONCILIATION.value,
         JobType.LEDGER_REPROCESS.value,
+        JobType.ANALYTICS_EXTRACT.value,
+        JobType.ANALYTICS_SILVER_BUILD.value,
     }:
         return QUEUE_HEAVY
 

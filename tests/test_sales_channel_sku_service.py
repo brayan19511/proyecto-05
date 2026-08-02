@@ -46,6 +46,19 @@ def make_managed_service():
     return service
 
 
+def make_sku_matched_external_id_service():
+    config = SkuModelConfig(
+        model=FakeSku,
+        external_id_field="id_channel",
+        updated_at_field="updated_at",
+        channel_name="Canal",
+        external_id_matches_sku=True,
+    )
+    service = ManagedSkuService(Mock(), config)
+    service.repository = Mock()
+    return service
+
+
 class ManagedSkuServiceTests(unittest.TestCase):
     def test_create_sets_active_and_external_id(self):
         service = make_managed_service()
@@ -67,6 +80,25 @@ class ManagedSkuServiceTests(unittest.TestCase):
 
         with self.assertRaises(ConflictError):
             service.create(SkuCreateRequest(sku="SKU-1"))
+
+    def test_create_can_force_external_id_to_match_sku(self):
+        service = make_sku_matched_external_id_service()
+        service.repository.get.return_value = None
+
+        result = service.create(SkuCreateRequest(sku="SKU-1"))
+
+        entity = service.repository.add.call_args.args[0]
+        self.assertEqual(entity.id_channel, "SKU-1")
+        self.assertEqual(result["external_id"], "SKU-1")
+
+    def test_create_rejects_external_id_different_from_sku_when_forced(self):
+        service = make_sku_matched_external_id_service()
+        service.repository.get.return_value = None
+
+        with self.assertRaises(ConflictError):
+            service.create(
+                SkuCreateRequest(sku="SKU-1", external_id="OTHER"),
+            )
 
     def test_deactivate_does_not_delete(self):
         service = make_managed_service()
@@ -131,6 +163,19 @@ class ManagedSkuServiceTests(unittest.TestCase):
 
         self.assertEqual(result["missing"], ["NEW"])
         service.repository.add.assert_not_called()
+
+    def test_bulk_sync_backfills_external_id_when_it_must_match_sku(self):
+        service = make_sku_matched_external_id_service()
+        sku_1 = FakeSku("SKU-1", id_channel=None, is_active=True)
+        service.repository.list.return_value = [sku_1]
+
+        service.bulk_sync(
+            BulkSkuSyncRequest(
+                items=[{"sku": "SKU-1", "active": True}],
+            )
+        )
+
+        self.assertEqual(sku_1.id_channel, "SKU-1")
 
     def test_peya_list_marks_promotional_skus(self):
         config = SkuModelConfig(

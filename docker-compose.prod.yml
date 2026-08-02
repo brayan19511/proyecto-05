@@ -60,8 +60,10 @@ services:
       ENV: prod
       SQL_ECHO: "false"
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      DATA_LAKE_ROOT: /app/var/data-lake
       PAYMENT_PROVIDER_STORAGE_DIR: /app/var/payment-provider-jobs
     volumes:
+      - analytics-data-lake:/app/var/data-lake
       - payment-provider-jobs:/app/var/payment-provider-jobs
     ports:
       - "${API_PORT}:8000"
@@ -101,6 +103,7 @@ services:
       ENV: prod
       SQL_ECHO: "false"
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      DATA_LAKE_ROOT: /app/var/data-lake
       PAYMENT_PROVIDER_STORAGE_DIR: /app/var/payment-provider-jobs
     command:
       [
@@ -123,6 +126,7 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
+      - analytics-data-lake:/app/var/data-lake
       - payment-provider-jobs:/app/var/payment-provider-jobs
     networks:
       - finance-network
@@ -141,6 +145,7 @@ services:
       ENV: prod
       SQL_ECHO: "false"
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      DATA_LAKE_ROOT: /app/var/data-lake
     command:
       [
         "celery",
@@ -159,6 +164,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - analytics-data-lake:/app/var/data-lake
     networks:
       - finance-network
 
@@ -176,6 +183,7 @@ services:
       ENV: prod
       SQL_ECHO: "false"
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      DATA_LAKE_ROOT: /app/var/data-lake
     command:
       [
         "celery",
@@ -194,6 +202,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    volumes:
+      - analytics-data-lake:/app/var/data-lake
     networks:
       - finance-network
 
@@ -251,6 +261,7 @@ volumes:
   pgadmin-data:
   rabbitmq-data:
   payment-provider-jobs:
+  analytics-data-lake:
 
 networks:
   finance-network:

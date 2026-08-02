@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.analytics import router as analytics_router
 from app.api.attendance import router as attendance_router
 from app.api.health import health_router
 from app.api.finance.router import router as finance_router
@@ -47,6 +48,7 @@ register_exception_handlers(app)
 # 4. RUTAS (ROUTERS)
 # =========================================================
 app.include_router(prefix="/api", router=sap_router.router)
+app.include_router(prefix="/api", router=analytics_router)
 app.include_router(prefix="/api", router=scheduled_jobs_router.router)
 app.include_router(prefix="/api", router=web_router.router)
 app.include_router(prefix="/api", router=finance_router)

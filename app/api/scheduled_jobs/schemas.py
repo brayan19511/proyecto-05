@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.api.jobs.constants import JobType, ScheduledJobScheduleKind
 from app.core.schemas import ORMModel, PageResponse
@@ -22,12 +22,13 @@ class ScheduledJobBase(BaseModel):
     @classmethod
     def validate_job_type(cls, value: JobType):
         supported = {
+            JobType.ANALYTICS_EXTRACT,
             JobType.LEDGER_SYNC,
             JobType.LEDGER_SYNC_DELTA,
             JobType.LEDGER_REPROCESS,
         }
         if value not in supported:
-            raise ValueError("Solo se soportan tareas programadas de libro mayor")
+            raise ValueError("Solo se soportan tareas programadas de libro mayor o analytics")
         return value
 
     @field_validator("schedule_config")
@@ -81,6 +82,42 @@ class ScheduledJobBase(BaseModel):
     def _minutes_of_day(value: str) -> int:
         hour, minute = [int(part) for part in value.split(":")]
         return hour * 60 + minute
+
+    @model_validator(mode="after")
+    def validate_job_parameters(self):
+        if self.job_type == JobType.ANALYTICS_EXTRACT:
+            table_name = self.parameters.get("table_name")
+            table_names = self.parameters.get("table_names")
+            table_group = self.parameters.get("table_group")
+            mode = self.parameters.get("mode", "incremental")
+            lookback_days = self.parameters.get("lookback_days")
+            selectors = [
+                isinstance(table_name, str) and bool(table_name.strip()),
+                isinstance(table_names, list) and bool(table_names),
+                isinstance(table_group, str) and bool(table_group.strip()),
+            ]
+            if sum(selectors) != 1:
+                raise ValueError(
+                    "ANALYTICS_EXTRACT requiere solo uno: parameters.table_name, "
+                    "parameters.table_names o parameters.table_group"
+                )
+            if table_names and any(not isinstance(item, str) or not item.strip() for item in table_names):
+                raise ValueError("ANALYTICS_EXTRACT parameters.table_names debe contener nombres validos")
+            if table_group and table_group not in {"transactional", "master", "all"}:
+                raise ValueError("ANALYTICS_EXTRACT parameters.table_group debe ser transactional, master o all")
+            if mode not in {"incremental", "reprocess", "snapshot"}:
+                raise ValueError(
+                    "ANALYTICS_EXTRACT parameters.mode debe ser incremental, reprocess o snapshot"
+                )
+            if lookback_days is not None and (
+                not isinstance(lookback_days, int)
+                or lookback_days < 0
+                or lookback_days > 31
+            ):
+                raise ValueError(
+                    "ANALYTICS_EXTRACT parameters.lookback_days debe estar entre 0 y 31"
+                )
+        return self
 
 
 class ScheduledJobCreate(ScheduledJobBase):

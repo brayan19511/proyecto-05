@@ -62,11 +62,13 @@ services:
         required: false
     volumes:
       - .:/app
+      - ./var/data-lake:/app/var/data-lake
       - payment-provider-jobs:/app/var/payment-provider-jobs
     environment:
       DB_HOST: db-postgres
       DB_PORT: 5432
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
+      DATA_LAKE_ROOT: ${DATA_LAKE_ROOT:-/app/var/data-lake}
       PAYMENT_PROVIDER_STORAGE_DIR: ${PAYMENT_PROVIDER_STORAGE_DIR:-/app/var/payment-provider-jobs}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173}
     ports:
@@ -95,6 +97,7 @@ services:
       DB_HOST: db-postgres
       DB_PORT: 5432
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
+      DATA_LAKE_ROOT: ${DATA_LAKE_ROOT:-/app/var/data-lake}
     command:
       [
         "celery",
@@ -115,6 +118,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      - ./var/data-lake:/app/var/data-lake
     networks:
       - finance-network
 
@@ -132,6 +136,7 @@ services:
       DB_HOST: db-postgres
       DB_PORT: 5432
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
+      DATA_LAKE_ROOT: ${DATA_LAKE_ROOT:-/app/var/data-lake}
     command:
       [
         "celery",
@@ -152,6 +157,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      - ./var/data-lake:/app/var/data-lake
     networks:
       - finance-network
 
@@ -169,6 +175,7 @@ services:
       DB_HOST: db-postgres
       DB_PORT: 5432
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672//}
+      DATA_LAKE_ROOT: ${DATA_LAKE_ROOT:-/app/var/data-lake}
       PAYMENT_PROVIDER_STORAGE_DIR: ${PAYMENT_PROVIDER_STORAGE_DIR:-/app/var/payment-provider-jobs}
     command:
       [
@@ -192,6 +199,7 @@ services:
         condition: service_healthy
     volumes:
       - .:/app
+      - ./var/data-lake:/app/var/data-lake
       - payment-provider-jobs:/app/var/payment-provider-jobs
     networks:
       - finance-network

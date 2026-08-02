@@ -52,6 +52,7 @@ RAPPI_PERU = SalesChannelDefinition(
         external_id_field="id_rappi",
         updated_at_field="updated_at",
         channel_name="Rappi Peru",
+        external_id_matches_sku=True,
     ),
 )
 
@@ -64,6 +65,7 @@ RAPPI_MEXICO = SalesChannelDefinition(
         external_id_field="id_rappi",
         updated_at_field="updated_at",
         channel_name="Rappi Mexico",
+        external_id_matches_sku=True,
     ),
 )
 
@@ -77,6 +79,7 @@ PEYA_PERU = SalesChannelDefinition(
         updated_at_field="modified_at",
         channel_name="Peya Peru",
         promotion_model=PeyaPromoSku,
+        external_id_matches_sku=True,
     ),
 )
 

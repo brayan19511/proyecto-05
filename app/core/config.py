@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     DB_CIC_TRUST_SERVER_CERTIFICATE: bool = False
     DB_CIC_DATABASE: str = "dbcoolbox"
 
+    DB_ICG_HOST: Optional[str] = None
+    DB_ICG_PORT: int = 1433
+    DB_ICG_USER: Optional[str] = None
+    DB_ICG_PASSWORD: Optional[str] = None
+    DB_ICG_DRIVER: str = "ODBC Driver 17 for SQL Server"
+    DB_ICG_ENCRYPT: bool = False
+    DB_ICG_TRUST_SERVER_CERTIFICATE: bool = False
+    DB_ICG_DATABASE: str = "ICG"
+
+    DATA_LAKE_ROOT: str = "var/data-lake"
+    ICG_INCREMENTAL_LOOKBACK_DAYS: int = 3
+
     @property
     def DATABASE_URL_SAP(self) -> str:
         return (
@@ -187,6 +199,19 @@ class Settings(BaseSettings):
             driver=self.DB_CIC_DRIVER,
             encrypt=self.DB_CIC_ENCRYPT,
             trust_server_certificate=self.DB_CIC_TRUST_SERVER_CERTIFICATE,
+        )
+
+    def get_icg_database_url(self) -> URL:
+        return self._build_mssql_url(
+            system_name="ICG",
+            database=self.DB_ICG_DATABASE,
+            host=self.DB_ICG_HOST,
+            port=self.DB_ICG_PORT,
+            user=self.DB_ICG_USER,
+            password=self.DB_ICG_PASSWORD,
+            driver=self.DB_ICG_DRIVER,
+            encrypt=self.DB_ICG_ENCRYPT,
+            trust_server_certificate=self.DB_ICG_TRUST_SERVER_CERTIFICATE,
         )
 
     model_config = SettingsConfigDict(

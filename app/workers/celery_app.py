@@ -8,6 +8,8 @@ celery_app = Celery(
     broker=settings.CELERY_BROKER_URL,
     include=[
         "app.workers.sap_tasks",
+        "app.workers.analytics_tasks",
+        "app.workers.silver_tasks",
         "app.workers.email_tasks",
         "app.workers.ledger_tasks",
         "app.workers.scheduled_tasks",
@@ -32,6 +34,8 @@ celery_app.conf.update(
     task_default_queue="light",
     task_routes={
         "jobs.sap.process_batch": {"queue": "heavy"},
+        "jobs.analytics.process_batch": {"queue": "heavy"},
+        "jobs.analytics_silver.process_batch": {"queue": "heavy"},
         "jobs.payment_provider.send_email_batch": {"queue": "email"},
         "jobs.ledger.process_batch": {"queue": "heavy"},
         "scheduled_jobs.tick": {"queue": "light"},
