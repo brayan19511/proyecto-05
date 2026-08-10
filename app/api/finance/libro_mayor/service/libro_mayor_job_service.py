@@ -3,7 +3,10 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.api.finance.libro_mayor.libro_mayor_service import SUPPORTED_ACCOUNTS
+from app.api.finance.libro_mayor.constants import (
+    DEFAULT_LEDGER_ACCOUNTS,
+    SUPPORTED_ACCOUNTS,
+)
 from app.api.finance.libro_mayor.repository.libro_mayor_repository import (
     LibroMayorRepository,
 )
@@ -13,7 +16,6 @@ from app.workers.dispatcher import dispatch_job
 
 
 DEFAULT_LEDGER_START_DATE = date(2026, 1, 1)
-DEFAULT_LEDGER_ACCOUNTS = ("97", "95")
 
 
 class LibroMayorJobService:

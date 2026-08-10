@@ -5,6 +5,7 @@ from datetime import date
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.finance.libro_mayor.constants import SUPPORTED_ACCOUNTS
 from app.api.finance.libro_mayor.repository.libro_mayor_repository import (
     LibroMayorRepository,
 )
@@ -14,8 +15,6 @@ from app.api.finance.libro_mayor.repository.reglas_gastos_repository import (
 from app.api.finance.libro_mayor.service.libro_mayor_rules_service import (
     LibroMayorRulesService,
 )
-
-SUPPORTED_ACCOUNTS = {"95", "97"}
 
 
 class LibroMayorReprocessService:

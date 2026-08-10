@@ -253,7 +253,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
             response.body_iterator = iterate_in_threadpool(iter(response_body_bytes))
 
             try:
-                response_body = json.loads(response_body_bytes[0].decode())
+                # Unir todos los chunks: una respuesta JSON puede venir
+                # fragmentada en varias secciones y decodificar solo la
+                # primera registraria un JSON parcial o invalido.
+                raw_body = b"".join(response_body_bytes)
+                response_body = json.loads(raw_body.decode())
                 response_body = sanitize_payload(response_body)
             except Exception:
                 response_body = {"info": "Body no serializable"}

@@ -167,8 +167,13 @@ class JobService:
         *,
         user_id: UUID,
         can_view_all: bool,
+        with_items: bool = False,
     ) -> Job:
-        job = self.repository.get_by_id(job_id, with_batches=True)
+        job = self.repository.get_by_id(
+            job_id,
+            with_batches=True,
+            with_items=with_items,
+        )
         if not job:
             raise NotFoundError("Tarea no encontrada")
         self._ensure_access(job, user_id, can_view_all)
@@ -204,6 +209,7 @@ class JobService:
             job_id,
             user_id=user_id,
             can_view_all=can_cancel_all,
+            with_items=True,
         )
         if JobStatus(job.status) in TERMINAL_JOB_STATUSES:
             raise ConflictError("La tarea ya se encuentra finalizada")

@@ -432,6 +432,14 @@ class ProvisionService:
         provision = self._get_or_404(provision_id)
         self._ensure_can_edit_access(provision, user_id, can_edit_all)
 
+        # Solo se envia a revision desde un estado editable (borrador u
+        # observada); evita reenviar una provision ya aprobada/cancelada.
+        if not self._can_edit(provision):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Solo se puede enviar a revision una provision en borrador u observada",
+            )
+
         if not provision.documents:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -496,6 +504,18 @@ class ProvisionService:
     ):
         provision = self._get_or_404(provision_id)
         self._ensure_can_edit_access(provision, user_id, can_edit_all)
+
+        # No se cancela una provision ya cerrada (aprobada, rechazada final o
+        # ya cancelada).
+        if provision.status.code in {
+            APPROVED_STATUS,
+            REJECTED_FINAL_STATUS,
+            CANCELLED_STATUS,
+        }:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No se puede cancelar una provision ya cerrada",
+            )
 
         return self._transition(
             provision=provision,

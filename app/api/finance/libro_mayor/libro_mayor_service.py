@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.finance.libro_mayor.constants import SUPPORTED_ACCOUNTS
 from app.api.finance.libro_mayor.libro_mayor_schema import LibroMayorSap
 from app.api.finance.libro_mayor.repository.libro_mayor_repository import (
     LibroMayorRepository,
@@ -18,8 +19,6 @@ from app.api.finance.libro_mayor.service.libro_mayor_rules_service import (
     LibroMayorRulesService,
 )
 from app.models.finance.libro_mayor_model import LibroMayor
-
-SUPPORTED_ACCOUNTS = {"95", "97"}
 
 
 class LibroMayorService:

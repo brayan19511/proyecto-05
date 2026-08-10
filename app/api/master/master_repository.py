@@ -21,7 +21,8 @@ class MasterRepository:
 
     def get_companies(self, search: str | None = None):
 
-        query = self.db.query(Company)
+        # Solo registros activos: el borrado es logico (active=False).
+        query = self.db.query(Company).filter(Company.active.is_(True))
 
         if search:
             query = query.filter(
@@ -57,7 +58,8 @@ class MasterRepository:
 
     def get_areas(self, search: str | None = None):
 
-        query = self.db.query(Area)
+        # Solo registros activos: el borrado es logico (active=False).
+        query = self.db.query(Area).filter(Area.active.is_(True))
 
         if search:
             query = query.filter(
@@ -93,7 +95,8 @@ class MasterRepository:
 
     def get_currencies(self, search: str | None = None):
 
-        query = self.db.query(Currency)
+        # Solo registros activos: el borrado es logico (active=False).
+        query = self.db.query(Currency).filter(Currency.active.is_(True))
 
         if search:
             query = query.filter(
@@ -128,7 +131,10 @@ class MasterRepository:
     # ==========================================
 
     def get_mailing_parameters(self, search: str | None = None):
-        query = self.db.query(MailingParameter)
+        # Solo registros activos: el borrado es logico (active=False).
+        query = self.db.query(MailingParameter).filter(
+            MailingParameter.active.is_(True)
+        )
         if search:
             query = query.filter(MailingParameter.name.ilike(f"%{search}%"))
         return query.order_by(MailingParameter.name).all()

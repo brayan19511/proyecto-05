@@ -59,11 +59,18 @@ class LibroMayorRepository:
     def get_reglas_activas(self) -> list[ReglasGastos]:
         """
         Obtiene reglas activas ordenadas por prioridad.
+
+        El desempate por id_regla hace la clasificacion determinista y alinea
+        el orden con el reproceso (ReglasGastosRepository.get_all_active), para
+        que un mismo registro no se clasifique distinto entre sync y reproceso.
         """
         return (
             self.db.query(ReglasGastos)
             .filter(ReglasGastos.activo.is_(True))
-            .order_by(ReglasGastos.prioridad.asc())
+            .order_by(
+                ReglasGastos.prioridad.asc(),
+                ReglasGastos.id_regla.asc(),
+            )
             .all()
         )
 

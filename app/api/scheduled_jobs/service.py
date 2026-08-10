@@ -17,6 +17,7 @@ from app.api.scheduled_jobs.schemas import (
     ScheduledJobCreate,
     ScheduledJobPageResponse,
     ScheduledJobUpdate,
+    validate_schedule_config,
 )
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.jobs import Job, ScheduledJob
@@ -91,6 +92,18 @@ class ScheduledJobService:
             normalized = value.value if hasattr(value, "value") else value
             setattr(scheduled_job, field, normalized)
 
+        # Valida la configuracion resultante tras el merge, para que un PATCH
+        # parcial no deje una agenda invalida (p.ej. DAILY sin times) que luego
+        # rompa el calculo del proximo disparo.
+        if {"schedule_kind", "schedule_config"}.intersection(updates):
+            try:
+                validate_schedule_config(
+                    scheduled_job.schedule_kind,
+                    scheduled_job.schedule_config,
+                )
+            except ValueError as error:
+                raise ValidationError(str(error)) from error
+
         if "next_run_at" not in updates and {
             "schedule_kind",
             "schedule_config",
@@ -127,24 +140,44 @@ class ScheduledJobService:
             due_jobs = self.repository.list_due_jobs(now=now, limit=1)
             if not due_jobs:
                 break
-            scheduled_job = due_jobs[0]
-            due_at = scheduled_job.next_run_at
-            scheduled_job.last_run_at = now
+            if self._advance_and_execute(due_jobs[0], now=now):
+                executed += 1
+        return executed
+
+    def _advance_and_execute(self, scheduled_job: ScheduledJob, *, now: datetime) -> bool:
+        """Avanza el proximo disparo y lanza la ejecucion de una tarea vencida.
+
+        Cualquier fallo se aisla en esta tarea para que una sola tarea "veneno"
+        no bloquee al resto de tareas vencidas:
+        - Si el schedule_config es invalido y no se puede calcular next_run_at,
+          la tarea se deshabilita (sale de la cola de vencidas) y el operador la
+          revisa por last_error.
+        - Si falla el despacho, next_run_at ya avanzo, asi que no se reintenta de
+          inmediato; el error queda registrado en la tarea programada.
+        """
+        due_at = scheduled_job.next_run_at
+        scheduled_job.last_run_at = now
+        try:
             scheduled_job.next_run_at = calculate_next_run(
                 schedule_kind=scheduled_job.schedule_kind,
                 schedule_config=scheduled_job.schedule_config,
                 tz_name=scheduled_job.timezone,
                 after=now,
             )
+        except Exception as error:
+            scheduled_job.enabled = False
+            scheduled_job.last_status = "FAILED"
+            scheduled_job.last_error = f"schedule_config invalido: {error}"[:1000]
+            scheduled_job.consecutive_failures += 1
             self.db.commit()
-            try:
-                self._create_execution(scheduled_job, due_at=due_at, manual=False)
-                executed += 1
-            except Exception:
-                # El error queda guardado en la tarea programada; las demas
-                # tareas vencidas deben seguir su curso.
-                continue
-        return executed
+            return False
+
+        self.db.commit()
+        try:
+            self._create_execution(scheduled_job, due_at=due_at, manual=False)
+            return True
+        except Exception:
+            return False
 
     def _create_execution(
         self,

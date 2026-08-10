@@ -8,6 +8,7 @@ from app.api.health import health_router
 from app.api.finance.router import router as finance_router
 from app.api.jobs.router import router as jobs_router
 from app.api.master import master_router
+from app.api.observability import router as observability_router
 from app.api.finance.provisions import provisions_router
 from app.api.sales_channel import router as sales_channel_router
 from app.api.sap import sap_router
@@ -60,4 +61,5 @@ app.include_router(prefix="/api", router=user_router.router)
 app.include_router(prefix="/api", router=sales_channel_router.router)
 app.include_router(prefix="/api", router=attendance_router.router)
 app.include_router(prefix="/api", router=jobs_router)
+app.include_router(prefix="/api", router=observability_router.router)
 app.include_router(router=health_router.router)

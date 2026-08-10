@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from email.message import EmailMessage as MimeEmailMessage
+from functools import lru_cache
 from email.utils import formataddr, parseaddr
 from html import escape
 import mimetypes
@@ -157,7 +158,7 @@ class EmailService:
         template_value = _get_attr(template, "template")
 
         if html_value:
-            return render_jinja_template(html_value, parameters), True
+            return render_jinja_template(html_value, parameters, autoescape=True), True
         if text_value:
             return render_jinja_template(text_value, parameters), False
         if not template_value:
@@ -207,8 +208,21 @@ def _looks_like_html(value: str) -> bool:
     return "<html" in value.lower() or "<body" in value.lower() or "</" in value
 
 
-def render_jinja_template(template: str, parameters: dict[str, Any]) -> str:
-    return Environment(autoescape=False).from_string(template).render(**parameters)
+@lru_cache(maxsize=2)
+def _string_template_env(autoescape: bool) -> Environment:
+    # Reutiliza una unica instancia de Environment por modo (HTML vs texto).
+    return Environment(autoescape=autoescape)
+
+
+def render_jinja_template(
+    template: str,
+    parameters: dict[str, Any],
+    *,
+    autoescape: bool = False,
+) -> str:
+    # autoescape=True escapa los VALORES interpolados (no el HTML propio de la
+    # plantilla). Para HTML intencional en un parametro usar el filtro |safe.
+    return _string_template_env(autoescape).from_string(template).render(**parameters)
 
 
 def render_user_message(template: str, parameters: dict[str, Any]) -> str:

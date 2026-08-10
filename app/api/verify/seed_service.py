@@ -17,6 +17,7 @@ from app.api.jobs.constants import (
     SCHEDULED_JOBS_VIEW_PERMISSION,
     ScheduledJobScheduleKind,
 )
+from app.api.observability.constants import OBSERVABILITY_VIEW_PERMISSION
 from app.api.scheduled_jobs.schedule import calculate_next_run
 from app.api.finance.provisions.constants import (
     APPROVED_STATUS,
@@ -240,6 +241,10 @@ PERMISSIONS = [
         "code": ANALYTICS_INGEST_RUN_PERMISSION,
         "description": "Ejecutar ingestas analytics",
     },
+    {
+        "code": OBSERVABILITY_VIEW_PERMISSION,
+        "description": "Ver estado del sistema y analitica de logs/jobs",
+    },
 ]
 
 ROLES = [
@@ -264,6 +269,7 @@ ROLES = [
     "Tareas Operador",
     "Tareas Admin",
     "Analytics Operador",
+    "Observabilidad",
 ]
 
 ROLE_PERMISSIONS = {
@@ -427,6 +433,11 @@ ROLE_PERMISSIONS = {
         ANALYTICS_INGEST_RUN_PERMISSION,
         JOBS_VIEW_PERMISSION,
         JOBS_CANCEL_PERMISSION,
+    },
+    "Observabilidad": {
+        OBSERVABILITY_VIEW_PERMISSION,
+        JOBS_VIEW_ALL_PERMISSION,
+        SCHEDULED_JOBS_VIEW_PERMISSION,
     },
 }
 

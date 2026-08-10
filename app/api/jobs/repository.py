@@ -9,9 +9,21 @@ class JobRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_by_id(self, job_id: UUID, *, with_batches: bool = False) -> Job | None:
+    def get_by_id(
+        self,
+        job_id: UUID,
+        *,
+        with_batches: bool = False,
+        with_items: bool = False,
+    ) -> Job | None:
         query = self.db.query(Job)
-        if with_batches:
+        if with_items:
+            # Precarga lotes e items en una sola consulta para evitar N+1
+            # cuando el consumidor recorre batch.items (p.ej. al cancelar).
+            query = query.options(
+                selectinload(Job.batches).selectinload(JobBatch.items)
+            )
+        elif with_batches:
             query = query.options(selectinload(Job.batches))
         return query.filter(Job.id == job_id).first()
 
