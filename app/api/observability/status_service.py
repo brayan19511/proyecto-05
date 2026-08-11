@@ -29,6 +29,11 @@ CHECK_TIMEOUT_SECONDS = 5.0
 CELERY_PING_TIMEOUT_SECONDS = 1.5
 SMTP_TIMEOUT_SECONDS = 3.0
 
+# Probe de vida por motor: la mayoria acepta "SELECT 1", pero SAP HANA exige
+# la tabla de sistema DUMMY ("SELECT 1" sin FROM es error de sintaxis).
+PROBE_DEFAULT = "SELECT 1"
+PROBE_HANA = "SELECT 1 FROM DUMMY"
+
 # Colas declaradas en celery_app.conf.task_routes.
 CELERY_QUEUES = ("light", "heavy", "email")
 
@@ -46,7 +51,10 @@ class SystemStatusService:
             ("postgres", lambda: self._check_engine("postgres", postgres_engine)),
             ("db_icg", lambda: self._check_engine("db_icg", get_icg_engine())),
             ("db_cic", lambda: self._check_engine("db_cic", get_cic_engine())),
-            ("db_sap", lambda: self._check_engine("db_sap", engine_sap)),
+            # SAP es HANA: SELECT 1 sin FROM es error de sintaxis; usa DUMMY.
+            ("db_sap", lambda: self._check_engine(
+                "db_sap", engine_sap, probe=PROBE_HANA
+            )),
             ("db_ofisis_ecomm", self._check_ofisis),
             ("celery_workers", self._check_celery),
             ("smtp", self._check_smtp),
@@ -94,11 +102,17 @@ class SystemStatusService:
     # =====================================================
     # CHEQUEOS
     # =====================================================
-    def _check_engine(self, name: str, engine: Engine) -> ComponentStatus:
+    def _check_engine(
+        self,
+        name: str,
+        engine: Engine,
+        *,
+        probe: str = PROBE_DEFAULT,
+    ) -> ComponentStatus:
         start = time.perf_counter()
         try:
             with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
+                connection.execute(text(probe))
             return ComponentStatus(
                 component=name,
                 status=STATUS_OK,

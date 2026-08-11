@@ -19,20 +19,42 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Indices para las agregaciones de observabilidad (filtros por rango de
     # fecha y por clase de estado). audit.logs solo indexaba trace_id.
-    op.create_index(
-        "ix_logs_created_at",
-        "logs",
-        ["created_at"],
-        schema="audit",
-    )
-    op.create_index(
-        "ix_logs_status_created_at",
-        "logs",
-        ["status_code", "created_at"],
-        schema="audit",
-    )
+    #
+    # Se crean CONCURRENTLY porque audit.logs recibe un INSERT por cada request:
+    # un CREATE INDEX normal bloquearia las escrituras (y por tanto la API)
+    # mientras se construye. CONCURRENTLY exige estar fuera de transaccion.
+    with op.get_context().autocommit_block():
+        op.create_index(
+            "ix_logs_created_at",
+            "logs",
+            ["created_at"],
+            schema="audit",
+            postgresql_concurrently=True,
+            if_not_exists=True,
+        )
+        op.create_index(
+            "ix_logs_status_created_at",
+            "logs",
+            ["status_code", "created_at"],
+            schema="audit",
+            postgresql_concurrently=True,
+            if_not_exists=True,
+        )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_logs_status_created_at", table_name="logs", schema="audit")
-    op.drop_index("ix_logs_created_at", table_name="logs", schema="audit")
+    with op.get_context().autocommit_block():
+        op.drop_index(
+            "ix_logs_status_created_at",
+            table_name="logs",
+            schema="audit",
+            postgresql_concurrently=True,
+            if_exists=True,
+        )
+        op.drop_index(
+            "ix_logs_created_at",
+            table_name="logs",
+            schema="audit",
+            postgresql_concurrently=True,
+            if_exists=True,
+        )
