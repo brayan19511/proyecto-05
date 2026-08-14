@@ -94,6 +94,10 @@ class BulkSkuSyncResponse(BaseModel):
     deactivated: int
     unchanged: int
     missing: list[str]
+    # Detalle de que SKUs cae en cada accion (util para el preview).
+    created_skus: list[str] = Field(default_factory=list)
+    activated_skus: list[str] = Field(default_factory=list)
+    deactivated_skus: list[str] = Field(default_factory=list)
 
 
 class ActiveSkuSnapshotRequest(BaseModel):

@@ -211,5 +211,8 @@ class SkuExcelImportService:
             promotions_added=result.get("promotions_added", 0),
             promotions_removed=result.get("promotions_removed", 0),
             missing=result.get("missing", []),
+            created_skus=result.get("created_skus", []),
+            activated_skus=result.get("activated_skus", []),
+            deactivated_skus=result.get("deactivated_skus", []),
             errors=errors,
         )

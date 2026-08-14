@@ -31,4 +31,8 @@ class SkuImportResponse(BaseModel):
     promotions_added: int = 0
     promotions_removed: int = 0
     missing: list[str] = Field(default_factory=list)
+    # Detalle de que SKUs se estan creando / activando / desactivando.
+    created_skus: list[str] = Field(default_factory=list)
+    activated_skus: list[str] = Field(default_factory=list)
+    deactivated_skus: list[str] = Field(default_factory=list)
     errors: list[SkuImportIssue] = Field(default_factory=list)

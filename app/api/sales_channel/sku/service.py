@@ -97,6 +97,8 @@ class ManagedSkuService:
             for entity in existing_entities
         }
         received_skus = {item.sku.casefold() for item in request.items}
+        # Ademas de los contadores, guardamos QUE SKUs cae en cada accion para
+        # que el preview muestre el detalle (no solo el total).
         result = {
             "received": len(request.items),
             "created": 0,
@@ -104,6 +106,9 @@ class ManagedSkuService:
             "deactivated": 0,
             "unchanged": 0,
             "missing": [],
+            "created_skus": [],
+            "activated_skus": [],
+            "deactivated_skus": [],
         }
 
         for item in request.items:
@@ -124,6 +129,7 @@ class ManagedSkuService:
                 self.repository.add(entity)
                 existing_by_sku[item.sku.casefold()] = entity
                 result["created"] += 1
+                result["created_skus"].append(item.sku)
                 continue
 
             self._sync_external_id(entity)
@@ -136,8 +142,10 @@ class ManagedSkuService:
             self._touch(entity)
             if item.active:
                 result["activated"] += 1
+                result["activated_skus"].append(entity.sku)
             else:
                 result["deactivated"] += 1
+                result["deactivated_skus"].append(entity.sku)
 
         if request.deactivate_missing:
             for normalized_sku, entity in existing_by_sku.items():
@@ -146,6 +154,7 @@ class ManagedSkuService:
                 entity.is_active = False
                 self._touch(entity)
                 result["deactivated"] += 1
+                result["deactivated_skus"].append(entity.sku)
 
         try:
             if dry_run:

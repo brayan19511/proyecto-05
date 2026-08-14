@@ -150,6 +150,32 @@ class ManagedSkuServiceTests(unittest.TestCase):
         self.assertEqual(result["deactivated"], 1)
         service.repository.commit.assert_called_once()
 
+    def test_bulk_sync_lists_which_skus_are_created_activated_deactivated(self):
+        service = make_managed_service()
+        sku_existente = FakeSku("SKU-1", is_active=False)  # se activara
+        sku_sobrante = FakeSku("SKU-2", is_active=True)    # se desactivara
+        service.repository.list.return_value = [sku_existente, sku_sobrante]
+
+        result = service.bulk_sync(
+            BulkSkuSyncRequest(
+                items=[
+                    {"sku": "SKU-1", "active": True},
+                    {"sku": "SKU-NUEVO", "active": True},
+                ],
+                deactivate_missing=True,
+            ),
+            dry_run=True,
+        )
+
+        # El detalle dice CUALES, no solo cuantos.
+        self.assertEqual(result["created_skus"], ["SKU-NUEVO"])
+        self.assertEqual(result["activated_skus"], ["SKU-1"])
+        self.assertEqual(result["deactivated_skus"], ["SKU-2"])
+        # Los contadores siguen intactos.
+        self.assertEqual(result["created"], 1)
+        self.assertEqual(result["activated"], 1)
+        self.assertEqual(result["deactivated"], 1)
+
     def test_bulk_sync_reports_missing_when_creation_is_disabled(self):
         service = make_managed_service()
         service.repository.list.return_value = []
