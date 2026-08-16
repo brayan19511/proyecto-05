@@ -23,6 +23,25 @@ def normalizar_texto(valor: str | None) -> str:
     return re.sub(r"\s+", " ", normalizar_para_busqueda(valor)).strip()
 
 
+def clave_comparacion(valor: str | None) -> str:
+    """Clave para comparar nombres de proveedor de forma tolerante.
+
+    Ademas de quitar tildes/mayusculas/espacios (normalizar_texto), elimina la
+    puntuacion (comas, puntos, etc.) para que "METEC CO., LIMITED" y
+    "METEC CO. LIMITED" se consideren el mismo proveedor.
+    """
+    base = normalizar_texto(valor)
+    base = re.sub(r"[^A-Z0-9 ]+", " ", base)
+    return re.sub(r"\s+", " ", base).strip()
+
+
+def clave_documento(valor: str | None) -> str:
+    """Clave para comparar documentos (RUC/DNI): solo alfanumericos en mayuscula."""
+    if not valor:
+        return ""
+    return re.sub(r"[^0-9A-Z]", "", valor.upper())
+
+
 def obtener_valor(contenido: str, campo: str) -> str | None:
     contenido_busqueda = normalizar_para_busqueda(contenido)
     campo_busqueda = normalizar_para_busqueda(campo)
@@ -70,6 +89,33 @@ def extraer_monto(valor: str | None) -> dict[str, Any] | None:
 
     moneda_original = coincidencia.group("moneda")
     monto_texto = coincidencia.group("monto")
+    try:
+        monto_decimal = Decimal(monto_texto.replace(",", ""))
+    except InvalidOperation:
+        return None
+
+    return {
+        "texto": valor.strip(),
+        "moneda_original": moneda_original,
+        "moneda": normalizar_moneda(moneda_original),
+        "monto": monto_decimal,
+    }
+
+
+def extraer_importe_cargado(valor: str | None) -> dict[str, Any] | None:
+    """Extrae montos con la moneda como palabra al final: "26,664.61 DOLARES"."""
+    if not valor:
+        return None
+
+    coincidencia = re.match(
+        r"^\s*(?P<monto>[\d.,]+)\s+(?P<moneda>[A-Za-z/.\$]+)\s*$",
+        valor.strip(),
+    )
+    if not coincidencia:
+        return None
+
+    monto_texto = coincidencia.group("monto")
+    moneda_original = coincidencia.group("moneda")
     try:
         monto_decimal = Decimal(monto_texto.replace(",", ""))
     except InvalidOperation:
@@ -228,6 +274,10 @@ class PaymentPdfParser:
                 inicio="Datos de operacion",
                 fin="Datos de orinen",
             )
+        # Formato BBVA "Consulta de Operaciones": no tiene secciones, es una
+        # lista plana de Etiqueta Valor.
+        if not seccion and self._es_consulta_operaciones(contenido):
+            return self._extract_consulta_operaciones_operation(contenido)
         column_values = self._extract_operation_column_values(seccion)
         return {
             "fecha_envio": (obtener_valor(seccion, "Fecha de envio") or obtener_valor(seccion, "Fecha de operacion")),
@@ -277,6 +327,11 @@ class PaymentPdfParser:
         }
 
     def _extract_payment_data(self, contenido: str) -> dict[str, Any]:
+        # Formato BBVA "Consulta de Operaciones" (lista plana Etiqueta Valor).
+        consulta_data = self._extract_consulta_operaciones_data(contenido)
+        if self._has_minimum_payment_data(consulta_data):
+            return consulta_data
+
         destination_data = self._extract_destination_data(contenido)
         if self._has_minimum_payment_data(destination_data):
             return destination_data
@@ -301,6 +356,98 @@ class PaymentPdfParser:
         # Devolvemos el primer intento para que el error liste los campos
         # faltantes habituales de la constancia.
         return destination_data
+
+    @staticmethod
+    def _es_consulta_operaciones(contenido: str) -> bool:
+        return "CONSULTA DE OPERACIONES" in normalizar_para_busqueda(contenido)
+
+    def _extract_consulta_operaciones_data(self, contenido: str) -> dict[str, Any]:
+        if not self._es_consulta_operaciones(contenido):
+            return {}
+
+        beneficiario = obtener_valor(
+            contenido, "Cuenta / Tarjeta / Servicio Beneficiario"
+        )
+        cuenta, nombre = self._split_cuenta_beneficiario(beneficiario)
+        ruc = self._extraer_documento(
+            obtener_valor(contenido, "Doc. Identidad")
+        )
+        monto_original = obtener_valor(contenido, "Importe Cargado")
+        monto_info = extraer_importe_cargado(monto_original)
+        return {
+            "monto_texto": monto_info["texto"] if monto_info else monto_original,
+            "monto_decimal": monto_info["monto"] if monto_info else None,
+            "moneda": monto_info["moneda"] if monto_info else None,
+            "moneda_original": (
+                monto_info["moneda_original"] if monto_info else None
+            ),
+            # Formato (3): trae nombre del beneficiario. Formato (4): solo RUC.
+            "titular": nombre,
+            "cuenta": cuenta,
+            "tipo": obtener_valor(contenido, "Tipo de Operacion"),
+            "referencia": obtener_valor(contenido, "Referencia"),
+            "ruc": ruc,
+            "source_section": "CONSULTA_OPERACIONES",
+        }
+
+    @staticmethod
+    def _split_cuenta_beneficiario(valor: str | None) -> tuple[str | None, str | None]:
+        """Separa "00110716810100023566 BUSINESS IT PERU SAC" en cuenta y nombre.
+
+        En el formato (4) solo viene la cuenta, sin nombre.
+        """
+        if not valor:
+            return None, None
+        coincidencia = re.match(
+            r"^\s*(?P<cuenta>\d+)\s*(?P<nombre>.*)$",
+            valor.strip(),
+        )
+        if not coincidencia:
+            texto = valor.strip()
+            return None, (texto or None)
+        cuenta = coincidencia.group("cuenta") or None
+        nombre = coincidencia.group("nombre").strip() or None
+        return cuenta, nombre
+
+    @staticmethod
+    def _extraer_documento(valor: str | None) -> str | None:
+        """Extrae el numero de documento (RUC/DNI) de "R - 20609307235"."""
+        if not valor:
+            return None
+        coincidencia = re.search(r"(\d{8,15})", valor)
+        return coincidencia.group(1) if coincidencia else None
+
+    def _extract_consulta_operaciones_operation(
+        self, contenido: str
+    ) -> dict[str, str | None]:
+        fecha = self._normalizar_fecha(obtener_valor(contenido, "Fecha / Hora"))
+        estado = (
+            "Realizada"
+            if "SU OPERACION HA SIDO REALIZADA"
+            in normalizar_para_busqueda(contenido)
+            else None
+        )
+        return {
+            "fecha_envio": fecha,
+            "estado": estado,
+            "tipo_operacion": obtener_valor(contenido, "Tipo de Operacion"),
+            "fecha_proceso": fecha,
+            "numero_operacion": obtener_valor(contenido, "Numero de Operacion"),
+        }
+
+    @staticmethod
+    def _normalizar_fecha(valor: str | None) -> str | None:
+        """Convierte "2026-08-14 16:31:03" a "14/08/2026" (para el nombre)."""
+        if not valor:
+            return None
+        coincidencia = re.search(r"(\d{4})[-/](\d{2})[-/](\d{2})", valor)
+        if coincidencia:
+            return (
+                f"{coincidencia.group(3)}/"
+                f"{coincidencia.group(2)}/"
+                f"{coincidencia.group(1)}"
+            )
+        return valor
 
     def _extract_destination_data(self, contenido: str) -> dict[str, Any]:
         seccion = self._extract_section(
@@ -588,8 +735,9 @@ class PaymentPdfParser:
 
     @staticmethod
     def _has_minimum_payment_data(data: dict) -> bool:
+        # El proveedor se identifica por nombre (titular) O por documento (ruc).
         return bool(
-            data.get("titular")
+            (data.get("titular") or data.get("ruc"))
             and data.get("monto_texto")
             and data.get("monto_decimal") is not None
             and data.get("moneda")
@@ -598,8 +746,8 @@ class PaymentPdfParser:
     @staticmethod
     def _validate_extracted_data(datos_destino: dict) -> None:
         campos_faltantes = []
-        if not datos_destino.get("titular"):
-            campos_faltantes.append("titular")
+        if not datos_destino.get("titular") and not datos_destino.get("ruc"):
+            campos_faltantes.append("titular o documento")
         if not datos_destino.get("monto_texto"):
             campos_faltantes.append("monto")
         if datos_destino.get("monto_decimal") is None:

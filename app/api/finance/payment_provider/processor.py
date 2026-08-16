@@ -2,7 +2,11 @@ from decimal import Decimal
 import re
 from typing import Any
 
-from app.api.finance.payment_provider.pdf_parser import normalizar_texto
+from app.api.finance.payment_provider.pdf_parser import (
+    clave_comparacion,
+    clave_documento,
+    normalizar_texto,
+)
 
 
 MONTH_NAMES = {
@@ -40,17 +44,24 @@ class PaymentProviderProcessor:
             destination = payment["datos_destino"]
             operation = payment["datos_operacion"]
             titular = destination["titular"]
+            ruc = destination.get("ruc")
             currency = destination["moneda"]
             amount = destination["monto_decimal"]
-            provider_key = normalizar_texto(titular)
-            provider = self._find_provider(provider_key)
 
-            if provider_key not in groups:
-                groups[provider_key] = {
+            # Se identifica primero por documento (RUC/DNI), que es lo mas
+            # confiable; si no, por nombre (tolerante a puntuacion).
+            provider = self._find_provider(ruc, titular)
+            display_name = (
+                provider.legal_name if provider else (titular or ruc or "SIN IDENTIFICAR")
+            )
+            group_key = self._group_key(provider, ruc, titular)
+
+            if group_key not in groups:
+                groups[group_key] = {
                     "provider_id": provider.id if provider else None,
-                    "provider_tax_id": provider.tax_id if provider else None,
-                    "proveedor": provider.legal_name if provider else titular,
-                    "titular_pdf": titular,
+                    "provider_tax_id": provider.tax_id if provider else ruc,
+                    "proveedor": display_name,
+                    "titular_pdf": titular or ruc,
                     "identificado": provider is not None,
                     "emails_payments": provider.emails_payments if provider else [],
                     "cantidad_pagos": 0,
@@ -59,25 +70,49 @@ class PaymentProviderProcessor:
                     "pagos": [],
                 }
 
-            group = groups[provider_key]
+            group = groups[group_key]
             group["totales"].setdefault(currency, Decimal("0.00"))
             group["totales"][currency] += amount
             group["cantidad_pagos"] += 1
             group["archivos"].append(payment["archivo"])
             payment_item = self._build_payment_item(payment, operation)
             payment_item["suggested_filename"] = build_pdf_filename(
-                titular=titular,
+                titular=titular or display_name,
                 fecha=operation["fecha_proceso"] or operation["fecha_envio"],
             )
             group["pagos"].append(payment_item)
 
         return [self._serialize_group(group) for group in groups.values()]
 
-    def _find_provider(self, normalized_name: str):
+    def _find_provider(self, ruc: str | None, titular: str | None):
+        return self._find_by_taxid(ruc) or self._find_by_name(titular)
+
+    def _find_by_taxid(self, ruc: str | None):
+        clave = clave_documento(ruc)
+        if not clave:
+            return None
         for provider in self.providers:
-            if normalized_name in (provider.normalized_names or []):
+            if clave_documento(provider.tax_id) == clave:
                 return provider
         return None
+
+    def _find_by_name(self, titular: str | None):
+        clave = clave_comparacion(titular)
+        if not clave:
+            return None
+        for provider in self.providers:
+            for nombre in provider.normalized_names or []:
+                if clave_comparacion(nombre) == clave:
+                    return provider
+        return None
+
+    @staticmethod
+    def _group_key(provider, ruc: str | None, titular: str | None) -> str:
+        if provider:
+            return f"id:{provider.id}"
+        if ruc:
+            return f"ruc:{clave_documento(ruc)}"
+        return f"name:{clave_comparacion(titular)}"
 
     @staticmethod
     def _build_payment_item(payment: dict, operation: dict) -> dict[str, Any]:
