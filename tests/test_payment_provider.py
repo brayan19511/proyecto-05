@@ -55,6 +55,54 @@ class PaymentProviderParsingTests(unittest.TestCase):
         self.assertEqual(data["moneda"], "PEN")
         self.assertEqual(data["monto_decimal"], Decimal("4324.70"))
 
+    def test_extracts_bbva_consulta_operaciones_by_document(self):
+        contenido = """
+        RASH PERU S.R.L. 2026/08/14 16:53:02
+        Consulta de Operaciones
+        Su operacion ha sido realizada
+        Numero de Operacion 000963753
+        Tipo de Operacion TRANSF INTERBANCARIA POR HORARIO
+        Importe Cargado 27,417.72 SOLES
+        Cuenta / Tarjeta / Servicio Beneficiario 00320000300450459138
+        Doc. Identidad R - 20609307235
+        Fecha / Hora 2026-08-14 16:31:03
+        Referencia TRANSF.INTERBANCARIA.CCE 007246861
+        """
+
+        parser = PaymentPdfParser()
+        operation = parser._extract_operation_data(contenido)
+        data = parser._extract_payment_data(contenido)
+
+        self.assertEqual(operation["numero_operacion"], "000963753")
+        self.assertEqual(operation["fecha_proceso"], "14/08/2026")
+        self.assertEqual(data["source_section"], "CONSULTA_OPERACIONES")
+        self.assertIsNone(data["titular"])
+        self.assertEqual(data["ruc"], "20609307235")
+        self.assertEqual(data["cuenta"], "00320000300450459138")
+        self.assertEqual(data["moneda"], "PEN")
+        self.assertEqual(data["monto_decimal"], Decimal("27417.72"))
+
+    def test_extracts_bbva_consulta_operaciones_account_and_name(self):
+        contenido = """
+        Consulta de Operaciones
+        Su operacion ha sido realizada
+        Numero de Operacion 000055189
+        Tipo de Operacion TRANSF A CTAS DE TERCEROS
+        Importe Cargado 26,664.61 DOLARES
+        Cuenta / Tarjeta / Servicio Beneficiario 00110716810100023566 BUSINESS IT PERU SAC
+        Fecha / Hora 2026-08-14 16:31:03
+        Referencia SERVICIO F002-9681 F002-9966
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["source_section"], "CONSULTA_OPERACIONES")
+        self.assertEqual(data["titular"], "BUSINESS IT PERU SAC")
+        self.assertEqual(data["cuenta"], "00110716810100023566")
+        self.assertIsNone(data["ruc"])
+        self.assertEqual(data["moneda"], "USD")
+        self.assertEqual(data["monto_decimal"], Decimal("26664.61"))
+
     def test_extracts_service_payment_section_when_provider_is_company(self):
         contenido = """
         Datos de la operación
@@ -251,6 +299,43 @@ class PaymentProviderGroupingTests(unittest.TestCase):
         )
 
         self.assertEqual(result[0]["status"], "MISSING_PAYMENT_EMAIL")
+
+    def test_group_matches_provider_names_ignoring_punctuation(self):
+        provider = Mock(
+            id="22222222-2222-2222-2222-222222222222",
+            tax_id="PE0000000313",
+            legal_name="METEC ELECTRONICS CO. LIMITED",
+            normalized_names=[normalizar_texto("METEC ELECTRONICS CO. LIMITED")],
+            emails_payments=["pagos@proveedor.pe"],
+        )
+
+        result = PaymentProviderProcessor([provider]).group(
+            [
+                {
+                    "archivo": "pago.pdf",
+                    "datos_destino": {
+                        "titular": "METEC ELECTRONICS CO., LIMITED",
+                        "cuenta": "60134 4 09732",
+                        "moneda": "USD",
+                        "monto_decimal": Decimal("18110.78"),
+                        "monto_texto": "$ 18,110.78",
+                        "moneda_original": "$",
+                        "tipo": "Transferencia exterior",
+                        "referencia": "METEC",
+                        "ruc": None,
+                    },
+                    "datos_operacion": {
+                        "fecha_envio": "12/08/2026",
+                        "fecha_proceso": "12/08/2026",
+                        "estado": "Procesada",
+                    },
+                }
+            ]
+        )
+
+        self.assertEqual(result[0]["provider_id"], provider.id)
+        self.assertTrue(result[0]["identificado"])
+        self.assertEqual(result[0]["status"], "READY")
 
 
 if __name__ == "__main__":
