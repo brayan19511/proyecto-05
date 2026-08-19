@@ -13,6 +13,7 @@
 9. [Aprender GitHub Actions](automation/github-actions.md)
 10. [Workflows del proyecto](automation/workflows.md)
 11. [Jobs y tareas en cola](automation/queues.md)
+12. [GraphQL sobre ICG](development/graphql.md)
 
 ## Estructura
 

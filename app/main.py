@@ -6,6 +6,7 @@ from app.api.analytics import router as analytics_router
 from app.api.attendance import router as attendance_router
 from app.api.health import health_router
 from app.api.finance.router import router as finance_router
+from app.api.graphql import graphql_router
 from app.api.jobs.router import router as jobs_router
 from app.api.master import master_router
 from app.api.observability import router as observability_router
@@ -62,4 +63,5 @@ app.include_router(prefix="/api", router=sales_channel_router.router)
 app.include_router(prefix="/api", router=attendance_router.router)
 app.include_router(prefix="/api", router=jobs_router)
 app.include_router(prefix="/api", router=observability_router.router)
+app.include_router(prefix="/api", router=graphql_router)
 app.include_router(router=health_router.router)

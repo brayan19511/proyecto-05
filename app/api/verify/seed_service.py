@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from uuid6 import uuid7
 
 from app.api.attendance.permissions import ATTENDANCE_MARKS_VIEW_PERMISSION
+from app.api.graphql.permissions import ICG_QUERY_VIEW_PERMISSION
 from app.api.jobs.constants import (
     ANALYTICS_INGEST_RUN_PERMISSION,
     ANALYTICS_INGEST_VIEW_PERMISSION,
@@ -244,6 +245,10 @@ PERMISSIONS = [
     {
         "code": OBSERVABILITY_VIEW_PERMISSION,
         "description": "Ver estado del sistema y analitica de logs/jobs",
+    },
+    {
+        "code": ICG_QUERY_VIEW_PERMISSION,
+        "description": "Consultar datos de ICG por GraphQL",
     },
 ]
 

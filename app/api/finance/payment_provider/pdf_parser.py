@@ -361,14 +361,22 @@ class PaymentPdfParser:
     def _es_consulta_operaciones(contenido: str) -> bool:
         return "CONSULTA DE OPERACIONES" in normalizar_para_busqueda(contenido)
 
+    # Campos que marcan el fin del bloque del beneficiario cuando el nombre
+    # es largo y se parte en varias lineas.
+    BENEFICIARIO_STOP_LABELS = (
+        "FECHA / HORA",
+        "DOC. IDENTIDAD",
+        "TIPO DE CAMBIO",
+        "NUMERO DE CONTRATO",
+        "REFERENCIA",
+        "BANCO DESTINO",
+    )
+
     def _extract_consulta_operaciones_data(self, contenido: str) -> dict[str, Any]:
         if not self._es_consulta_operaciones(contenido):
             return {}
 
-        beneficiario = obtener_valor(
-            contenido, "Cuenta / Tarjeta / Servicio Beneficiario"
-        )
-        cuenta, nombre = self._split_cuenta_beneficiario(beneficiario)
+        cuenta, nombre = self._extract_beneficiario_field(contenido)
         ruc = self._extraer_documento(
             obtener_valor(contenido, "Doc. Identidad")
         )
@@ -389,6 +397,53 @@ class PaymentPdfParser:
             "ruc": ruc,
             "source_section": "CONSULTA_OPERACIONES",
         }
+
+    def _extract_beneficiario_field(
+        self, contenido: str
+    ) -> tuple[str | None, str | None]:
+        """Extrae cuenta y nombre del beneficiario en el formato BBVA.
+
+        Maneja dos disposiciones:
+        - Corta: "Cuenta / Tarjeta / Servicio Beneficiario <cuenta> <nombre>".
+        - Larga (nombre extenso): el PDF parte el valor y queda la cuenta+inicio
+          del nombre en la linea de ARRIBA de la etiqueta y el resto en las de
+          ABAJO. Ej:
+              00110349880100019580 WARI EXPRESS SOCIEDAD ANONIMA
+              Cuenta / Tarjeta / Servicio Beneficiario
+              CERRADA
+        """
+        lines = [line.strip() for line in contenido.splitlines() if line.strip()]
+        norm = [normalizar_para_busqueda(line) for line in lines]
+        label_norm = "CUENTA / TARJETA / SERVICIO BENEFICIARIO"
+        idx = next(
+            (i for i, line in enumerate(norm) if line.startswith(label_norm)),
+            None,
+        )
+        if idx is None:
+            return None, None
+
+        pieces: list[str] = []
+
+        # Valor en la misma linea de la etiqueta (disposicion corta / formato 4).
+        coincidencia = re.match(
+            r"^\s*Cuenta\s*/\s*Tarjeta\s*/\s*Servicio\s*Beneficiario\s*(.*)$",
+            lines[idx],
+            flags=re.IGNORECASE,
+        )
+        same_line = coincidencia.group(1).strip() if coincidencia else ""
+        if same_line:
+            pieces.append(same_line)
+        elif idx - 1 >= 0 and re.search(r"\d{15,}", norm[idx - 1]):
+            # Disposicion larga: cuenta + inicio del nombre en la linea de arriba.
+            pieces.append(lines[idx - 1])
+
+        # Continuacion del nombre en las lineas siguientes, hasta el proximo campo.
+        for j in range(idx + 1, len(lines)):
+            if any(norm[j].startswith(stop) for stop in self.BENEFICIARIO_STOP_LABELS):
+                break
+            pieces.append(lines[j])
+
+        return self._split_cuenta_beneficiario(" ".join(pieces).strip())
 
     @staticmethod
     def _split_cuenta_beneficiario(valor: str | None) -> tuple[str | None, str | None]:

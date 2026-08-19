@@ -4,6 +4,9 @@ from unittest.mock import Mock, patch
 
 from app.api.finance.payment_provider.pdf_parser import (
     PaymentPdfParser,
+    clave_comparacion,
+    clave_documento,
+    extraer_importe_cargado,
     extraer_monto,
     normalizar_texto,
     obtener_valor,
@@ -141,6 +144,89 @@ class PaymentProviderParsingTests(unittest.TestCase):
         self.assertEqual(data["numero_operacion"], "100105")
         self.assertEqual(data["fecha_proceso"], "11/02/2025 - 03:59 p. m.")
 
+    def test_extracts_importe_cargado_with_currency_word(self):
+        monto = extraer_importe_cargado("26,664.61 DOLARES")
+
+        self.assertEqual(monto["moneda"], "USD")
+        self.assertEqual(monto["monto"], Decimal("26664.61"))
+
+    def test_consulta_operaciones_extracts_name_after_account(self):
+        # Formato BBVA (3): etiqueta y valor en la misma linea.
+        contenido = """
+        Consulta de Operaciones
+        Su operación ha sido realizada
+        Número de Operación 000055189
+        Tipo de Operación TRANSF A CTAS DE TERCEROS
+        Importe Cargado 26,664.61 DOLARES
+        Cuenta / Tarjeta / Servicio Beneficiario 00110716810100023566 BUSINESS IT PERU SAC
+        Fecha / Hora 2026-08-14 16:31:03
+        Referencia SERVICIO F002-9681
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["source_section"], "CONSULTA_OPERACIONES")
+        self.assertEqual(data["titular"], "BUSINESS IT PERU SAC")
+        self.assertEqual(data["cuenta"], "00110716810100023566")
+        self.assertIsNone(data["ruc"])
+        self.assertEqual(data["moneda"], "USD")
+        self.assertEqual(data["monto_decimal"], Decimal("26664.61"))
+
+    def test_consulta_operaciones_extracts_ruc_when_no_name(self):
+        # Formato BBVA (4): sin nombre, solo Doc. Identidad (RUC).
+        contenido = """
+        Consulta de Operaciones
+        Su operación ha sido realizada
+        Importe Cargado 27,417.72 SOLES
+        Banco destino INTERBANK
+        Cuenta / Tarjeta / Servicio Beneficiario 00320000300450459138
+        Doc. Identidad R - 20609307235
+        Fecha / Hora 2026-08-14 16:31:03
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["source_section"], "CONSULTA_OPERACIONES")
+        self.assertIsNone(data["titular"])
+        self.assertEqual(data["ruc"], "20609307235")
+        self.assertEqual(data["moneda"], "PEN")
+        self.assertEqual(data["monto_decimal"], Decimal("27417.72"))
+
+    def test_consulta_operaciones_reconstructs_wrapped_long_name(self):
+        # Nombre largo: el PDF parte el valor arriba/abajo de la etiqueta.
+        contenido = """
+        Consulta de Operaciones
+        Su operación ha sido realizada
+        Importe Cargado 21,567.03 SOLES
+        00110349880100019580 WARI EXPRESS SOCIEDAD ANONIMA
+        Cuenta / Tarjeta / Servicio Beneficiario
+        CERRADA
+        Fecha / Hora 2026-08-13 12:59:29
+        Referencia SERVICIO TRANSPORTE PROV
+        """
+
+        data = PaymentPdfParser()._extract_payment_data(contenido)
+
+        self.assertEqual(data["titular"], "WARI EXPRESS SOCIEDAD ANONIMA CERRADA")
+        self.assertEqual(data["cuenta"], "00110349880100019580")
+        self.assertEqual(data["monto_decimal"], Decimal("21567.03"))
+
+    def test_consulta_operaciones_operation_data(self):
+        contenido = """
+        Consulta de Operaciones
+        Su operación ha sido realizada
+        Número de Operación 000055189
+        Tipo de Operación TRANSF A CTAS DE TERCEROS
+        Fecha / Hora 2026-08-14 16:31:03
+        """
+
+        data = PaymentPdfParser()._extract_operation_data(contenido)
+
+        self.assertEqual(data["estado"], "Realizada")
+        self.assertEqual(data["numero_operacion"], "000055189")
+        # La fecha se normaliza a dd/mm/aaaa para el nombre del archivo.
+        self.assertEqual(data["fecha_proceso"], "14/08/2026")
+
     def test_pdf_text_extraction_skips_ocr_when_pdf_has_text(self):
         parser = PaymentPdfParser()
         file = Mock()
@@ -217,6 +303,64 @@ class PaymentProviderGroupingTests(unittest.TestCase):
         self.assertEqual(result[0]["pagos"][0]["moneda_simbolo"], "S/")
         self.assertEqual(result[0]["totales"][0]["moneda"], "PEN")
         self.assertEqual(result[0]["totales"][0]["moneda_simbolo"], "S/")
+
+    def _payment(self, titular=None, ruc=None):
+        return {
+            "archivo": "pago.pdf",
+            "datos_destino": {
+                "titular": titular,
+                "ruc": ruc,
+                "cuenta": "001",
+                "moneda": "PEN",
+                "monto_decimal": Decimal("100.00"),
+                "monto_texto": "S/ 100.00",
+                "moneda_original": "S/",
+                "tipo": "Cuenta corriente",
+                "referencia": "REF",
+            },
+            "datos_operacion": {
+                "fecha_envio": "10/07/2026",
+                "fecha_proceso": "10/07/2026",
+                "estado": "Procesado",
+            },
+        }
+
+    def test_group_matches_provider_ignoring_punctuation(self):
+        # El titular trae una coma extra ("CO.,") frente al nombre guardado.
+        provider = Mock(
+            id="22222222-2222-2222-2222-222222222222",
+            tax_id="PE0000000313",
+            legal_name="METEC ELECTRONICS CO. LIMITED",
+            normalized_names=[normalizar_texto("METEC ELECTRONICS CO. LIMITED")],
+            emails_payments=["pagos@metec.pe"],
+        )
+
+        result = PaymentProviderProcessor([provider]).group(
+            [self._payment(titular="METEC ELECTRONICS CO., LIMITED")]
+        )
+
+        self.assertTrue(result[0]["identificado"])
+        self.assertEqual(result[0]["status"], "READY")
+        self.assertEqual(result[0]["provider_id"], provider.id)
+
+    def test_group_matches_provider_by_tax_id_when_only_ruc(self):
+        # Constancia sin nombre: se identifica por RUC/tax_id.
+        provider = Mock(
+            id="33333333-3333-3333-3333-333333333333",
+            tax_id="20609307235",
+            legal_name="PROVEEDOR CON RUC SAC",
+            normalized_names=[normalizar_texto("PROVEEDOR CON RUC SAC")],
+            emails_payments=["pagos@prov.pe"],
+        )
+
+        result = PaymentProviderProcessor([provider]).group(
+            [self._payment(titular=None, ruc="20609307235")]
+        )
+
+        self.assertTrue(result[0]["identificado"])
+        self.assertEqual(result[0]["status"], "READY")
+        self.assertEqual(result[0]["proveedor"], "PROVEEDOR CON RUC SAC")
+        self.assertEqual(result[0]["provider_tax_id"], "20609307235")
 
     def test_group_marks_missing_payment_email(self):
         provider = Mock(
