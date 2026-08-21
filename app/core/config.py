@@ -75,7 +75,10 @@ class Settings(BaseSettings):
     DB_ICG_DRIVER: str = "ODBC Driver 17 for SQL Server"
     DB_ICG_ENCRYPT: bool = False
     DB_ICG_TRUST_SERVER_CERTIFICATE: bool = False
+    # Peru (mcoolboxreal) es la base por defecto. Mexico (MCOOLBOXMEXIPROD) esta
+    # en el mismo servidor/credenciales; solo cambia el nombre de la base.
     DB_ICG_DATABASE: str = "ICG"
+    DB_ICG_DATABASE_MX: Optional[str] = None
 
     DATA_LAKE_ROOT: str = "var/data-lake"
     ICG_INCREMENTAL_LOOKBACK_DAYS: int = 3
@@ -201,10 +204,20 @@ class Settings(BaseSettings):
             trust_server_certificate=self.DB_CIC_TRUST_SERVER_CERTIFICATE,
         )
 
-    def get_icg_database_url(self) -> URL:
+    def icg_database_for_country(self, country_code: str) -> str | None:
+        """Base ICG segun el pais del canal (mismo servidor, distinta base).
+
+        Devuelve None para Mexico si no esta configurada, para que el llamador
+        omita el enriquecimiento en vez de consultar la base equivocada.
+        """
+        if country_code == "mx":
+            return self.DB_ICG_DATABASE_MX
+        return self.DB_ICG_DATABASE
+
+    def get_icg_database_url(self, database: str | None = None) -> URL:
         return self._build_mssql_url(
             system_name="ICG",
-            database=self.DB_ICG_DATABASE,
+            database=database or self.DB_ICG_DATABASE,
             host=self.DB_ICG_HOST,
             port=self.DB_ICG_PORT,
             user=self.DB_ICG_USER,

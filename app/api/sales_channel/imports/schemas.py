@@ -35,4 +35,9 @@ class SkuImportResponse(BaseModel):
     created_skus: list[str] = Field(default_factory=list)
     activated_skus: list[str] = Field(default_factory=list)
     deactivated_skus: list[str] = Field(default_factory=list)
+    # Nombre del articulo por SKU (desde la ICG del pais del canal). El front lo
+    # muestra junto al SKU. Puede venir vacio para SKUs sin match o si ICG no
+    # respondio. `descriptions_truncated` avisa si se omitieron por tope.
+    descriptions: dict[str, str] = Field(default_factory=dict)
+    descriptions_truncated: bool = False
     errors: list[SkuImportIssue] = Field(default_factory=list)

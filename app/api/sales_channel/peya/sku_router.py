@@ -27,8 +27,10 @@ from app.api.sales_channel.sku.schemas import (
     SkuCreateRequest,
     SkuUpdateRequest,
 )
+from app.api.sales_channel.imports.icg_enrichment import IcgDescriptionLookup
 from app.api.sales_channel.sku.service import ManagedSkuService
 from app.core.access import require_any_permission
+from app.core.db.db_icg import get_db_icg
 from app.core.db.db_ofisis import get_db_ofisis_ecomm
 
 
@@ -77,13 +79,16 @@ def preview_peya_sku_import(
     create_missing: bool = Form(True),
     service: ManagedSkuService = Depends(get_peya_sku_service),
     import_service: SkuExcelImportService = Depends(SkuExcelImportService),
+    db_icg=Depends(get_db_icg),
     current_user=Depends(require_any_permission(SKU_IMPORT_PERMISSION)),
 ):
+    # El preview muestra el nombre del articulo (ICG Peru) junto a cada SKU.
     return import_service.preview_managed(
         file,
         mode,
         create_missing,
         service,
+        icg_lookup=IcgDescriptionLookup(db_icg),
     )
 
 

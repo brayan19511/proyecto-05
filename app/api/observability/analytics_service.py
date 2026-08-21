@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.api.observability.repository import ObservabilityRepository
 from app.api.observability.schemas import (
+    AuditStepItem,
+    AuthEventItem,
+    AuthEventPageResponse,
     AuthStatsResponse,
     EndpointStat,
     EndpointStatsResponse,
@@ -13,14 +16,20 @@ from app.api.observability.schemas import (
     JobTypeStat,
     LabelCount,
     LogsSummaryResponse,
+    RequestLogDetail,
+    RequestLogItem,
+    RequestLogPageResponse,
 )
-from app.core.exceptions import ValidationError
+from app.core.exceptions import NotFoundError, ValidationError
 
 
 # Rango por defecto cuando el cliente no envia fechas, y tope maximo para que
 # una consulta no barra un historial demasiado grande.
 DEFAULT_WINDOW_HOURS = 24
 MAX_WINDOW_DAYS = 92
+
+# Cuantos elementos traer en los rankings de recurrencia del resumen.
+TOP_N = 5
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -59,6 +68,8 @@ class ObservabilityAnalyticsService:
     ) -> LogsSummaryResponse:
         totals = self.repository.logs_totals(date_from, date_to)
         levels = self.repository.logs_by_level(date_from, date_to)
+        top_users = self.repository.logs_top_users(date_from, date_to, limit=TOP_N)
+        top_ips = self.repository.logs_top_ips(date_from, date_to, limit=TOP_N)
 
         total = totals["total"] or 0
         c5xx = totals["c5xx"] or 0
@@ -77,6 +88,12 @@ class ObservabilityAnalyticsService:
             error_rate=round(c5xx / total, 4) if total else 0.0,
             avg_duration_ms=self._round(totals["avg_ms"]),
             p95_duration_ms=self._round(totals["p95_ms"]),
+            top_users=[
+                LabelCount(label=row["label"], count=row["count"]) for row in top_users
+            ],
+            top_ips=[
+                LabelCount(label=row["label"], count=row["count"]) for row in top_ips
+            ],
         )
 
     def endpoint_stats(
@@ -125,6 +142,62 @@ class ObservabilityAnalyticsService:
         )
         items = [ErrorLogItem(**row) for row in rows]
         return ErrorLogPageResponse.build(items, total, limit, offset)
+
+    def list_requests(
+        self,
+        date_from: datetime,
+        date_to: datetime,
+        *,
+        level: str | None,
+        status_class: str | None,
+        method: str | None,
+        path_contains: str | None,
+        user_id: str | None,
+        min_duration_ms: float | None,
+        limit: int,
+        offset: int,
+    ) -> RequestLogPageResponse:
+        rows, total = self.repository.list_requests(
+            date_from,
+            date_to,
+            level=level,
+            status_class=status_class,
+            method=method,
+            path_contains=path_contains,
+            user_id=user_id,
+            min_duration_ms=min_duration_ms,
+            limit=limit,
+            offset=offset,
+        )
+        items = [RequestLogItem(**row) for row in rows]
+        return RequestLogPageResponse.build(items, total, limit, offset)
+
+    def get_request_detail(self, log_id: str) -> RequestLogDetail:
+        detail = self.repository.get_request_detail(log_id)
+        if detail is None:
+            raise NotFoundError("Peticion no encontrada")
+        steps = self.repository.get_request_steps(log_id)
+        return RequestLogDetail(
+            **detail,
+            steps=[AuditStepItem(**step) for step in steps],
+        )
+
+    def list_auth_events(
+        self,
+        date_from: datetime,
+        date_to: datetime,
+        *,
+        limit: int,
+        offset: int,
+    ) -> AuthEventPageResponse:
+        rows, total = self.repository.list_auth_events(
+            date_from,
+            date_to,
+            limit=limit,
+            offset=offset,
+        )
+        items = [AuthEventItem(**row) for row in rows]
+        return AuthEventPageResponse.build(items, total, limit, offset)
 
     def auth_stats(
         self,

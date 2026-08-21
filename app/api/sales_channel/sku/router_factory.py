@@ -18,9 +18,12 @@ from app.api.sales_channel.sku.schemas import (
     SkuResponse,
     SkuUpdateRequest,
 )
+from app.api.sales_channel.imports.icg_enrichment import IcgDescriptionLookup
 from app.api.sales_channel.sku.service import ManagedSkuService, SkuModelConfig
 from app.core.access import require_any_permission
+from app.core.db.db_icg import get_icg_session_factory
 from app.core.db.db_ofisis import get_db_ofisis_ecomm
+from app.core.db.session import session_scope
 
 
 def build_managed_sku_router(
@@ -28,11 +31,15 @@ def build_managed_sku_router(
     prefix: str,
     tag: str,
     config: SkuModelConfig,
+    icg_database: str | None = None,
 ) -> APIRouter:
     """Build the standard CRUD and synchronization contract for one channel.
 
     Providers with the same SKU behavior reuse these routes while supplying a
     different model configuration from ``channel_registry``.
+
+    ``icg_database`` indica la base ICG (segun el pais) desde la que se lee el
+    nombre del articulo en el preview. Si es None, no se enriquece.
     """
     router = APIRouter(prefix=prefix, tags=[tag])
 
@@ -40,6 +47,14 @@ def build_managed_sku_router(
         db=Depends(get_db_ofisis_ecomm),
     ) -> ManagedSkuService:
         return ManagedSkuService(db, config)
+
+    def get_icg_session():
+        # Sesion ICG del pais del canal. Si el canal no tiene base ICG
+        # configurada (p. ej. Mexico sin conexion), no se abre nada.
+        if not icg_database:
+            yield None
+            return
+        yield from session_scope(get_icg_session_factory(icg_database))
 
     @router.get("", response_model=list[SkuResponse])
     def list_skus(
@@ -81,15 +96,19 @@ def build_managed_sku_router(
         import_service: SkuExcelImportService = Depends(
             SkuExcelImportService
         ),
+        icg_db=Depends(get_icg_session),
         current_user=Depends(
             require_any_permission(SKU_IMPORT_PERMISSION),
         ),
     ):
+        # El preview muestra el nombre del articulo (ICG del pais) junto a cada SKU.
+        icg_lookup = IcgDescriptionLookup(icg_db) if icg_db is not None else None
         return import_service.preview_managed(
             file,
             mode,
             create_missing,
             service,
+            icg_lookup=icg_lookup,
         )
 
     @router.post("/import", response_model=SkuImportResponse)

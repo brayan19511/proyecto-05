@@ -44,6 +44,10 @@ class LogsSummaryResponse(BaseModel):
     error_rate: float
     avg_duration_ms: float | None
     p95_duration_ms: float | None
+    # Recurrencia: usuarios e IPs con mas peticiones en el rango.
+    # En top_users, label = user_id (UUID como texto).
+    top_users: list[LabelCount]
+    top_ips: list[LabelCount]
 
 
 class EndpointStat(BaseModel):
@@ -85,6 +89,80 @@ class AuthStatsResponse(BaseModel):
     failed: int
     distinct_users: int
     distinct_ips: int
+
+
+# =====================================================
+# DRILL-DOWN: navegar peticiones y ver su detalle
+# =====================================================
+class RequestLogItem(BaseModel):
+    """Fila resumida para el listado navegable de peticiones."""
+
+    id: UUID
+    trace_id: str
+    level: str
+    method: str
+    path: str
+    status_code: int | None
+    duration_ms: float | None
+    user_id: UUID | None
+    ip_address: str | None
+    error_message: str | None
+    created_at: datetime
+
+
+RequestLogPageResponse = PageResponse[RequestLogItem]
+
+
+class AuditStepItem(BaseModel):
+    step_order: int
+    step_name: str
+    status: str
+    message: str | None
+    duration_ms: float | None
+    extra_data: dict | list | None
+
+
+class RequestLogDetail(BaseModel):
+    """Detalle completo de una peticion (cabecera + cuerpos + pasos)."""
+
+    id: UUID
+    trace_id: str
+    method: str
+    path: str
+    status_code: int | None
+    level: str
+    duration_ms: float | None
+    user_id: UUID | None
+    ip_address: str | None
+    user_agent: str | None
+    environment: str | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    created_at: datetime
+    # Contenido pesado (ya sanitizado al capturarse en el middleware).
+    request_headers: dict | None
+    query_params: dict | None
+    request_body: dict | list | None
+    response_body: dict | list | None
+    response_size_bytes: int | None
+    error_message: str | None
+    error_stack: str | None
+    steps: list[AuditStepItem]
+
+
+class AuthEventItem(BaseModel):
+    """Un intento de login individual."""
+
+    id: UUID
+    user_id: UUID | None
+    ip_address: str | None
+    user_agent: str | None
+    status_code: int | None
+    succeeded: bool
+    created_at: datetime
+
+
+AuthEventPageResponse = PageResponse[AuthEventItem]
 
 
 # =====================================================
