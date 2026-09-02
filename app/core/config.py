@@ -1,3 +1,4 @@
+from pathlib import Path
 import unicodedata
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,6 +67,22 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER_OCR_LANG: str = "spa"
     PAYMENT_PROVIDER_OCR_DPI: int = 250
     PAYMENT_PROVIDER_MIN_TEXT_LENGTH: int = 80
+    # Archivo permanente de las constancias enviadas. Vacio = subcarpeta
+    # "archive" dentro del staging, que es lo que se quiere: al estar en el
+    # mismo volumen, mover el PDF es un rename atomico y no una copia que
+    # pueda quedar a medias, y no hace falta declarar otro volumen. Se deriva
+    # de PAYMENT_PROVIDER_STORAGE_DIR y no se repite el valor, porque en los
+    # contenedores esa ruta es absoluta (/app/var/...) y dos defaults
+    # separados se desincronizarian.
+    PAYMENT_PROVIDER_ARCHIVE_DIR: Optional[str] = None
+    # Dias que se conserva una carpeta de staging despues de que su job
+    # termino. Es la ventana para reintentar a mano un envio fallido sin
+    # volver a subir los PDFs.
+    PAYMENT_PROVIDER_RETENTION_DAYS: int = 7
+    # Tope absoluto: ninguna carpeta de staging vive mas que esto, sin importar
+    # el estado del job. Cubre los jobs que quedaron en DISPATCH_FAILED y
+    # nadie reintento, que de otro modo no se limpiarian nunca.
+    PAYMENT_PROVIDER_STAGING_MAX_AGE_DAYS: int = 30
 
     DB_OFISIS_HOST: Optional[str] = None
     DB_OFISIS_PORT: int = 1433
@@ -96,6 +113,15 @@ class Settings(BaseSettings):
     # en el mismo servidor/credenciales; solo cambia el nombre de la base.
     DB_ICG_DATABASE: str = "ICG"
     DB_ICG_DATABASE_MX: Optional[str] = None
+
+    # =====================================================
+    # MODULOS APAGADOS POR ENTORNO
+    # =====================================================
+    # Lista de codigos separados por coma (ej. "sap,email"). Es el apagado
+    # duro: para ambientes que no tienen las credenciales o la red del modulo.
+    # Manda sobre la tabla master.modules, asi que un modulo listado aqui no
+    # se puede prender desde el panel. Vacio = manda solo la tabla.
+    MODULES_DISABLED: str = ""
 
     DATA_LAKE_ROOT: str = "var/data-lake"
     ICG_INCREMENTAL_LOOKBACK_DAYS: int = 3
@@ -192,6 +218,17 @@ class Settings(BaseSettings):
             for item in self.AUDIT_REDACT_RESPONSE_PATHS.split(",")
             if item.strip()
         )
+
+    @property
+    def payment_provider_archive_dir(self) -> str:
+        if self.PAYMENT_PROVIDER_ARCHIVE_DIR:
+            return self.PAYMENT_PROVIDER_ARCHIVE_DIR
+
+        return str(Path(self.PAYMENT_PROVIDER_STORAGE_DIR) / "archive")
+
+    @property
+    def modules_disabled(self) -> frozenset[str]:
+        return frozenset(split_config_list(self.MODULES_DISABLED))
 
     @property
     def cors_origins(self) -> list[str]:

@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from app.api.finance.libro_mayor.service.libro_mayor_job_service import (
     LibroMayorJobService,
 )
-from app.api.jobs.constants import JobTriggerSource, JobType
+from app.api.jobs.constants import (
+    JOB_MODULES,
+    JobTriggerSource,
+    JobType,
+    SKIPPED_STATUS,
+)
 from app.api.scheduled_jobs.repository import ScheduledJobRepository
 from app.api.scheduled_jobs.schedule import (
     calculate_next_run,
@@ -20,6 +25,7 @@ from app.api.scheduled_jobs.schemas import (
     validate_schedule_config,
 )
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
+from app.core.modules import is_module_enabled, module_display_name
 from app.models.jobs import Job, ScheduledJob
 from app.services.ingestion.orchestrator import AnalyticsIngestionService
 
@@ -173,6 +179,20 @@ class ScheduledJobService:
             return False
 
         self.db.commit()
+
+        # Modulo apagado: se omite la corrida sin contarla como fallo. Si se
+        # dejara caer en _create_execution quedaria como FAILED y sumaria a
+        # consecutive_failures, ensuciando el historial de la programacion.
+        module_code = JOB_MODULES.get(scheduled_job.job_type)
+        if module_code and not is_module_enabled(module_code, self.db):
+            scheduled_job.last_status = SKIPPED_STATUS
+            scheduled_job.last_error = (
+                f"Omitido: el modulo '{module_display_name(module_code)}' "
+                "esta desactivado"
+            )
+            self.db.commit()
+            return False
+
         try:
             self._create_execution(scheduled_job, due_at=due_at, manual=False)
             return True

@@ -1,14 +1,21 @@
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import selectinload
 
+from app.api.finance.payment_provider.archive_service import (
+    PaymentProviderArchiveService,
+)
 from app.api.jobs.constants import JobBatchStatus, JobItemStatus, JobStatus
 from app.api.jobs.service import JobService
 from app.models.jobs import Job, JobBatch, JobItem
 from app.services.email import EmailAttachment, EmailService
+
+
+logger = logging.getLogger(__name__)
 
 
 class PaymentProviderEmailJobProcessor:
@@ -17,6 +24,7 @@ class PaymentProviderEmailJobProcessor:
     def __init__(self, db):
         self.db = db
         self.email_service = EmailService()
+        self.archive_service = PaymentProviderArchiveService(db)
 
     def process(self, batch_id: UUID, task_id: str) -> dict:
         batch = (
@@ -151,9 +159,10 @@ class PaymentProviderEmailJobProcessor:
                 bcc=payload.get("bcc"),
                 attachments=attachments,
             )
-            self.email_service.send(message)
+            self.email_service.send(message, self.db)
             item.status = JobItemStatus.SUCCEEDED.value
             item.external_status_code = 200
+            item.safe_error = None
             item.result_data = {
                 "provider_id": payload.get("provider_id"),
                 "provider": payload.get("provider"),
@@ -163,9 +172,8 @@ class PaymentProviderEmailJobProcessor:
                 "bcc": message.bcc,
                 "attachments": [attachment.filename for attachment in attachments],
                 "message": "Correo enviado correctamente",
+                **self._archive_sent_attachments(batch, item, payload),
             }
-            item.safe_error = None
-            self._delete_files(payload.get("attachments", []))
         except Exception as exc:
             item.status = JobItemStatus.FAILED.value
             item.safe_error = str(exc)[:2000]
@@ -192,13 +200,33 @@ class PaymentProviderEmailJobProcessor:
             )
         return attachments
 
-    @staticmethod
-    def _delete_files(items: list[dict]) -> None:
-        for item in items:
-            try:
-                Path(item["file_path"]).unlink(missing_ok=True)
-            except Exception:
-                pass
+    def _archive_sent_attachments(
+        self,
+        batch: JobBatch,
+        item: JobItem,
+        payload: dict,
+    ) -> dict:
+        """Mueve las constancias al archivo permanente. Nunca tumba el envio.
+
+        Si el archivado falla el correo YA salio, asi que el item sigue siendo
+        exitoso: se anota el error y el PDF se queda en el staging para que la
+        limpieza lo recoja mas adelante.
+        """
+        try:
+            archived = self.archive_service.archive_item_attachments(
+                item.id,
+                payload.get("attachments", []),
+                user_id=batch.job.created_by,
+            )
+            return {
+                "archived_attachment_ids": [str(row.id) for row in archived],
+            }
+        except Exception as error:
+            logger.exception(
+                "Correo enviado pero no se pudo archivar la constancia del item %s",
+                item.id,
+            )
+            return {"archive_error": str(error)[:500]}
 
     def _finish_batch(self, batch: JobBatch) -> None:
         self.db.refresh(batch, attribute_names=["items"])

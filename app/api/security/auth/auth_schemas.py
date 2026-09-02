@@ -50,3 +50,6 @@ class CurrentUserResponse(BaseModel):
     companies: list[CompanyScopeResponse] = []
     # True para admin: ve todas las empresas y areas.
     unrestricted_scope: bool = False
+    # Modulos encendidos. El front arma el menu con permissions ∩
+    # enabled_modules: un permiso de un modulo apagado no se muestra.
+    enabled_modules: list[str] = []

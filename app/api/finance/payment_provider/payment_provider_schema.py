@@ -52,3 +52,18 @@ class PaymentProviderResponse(BaseModel):
     commercial_names: list[str]
     emails_payments: list[str]
     active: bool
+
+
+class SentAttachmentResponse(BaseModel):
+    """Constancia archivada tal como la ve el front.
+
+    No expone file_path a proposito: es una ruta interna del servidor y el
+    front no la necesita, descarga por /payments/attachments/{id}/content.
+    """
+
+    id: UUID
+    file_name: str
+    mime_type: str
+    file_size: int | None = None
+
+    model_config = ConfigDict(from_attributes=True)

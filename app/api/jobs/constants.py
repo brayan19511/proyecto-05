@@ -1,5 +1,12 @@
 from enum import StrEnum
 
+from app.core.modules import (
+    MODULE_ANALYTICS,
+    MODULE_LEDGER,
+    MODULE_PAYMENT_PROVIDER,
+    MODULE_SAP,
+)
+
 
 class JobType(StrEnum):
     SAP_DOCUMENT_ACTION = "SAP_DOCUMENT_ACTION"
@@ -80,3 +87,24 @@ SCHEDULED_JOBS_EDIT_PERMISSION = "scheduled_jobs.edit"
 SCHEDULED_JOBS_RUN_PERMISSION = "scheduled_jobs.run"
 ANALYTICS_INGEST_VIEW_PERMISSION = "analytics.ingest.view"
 ANALYTICS_INGEST_RUN_PERMISSION = "analytics.ingest.run"
+
+
+# =====================================================
+# MODULO AL QUE PERTENECE CADA TIPO DE TAREA
+# =====================================================
+# Vive aqui y no en el dispatcher porque lo consultan tanto el dispatcher
+# como el scheduler, y este modulo no importa nada del resto de la app.
+JOB_MODULES = {
+    JobType.SAP_DOCUMENT_ACTION.value: MODULE_SAP,
+    JobType.SAP_RECONCILIATION.value: MODULE_SAP,
+    JobType.PAYMENT_PROVIDER_EMAIL.value: MODULE_PAYMENT_PROVIDER,
+    JobType.LEDGER_SYNC.value: MODULE_LEDGER,
+    JobType.LEDGER_SYNC_DELTA.value: MODULE_LEDGER,
+    JobType.LEDGER_REPROCESS.value: MODULE_LEDGER,
+    JobType.ANALYTICS_EXTRACT.value: MODULE_ANALYTICS,
+    JobType.ANALYTICS_SILVER_BUILD.value: MODULE_ANALYTICS,
+}
+
+# last_status de una tarea programada que no corrio por modulo apagado.
+# No es un fallo: no incrementa consecutive_failures.
+SKIPPED_STATUS = "SKIPPED"

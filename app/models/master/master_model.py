@@ -58,3 +58,30 @@ class Area(Base, AuditMixin):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class Module(Base, AuditMixin):
+    """Interruptor de encendido/apagado por modulo funcional del sistema.
+
+    Una fila por modulo (``sap``, ``email``, ``ledger``...). Es el nivel
+    "de negocio": el operador lo apaga en caliente desde el panel y no
+    requiere despliegue. El nivel "de infraestructura" vive en la variable
+    MODULES_DISABLED del .env y manda sobre esta tabla.
+    """
+
+    __tablename__ = "modules"
+    __table_args__ = {"schema": "master"}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=text("true"),
+        nullable=False,
+    )
+    # Motivo que el operador dejo al apagarlo; se muestra en el 503 para que
+    # quien reporte el problema sepa por que esta apagado y no abra un ticket.
+    disabled_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)

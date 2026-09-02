@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import settings
 
@@ -13,6 +14,7 @@ celery_app = Celery(
         "app.workers.email_tasks",
         "app.workers.ledger_tasks",
         "app.workers.scheduled_tasks",
+        "app.workers.maintenance_tasks",
     ],
 )
 
@@ -39,11 +41,18 @@ celery_app.conf.update(
         "jobs.payment_provider.send_email_batch": {"queue": "email"},
         "jobs.ledger.process_batch": {"queue": "heavy"},
         "scheduled_jobs.tick": {"queue": "light"},
+        "maintenance.payment_provider.cleanup_staging": {"queue": "light"},
     },
     beat_schedule={
         "scheduled-jobs-tick": {
             "task": "scheduled_jobs.tick",
             "schedule": settings.CELERY_SCHEDULER_INTERVAL_SECONDS,
+        },
+        # Una vez al dia y de madrugada: es un barrido de disco, no hay
+        # apuro y asi no compite con los envios en horario de oficina.
+        "payment-provider-cleanup-staging": {
+            "task": "maintenance.payment_provider.cleanup_staging",
+            "schedule": crontab(hour=3, minute=30),
         },
     },
     timezone="America/Lima",

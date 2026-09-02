@@ -10,9 +10,11 @@ from string import Formatter
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import ValidationError
+from app.core.modules import MODULE_EMAIL, require_module
 
 
 @dataclass
@@ -83,7 +85,12 @@ class EmailService:
             attachments=attachments or [],
         )
 
-    def send(self, message: EmailMessage) -> None:
+    def send(self, message: EmailMessage, db: Session | None = None) -> None:
+        # Ultima reja del modulo de correo: todo envio del sistema pasa por
+        # aqui, asi que un flujo nuevo no se puede escapar del interruptor por
+        # olvidar el guard en su router. Quien ya tiene sesion la pasa en db
+        # para no abrir una conexion extra por correo.
+        require_module(MODULE_EMAIL, db)
         self._validate_settings()
         recipients = [*message.to, *message.cc, *message.bcc]
         if not recipients:

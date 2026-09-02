@@ -11,6 +11,7 @@ from app.core.exceptions import (
     SAPConnectionError,
     SAPRequestError,
 )
+from app.core.modules import MODULE_SAP, require_module
 
 
 class SAPServiceLayerClient:
@@ -23,6 +24,10 @@ class SAPServiceLayerClient:
         verify_ssl: bool = False,
         timeout: float = 300.0,
     ):
+        # Ultima reja del modulo SAP: no se abre ninguna sesion contra Service
+        # Layer si el modulo esta apagado, venga de donde venga la llamada.
+        require_module(MODULE_SAP)
+
         self.base_url = settings.SAP_URL.rstrip("/")
 
         self.user_name = user_name

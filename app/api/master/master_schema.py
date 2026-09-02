@@ -110,3 +110,25 @@ class MailingParameterUpdateRequest(BaseModel):
 class MailingParameterResponse(MailingParameterCreateRequest):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+# =====================================================
+# MODULOS (interruptor de encendido/apagado)
+# =====================================================
+class ModuleResponse(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+    enabled: bool
+    disabled_reason: str | None = None
+    # True cuando el apagado viene del .env: el panel debe mostrarlo apagado
+    # y sin poder prenderlo, porque la tabla no manda en ese caso.
+    locked_by_environment: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ModuleUpdateRequest(BaseModel):
+    enabled: bool
+    # Motivo opcional que se muestra en el 503 y queda en la auditoria.
+    disabled_reason: str | None = Field(default=None, max_length=255)

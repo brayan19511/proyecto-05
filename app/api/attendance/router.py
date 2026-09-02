@@ -12,9 +12,14 @@ from app.api.attendance.schemas import (
 from app.api.attendance.service import AttendanceService
 from app.core.access import require_any_permission
 from app.core.db.db_cic import get_db_cic
+from app.core.modules import MODULE_ATTENDANCE, ModuleEnabled
 
 
-router = APIRouter(prefix="/attendance", tags=["ATTENDANCE"])
+router = APIRouter(
+    prefix="/attendance",
+    tags=["ATTENDANCE"],
+    dependencies=[Depends(ModuleEnabled(MODULE_ATTENDANCE))],
+)
 
 
 def get_attendance_service(

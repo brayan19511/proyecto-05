@@ -1,9 +1,16 @@
 from uuid import UUID, uuid4
 
-from app.api.jobs.constants import JobBatchStatus, JobType
+from app.api.jobs.constants import (
+    JOB_MODULES,
+    JobBatchStatus,
+    JobStatus,
+    JobType,
+)
 from app.api.jobs.repository import JobRepository
 from app.api.sap.handlers import get_sap_item_handler
 from app.core.db.db_postgres import SessionLocal
+from app.core.exceptions import ModuleDisabledError
+from app.core.modules import require_module
 from app.workers.analytics_tasks import process_analytics_batch
 from app.workers.email_tasks import process_payment_provider_email_batch
 from app.workers.ledger_tasks import process_ledger_batch
@@ -71,6 +78,19 @@ def dispatch_job(job_id: UUID) -> None:
         task = JOB_TASKS.get(job.job_type)
         if not task:
             raise ValueError(f"Tipo de tarea no soportado: {job.job_type}")
+
+        module_code = JOB_MODULES.get(job.job_type)
+        if module_code:
+            try:
+                require_module(module_code, db)
+            except ModuleDisabledError as error:
+                # No se deja el job colgado en CREATED: se cancela con el
+                # motivo, para que el operador vea por que no corrio.
+                job.status = JobStatus.CANCELLED.value
+                job.error_summary = str(error)
+                db.commit()
+                raise
+
         queue = resolve_job_queue(job)
         if job.job_type in JOB_TYPES_WITH_SAP_HANDLER:
             # SAP mantiene validacion adicional por handler de negocio.

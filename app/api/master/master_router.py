@@ -22,6 +22,8 @@ from app.api.master.master_schema import (
     MailingParameterCreateRequest,
     MailingParameterResponse,
     MailingParameterUpdateRequest,
+    ModuleResponse,
+    ModuleUpdateRequest,
 )
 
 router = APIRouter(prefix="/master", tags=["MASTER"])
@@ -344,3 +346,30 @@ def delete_area(
 ):
     # No existe borrado fisico: es un alias de /deactivate.
     return service.delete_area(area_id, current_user.id)
+
+
+# =====================================================
+# MODULOS
+# =====================================================
+# El panel de modulos es una vista de administracion: lista el catalogo
+# completo con su estado. Para armar el menu, el front NO usa este endpoint
+# sino enabled_modules de /security/auth/me, que ya trae permisos y alcance.
+@router.get("/modules", response_model=list[ModuleResponse])
+def get_modules(
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(
+        require_any_permission("master.modules.view", "master.modules.edit"),
+    ),
+):
+    return service.get_modules()
+
+
+@router.patch("/modules/{code}", response_model=ModuleResponse)
+def set_module_enabled(
+    code: str,
+    request: ModuleUpdateRequest,
+    service: MasterService = Depends(get_master_service),
+    current_user=Depends(require_any_permission("master.modules.edit")),
+):
+    # Queda en la auditoria por AuditMiddleware: quien apago que y cuando.
+    return service.set_module_enabled(code, request, current_user.id)

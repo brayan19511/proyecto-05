@@ -14,7 +14,7 @@ from .audit import AuditLog, AuditLogDetail, AuditStep
 from .finance import Provision, ProvisionAccess, ProvisionConcept, ProvisionDocument, ProvisionStatus
 from .finance import LibroMayor, ReglasGastos
 from .finance import PaymentProvider
-from .master import Area, Company, Currency, MailingParameter
+from .master import Area, Company, Currency, MailingParameter, Module
 from .jobs import Job, JobBatch, JobItem, ScheduledJob
 from .storage import Attachment
 from .tickets import Tickets
@@ -26,7 +26,7 @@ __all__ = [
     "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission",
     "UserAreaAccess",
     "Provision", "ProvisionAccess", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus",
-    "Company", "Currency", "Area", "MailingParameter", "Attachment",
+    "Company", "Currency", "Area", "MailingParameter", "Module", "Attachment",
     "Job", "JobBatch", "JobItem", "ScheduledJob",
     "LibroMayor", "ReglasGastos",
     "PaymentProvider",

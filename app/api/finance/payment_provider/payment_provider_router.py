@@ -17,6 +17,10 @@ from app.api.finance.payment_provider.payment_provider_schema import (
     PaymentProviderCreateRequest,
     PaymentProviderResponse,
     PaymentProviderUpdateRequest,
+    SentAttachmentResponse,
+)
+from app.api.finance.payment_provider.archive_service import (
+    PaymentProviderArchiveService,
 )
 from app.api.finance.payment_provider.payment_provider_service import (
     PaymentProviderService,
@@ -35,6 +39,10 @@ router = APIRouter(
 
 def get_payment_provider_service(db=Depends(get_db)) -> PaymentProviderService:
     return PaymentProviderService(db)
+
+
+def get_archive_service(db=Depends(get_db)) -> PaymentProviderArchiveService:
+    return PaymentProviderArchiveService(db)
 
 
 @router.get("/health")
@@ -195,4 +203,60 @@ async def enqueue_payment_emails(
         message_override=message_override,
         idempotency_key=idempotency_key,
         batch_size=batch_size,
+    )
+
+
+# =====================================================
+# CONSTANCIAS ARCHIVADAS
+# =====================================================
+# Los adjuntos de un correo enviado quedan en storage.attachments colgados del
+# JobItem. No se leen por el router de /attachments porque ese esta acotado al
+# alcance de provisiones; aca el control es el permiso del propio modulo.
+@router.get(
+    "/payments/{item_id}/attachments",
+    response_model=list[SentAttachmentResponse],
+    summary="Constancias archivadas de un correo enviado",
+)
+def list_sent_attachments(
+    item_id: UUID,
+    service: PaymentProviderArchiveService = Depends(get_archive_service),
+    current_user=Depends(
+        require_any_permission("payment_provider.view", "payment_provider.edit"),
+    ),
+):
+    return service.list_item_attachments(item_id)
+
+
+@router.get(
+    "/payments/attachments/{attachment_id}/content",
+    summary="Descargar una constancia archivada",
+)
+def download_sent_attachment(
+    attachment_id: UUID,
+    service: PaymentProviderArchiveService = Depends(get_archive_service),
+    current_user=Depends(
+        require_any_permission("payment_provider.view", "payment_provider.edit"),
+    ),
+):
+    attachment = service.get_attachment(attachment_id)
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Constancia no encontrada")
+
+    content = service.read_bytes(attachment)
+    if content is None:
+        # La fila existe pero el archivo no: se distingue del 404 para que se
+        # vea que es un problema del volumen y no un id equivocado.
+        raise HTTPException(
+            status_code=410,
+            detail="El archivo de la constancia ya no esta disponible en disco",
+        )
+
+    return Response(
+        content=content,
+        media_type=attachment.mime_type or "application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{attachment.file_name}"'
+            ),
+        },
     )

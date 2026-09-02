@@ -1,5 +1,5 @@
 # app/main.py
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analytics import router as analytics_router
@@ -22,6 +22,7 @@ from app.api.web import web_router
 from app.core.config import settings
 from app.core.handlers import register_exception_handlers
 from app.core.middleware import AuditMiddleware
+from app.core.modules import MODULE_ICG_QUERY, ModuleEnabled
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -63,5 +64,11 @@ app.include_router(prefix="/api", router=sales_channel_router.router)
 app.include_router(prefix="/api", router=attendance_router.router)
 app.include_router(prefix="/api", router=jobs_router)
 app.include_router(prefix="/api", router=observability_router.router)
-app.include_router(prefix="/api", router=graphql_router)
+# GraphQL expone todo el modulo en una sola URL, por eso el interruptor va
+# aqui en el include y no dentro del GraphQLRouter de strawberry.
+app.include_router(
+    prefix="/api",
+    router=graphql_router,
+    dependencies=[Depends(ModuleEnabled(MODULE_ICG_QUERY))],
+)
 app.include_router(router=health_router.router)

@@ -8,6 +8,7 @@ from app.models.master.master_model import (
     Company,
     Area,
     Currency,
+    Module,
 )
 from app.models.master.mailing_parameter_model import MailingParameter
 
@@ -253,3 +254,17 @@ class MasterRepository:
 
     def rollback(self):
         self.db.rollback()
+
+    # ==========================================
+    # MODULOS
+    # ==========================================
+
+    def get_modules(self):
+        return self.db.query(Module).order_by(Module.code).all()
+
+    def get_module_by_code(self, code: str):
+        return self.db.query(Module).filter(Module.code == code).first()
+
+    def create_module(self, module: Module):
+        self.db.add(module)
+        return module

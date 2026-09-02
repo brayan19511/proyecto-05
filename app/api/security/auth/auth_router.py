@@ -7,6 +7,7 @@ from app.api.security.auth.auth_service import AuthService
 from app.api.security.user_scope.user_scope_service import UserScopeService
 from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
+from app.core.modules import enabled_module_codes
 from app.core.security import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["AUTENTICACION"])
@@ -46,6 +47,7 @@ def get_me(
         ],
         companies=scope.companies,
         unrestricted_scope=scope.unrestricted,
+        enabled_modules=enabled_module_codes(db),
     )
 
 

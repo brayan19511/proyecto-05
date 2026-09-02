@@ -39,6 +39,7 @@ from app.api.sales_channel.permissions import (
     SKU_IMPORT_PERMISSION,
     SKU_VIEW_PERMISSION,
 )
+from app.core.modules import MODULE_CATALOG
 from app.core.security import hash_password
 from app.models.auth.security_model import (
     Auth,
@@ -51,7 +52,7 @@ from app.models.auth.user_model import Information
 from app.models.finance.provision_model import ProvisionStatus
 from app.models.jobs import ScheduledJob
 from app.models.master.mailing_parameter_model import MailingParameter
-from app.models.master.master_model import Area, Company, Currency
+from app.models.master.master_model import Area, Company, Currency, Module
 from app.services.ingestion.catalog import ICG_TABLES
 
 ADMIN_EMAIL = "admin@admin.com"
@@ -250,6 +251,14 @@ PERMISSIONS = [
         "code": ICG_QUERY_VIEW_PERMISSION,
         "description": "Consultar datos de ICG por GraphQL",
     },
+    {
+        "code": "master.modules.view",
+        "description": "Ver el estado de los modulos del sistema",
+    },
+    {
+        "code": "master.modules.edit",
+        "description": "Activar y desactivar modulos del sistema",
+    },
 ]
 
 ROLES = [
@@ -292,12 +301,15 @@ ROLE_PERMISSIONS = {
         JOBS_RETRY_PERMISSION,
     },
     "Master Consulta": {
+        "master.modules.view",
         "master.company.view",
         "master.currency.view",
         "master.area.view",
         "master.data.view",
     },
     "Master Admin": {
+        "master.modules.view",
+        "master.modules.edit",
         "master.company.view",
         "master.company.edit",
         "master.currency.view",
@@ -724,6 +736,37 @@ class SeedService:
 
         for item in CURRENCIES:
             self.ensure_currency(item)
+
+        self.ensure_modules()
+
+    def ensure_modules(self):
+        """Siembra el catalogo de modulos sin tocar el estado ya elegido.
+
+        Solo se actualizan nombre y descripcion: si el operador apago un
+        modulo, volver a correr el seed no lo debe prender.
+        """
+        for item in MODULE_CATALOG:
+            module = (
+                self.db.query(Module)
+                .filter(Module.code == item["code"])
+                .first()
+            )
+
+            if module:
+                module.name = item["name"]
+                module.description = item["description"]
+                self.existing.append(f"module:{item['code']}")
+                continue
+
+            self.db.add(
+                Module(
+                    code=item["code"],
+                    name=item["name"],
+                    description=item["description"],
+                    enabled=True,
+                )
+            )
+            self.created.append(f"module:{item['code']}")
 
     def ensure_mailing_parameters(self):
         for item in MAILING_PARAMETERS:

@@ -207,7 +207,7 @@ class PaymentProviderService:
                     cc=parse_email_list(mailing_parameter.cc),
                     attachments=attachments,
                 )
-                self.email_service.send(message)
+                self.email_service.send(message, self.db)
                 sent.append(
                     {
                         "provider_id": provider_group["provider_id"],

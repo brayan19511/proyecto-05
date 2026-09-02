@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.exceptions import (
     ConflictError,
     ForbiddenError,
+    ModuleDisabledError,
     NotFoundError,
     ValidationError,
 )
@@ -43,6 +44,20 @@ def register_exception_handlers(app):
         return JSONResponse(
             status_code=409,
             content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(ModuleDisabledError)
+    async def module_disabled_handler(request: Request, exc: ModuleDisabledError):
+        # 503 y no 403: no es un problema de permisos del usuario, es que la
+        # funcionalidad esta apagada para todos. Se devuelve el codigo del
+        # modulo para que el front pueda reaccionar sin parsear el mensaje.
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": str(exc),
+                "module": exc.code,
+                "reason": exc.reason,
+            },
         )
 
     @app.exception_handler(Exception)

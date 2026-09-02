@@ -8,6 +8,7 @@ from app.models.master.master_model import (
     Company,
     Area,
     Currency,
+    Module,
 )
 from app.models.master.mailing_parameter_model import MailingParameter
 
@@ -24,9 +25,21 @@ from app.api.master.master_schema import (
     CurrencyUpdateRequest,
     MailingParameterCreateRequest,
     MailingParameterUpdateRequest,
+    ModuleResponse,
+    ModuleUpdateRequest,
 )
+from app.core.config import settings
 from app.core.db.integrity import raise_integrity_error
-from app.core.exceptions import ConflictError, ValidationError, get_or_404
+from app.core.modules import (
+    ENVIRONMENT_DISABLED_REASON,
+    MODULE_CATALOG,
+)
+from app.core.exceptions import (
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+    get_or_404,
+)
 
 
 class MasterService:
@@ -393,3 +406,83 @@ class MasterService:
         self.repository.commit()
 
         return True
+
+    # ==========================================
+    # MODULOS
+    # ==========================================
+
+    def get_modules(self) -> list[ModuleResponse]:
+        """Catalogo completo con su estado, en el orden de MODULE_CATALOG.
+
+        Se recorre el catalogo y no la tabla para que un modulo sin fila
+        (seed no corrido) aparezca igual en el panel, como encendido.
+        """
+        rows = {row.code: row for row in self.repository.get_modules()}
+
+        return [
+            self._build_module_response(item, rows.get(item["code"]))
+            for item in MODULE_CATALOG
+        ]
+
+    def set_module_enabled(
+        self,
+        code: str,
+        request: ModuleUpdateRequest,
+        current_user_id: UUID | None,
+    ) -> ModuleResponse:
+        item = next(
+            (entry for entry in MODULE_CATALOG if entry["code"] == code),
+            None,
+        )
+        if item is None:
+            raise NotFoundError(f"No existe el modulo '{code}'")
+
+        if code in settings.modules_disabled:
+            raise ValidationError(
+                f"El modulo '{item['name']}' esta apagado por configuracion "
+                "del entorno (MODULES_DISABLED) y no se puede cambiar aqui"
+            )
+
+        module = self.repository.get_module_by_code(code)
+        if module is None:
+            # Primera vez que se toca un modulo que el seed aun no sembro.
+            module = Module(
+                code=code,
+                name=item["name"],
+                description=item["description"],
+                enabled=True,
+                created_by=current_user_id,
+            )
+            self.repository.create_module(module)
+
+        module.enabled = request.enabled
+        # Al prender se limpia el motivo para no dejar un texto viejo colgado.
+        module.disabled_reason = None if request.enabled else request.disabled_reason
+        module.updated_by = current_user_id
+
+        self._commit(
+            "uq_modules_code",
+            "Ya existe un modulo con este codigo",
+        )
+
+        return self._build_module_response(item, module)
+
+    @staticmethod
+    def _build_module_response(item: dict, module: Module | None) -> ModuleResponse:
+        locked = item["code"] in settings.modules_disabled
+
+        if locked:
+            reason = ENVIRONMENT_DISABLED_REASON
+        elif module is not None and not module.enabled:
+            reason = module.disabled_reason or "Desactivado por el administrador"
+        else:
+            reason = None
+
+        return ModuleResponse(
+            code=item["code"],
+            name=module.name if module else item["name"],
+            description=module.description if module else item["description"],
+            enabled=reason is None,
+            disabled_reason=reason,
+            locked_by_environment=locked,
+        )

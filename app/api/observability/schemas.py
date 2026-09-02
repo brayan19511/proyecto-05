@@ -13,7 +13,7 @@ class ComponentStatus(BaseModel):
     """Resultado del chequeo de un componente (DB, workers, SMTP, etc.)."""
 
     component: str
-    status: str  # ok | degraded | down
+    status: str  # ok | disabled | degraded | down
     latency_ms: float | None = None
     detail: str | None = None
 

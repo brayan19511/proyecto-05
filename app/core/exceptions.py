@@ -20,6 +20,15 @@ class ForbiddenError(DomainError):
 class BusinessException(DomainError):
     pass
 
+class ModuleDisabledError(DomainError):
+    """El modulo funcional esta apagado. handlers lo traduce a 503."""
+
+    def __init__(self, message: str, *, code: str, reason: str):
+        self.code = code
+        self.reason = reason
+
+        super().__init__(message)
+
 class SAPError(Exception):
     pass
 

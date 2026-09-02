@@ -8,7 +8,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app.api.observability.constants import (
+    COMPONENT_MODULES,
     STATUS_DEGRADED,
+    STATUS_DISABLED,
     STATUS_DOWN,
     STATUS_OK,
     STATUS_SEVERITY,
@@ -20,6 +22,7 @@ from app.core.db.db_cic import get_cic_engine
 from app.core.db.db_icg import get_icg_engine
 from app.core.db.db_ofisis import get_ofisis_engine
 from app.core.db.db_postgres import engine as postgres_engine
+from app.core.modules import enabled_module_codes, module_display_name
 from app.core.db.db_sap import engine_sap
 from app.workers.celery_app import celery_app
 
@@ -42,6 +45,7 @@ class SystemStatusService:
     """Chequeos de salud en vivo de las dependencias del sistema."""
 
     def __init__(self, db: Session):
+        self.db = db
         self.repository = ObservabilityRepository(db)
 
     def get_status(self) -> SystemStatusResponse:
@@ -59,7 +63,12 @@ class SystemStatusService:
             ("celery_workers", self._check_celery),
             ("smtp", self._check_smtp),
         ]
-        components = self._run_parallel(parallel_checks)
+        # Un componente de un modulo apagado no se chequea: reportarlo "down"
+        # ensuciaria el semaforo con una falla que no existe.
+        runnable, disabled = self._split_by_module(parallel_checks)
+
+        components = self._run_parallel(runnable)
+        components.extend(disabled)
         # El scheduler se consulta con la sesion local (fuera del pool).
         components.append(self._check_scheduler())
 
@@ -73,7 +82,35 @@ class SystemStatusService:
     # =====================================================
     # EJECUCION ACOTADA
     # =====================================================
+    def _split_by_module(self, checks) -> tuple[list, list[ComponentStatus]]:
+        """Separa los chequeos a correr de los que se reportan desactivados."""
+        enabled = set(enabled_module_codes(self.db))
+
+        runnable = []
+        disabled: list[ComponentStatus] = []
+
+        for name, fn in checks:
+            module_code = COMPONENT_MODULES.get(name)
+            if module_code and module_code not in enabled:
+                disabled.append(
+                    ComponentStatus(
+                        component=name,
+                        status=STATUS_DISABLED,
+                        detail=(
+                            f"Modulo '{module_display_name(module_code)}' "
+                            "desactivado"
+                        ),
+                    )
+                )
+                continue
+            runnable.append((name, fn))
+
+        return runnable, disabled
+
     def _run_parallel(self, checks) -> list[ComponentStatus]:
+        if not checks:
+            return []
+
         results: list[ComponentStatus] = []
         with ThreadPoolExecutor(max_workers=len(checks)) as pool:
             futures = [(name, pool.submit(fn)) for name, fn in checks]

@@ -14,10 +14,15 @@ from app.core.access import require_any_permission
 from app.core.config import settings
 from app.core.db.db_postgres import get_db
 from app.core.exceptions import ValidationError
+from app.core.modules import MODULE_SAP, ModuleEnabled
 from app.core.secret_cipher import encrypt_job_secrets
 from app.workers.dispatcher import dispatch_job
 
-router = APIRouter(prefix="/sap", tags=["SAP"])
+router = APIRouter(
+    prefix="/sap",
+    tags=["SAP"],
+    dependencies=[Depends(ModuleEnabled(MODULE_SAP))],
+)
 
 
 def get_job_service(db: Session = Depends(get_db)) -> JobService:

@@ -16,13 +16,18 @@ from app.api.jobs.constants import (
 from app.api.jobs.schemas import JobDetailResponse
 from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
+from app.core.modules import MODULE_ANALYTICS, ModuleEnabled
 from app.services.analytics_queries import IcgSalesAnalyticsQuery
 from app.services.analytics_silver.orchestrator import AnalyticsSilverJobService
 from app.services.ingestion.catalog import ICG_TABLES
 from app.services.ingestion.orchestrator import AnalyticsIngestionService
 
 
-router = APIRouter(prefix="/analytics", tags=["ANALYTICS"])
+router = APIRouter(
+    prefix="/analytics",
+    tags=["ANALYTICS"],
+    dependencies=[Depends(ModuleEnabled(MODULE_ANALYTICS))],
+)
 
 
 def get_ingestion_service(db: Session = Depends(get_db)) -> AnalyticsIngestionService:

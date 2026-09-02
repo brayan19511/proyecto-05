@@ -170,7 +170,13 @@ class EmailServiceTests(unittest.TestCase):
 
     @patch("app.services.email.email_service.settings")
     @patch("app.services.email.email_service.smtplib.SMTP")
-    def test_send_uses_tls_and_login_when_configured(self, smtp_class, settings):
+    @patch("app.services.email.email_service.require_module")
+    def test_send_uses_tls_and_login_when_configured(
+        self,
+        require_module,
+        smtp_class,
+        settings,
+    ):
         settings.SMTP_HOST = "smtp.office365.com"
         settings.SMTP_PORT = 587
         settings.SMTP_USE_TLS = True
