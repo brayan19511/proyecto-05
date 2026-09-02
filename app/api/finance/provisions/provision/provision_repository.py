@@ -14,6 +14,7 @@ from app.models.finance.provision_model import (
 )
 
 from app.api.storage.constants import PROVISION_DOCUMENT_ENTITY_TYPE
+from app.core.scope import UserScope, scope_condition
 from app.models.storage import Attachment
 
 
@@ -93,6 +94,7 @@ class ProvisionRepository:
         company_id: int | None = None,
         user_id=None,
         review_queue: bool = False,
+        scope: UserScope | None = None,
     ):
 
         query = self.db.query(Provision).options(
@@ -126,18 +128,36 @@ class ProvisionRepository:
                 Provision.company_id == company_id
             )
 
-        if user_id is not None and not review_queue:
+        # Alcance por empresa/area. None = sin restriccion (admin o *_all);
+        # vacio = el usuario no tiene alcance configurado y se ignora, para no
+        # romper a quienes todavia no lo tienen asignado.
+        area_condition = None
+        if scope is not None and not scope.is_empty:
+            area_condition = scope_condition(Provision, scope)
+
+        if review_queue or user_id is None:
+            # Sin restriccion por autoria (revisor o "ve todo"): queda solo el
+            # limite por empresa/area, si corresponde.
+            if area_condition is not None:
+                query = query.filter(area_condition)
+
+        else:
+            # Visibilidad: lo propio, lo compartido explicitamente y, si el
+            # usuario tiene alcance por area, todo lo de sus areas.
+            visibility = [
+                Provision.created_by == user_id,
+                ProvisionAccess.user_id == user_id,
+            ]
+
+            if area_condition is not None:
+                visibility.append(area_condition)
+
             query = (
                 query.outerjoin(
                     ProvisionAccess,
                     ProvisionAccess.provision_id == Provision.id,
                 )
-                .filter(
-                    or_(
-                        Provision.created_by == user_id,
-                        ProvisionAccess.user_id == user_id,
-                    )
-                )
+                .filter(or_(*visibility))
                 .distinct()
             )
 

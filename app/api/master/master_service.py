@@ -1,4 +1,5 @@
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -48,8 +49,12 @@ class MasterService:
     # COMPANY
     # ==========================================
 
-    def get_companies(self, search: str | None = None):
-        return self.repository.get_companies(search)
+    def get_companies(
+        self,
+        search: str | None = None,
+        active: bool | None = True,
+    ):
+        return self.repository.get_companies(search, active)
 
     def get_company_by_id(self, company_id: int):
         return get_or_404(
@@ -57,15 +62,30 @@ class MasterService:
             "Company not found",
         )
 
+    def get_active_company_by_id(self, company_id: int):
+        """Valida contra empresas vigentes (no sirve una dada de baja)."""
+        return get_or_404(
+            self.repository.get_company_by_id(company_id, only_active=True),
+            "La empresa indicada no existe o esta inactiva",
+        )
+
     def create_company(
         self,
         request: CompanyCreateRequest,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         data = request.model_dump()
         data["code"] = data["code"].strip().upper()
-        if self.repository.get_company_by_code(data["code"]):
+        existing = self.repository.get_company_by_code(data["code"])
+        if existing:
+            # El borrado es logico, asi que el codigo sigue ocupado por el
+            # registro inactivo: hay que reactivarlo, no crear otro.
+            if not existing.active:
+                raise ConflictError(
+                    "Ya existe una empresa inactiva con este codigo, "
+                    "reactivela en lugar de crear una nueva"
+                )
             raise ConflictError("El codigo de empresa ya existe")
 
         company = Company(**data, created_by=current_user_id)
@@ -77,7 +97,7 @@ class MasterService:
         self,
         company_id: int,
         request: CompanyUpdateRequest,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         company = self.get_company_by_id(company_id)
@@ -96,18 +116,37 @@ class MasterService:
         self._commit("companies_code_key", "El codigo de empresa ya existe")
         return company
 
-    def delete_company(
+    def set_company_active(
         self,
         company_id: int,
-        current_user_id: int|None,
+        active: bool,
+        current_user_id: UUID | None,
     ):
-
+        """Activa o desactiva la empresa (no hay borrado fisico)."""
         company = self.get_company_by_id(company_id)
 
-        company.active = False
+        if not active and company.active:
+            dependents = self.repository.count_company_dependents(company_id)
+            if dependents:
+                raise ConflictError(
+                    "No se puede desactivar la empresa: tiene "
+                    f"{dependents} registro(s) activo(s) asociado(s)"
+                )
+
+        company.active = active
         company.updated_by = current_user_id
 
         self.repository.commit()
+
+        return company
+
+    def delete_company(
+        self,
+        company_id: int,
+        current_user_id: UUID | None,
+    ):
+        # Mantenido por compatibilidad: desactiva, nunca borra.
+        self.set_company_active(company_id, False, current_user_id)
 
         return True
 
@@ -126,8 +165,12 @@ class MasterService:
 
         return data
 
-    def get_currencies(self, search: str | None = None):
-        return self.repository.get_currencies(search)
+    def get_currencies(
+        self,
+        search: str | None = None,
+        active: bool | None = True,
+    ):
+        return self.repository.get_currencies(search, active)
 
     def get_currency_by_id(self, currency_id: int):
         return get_or_404(
@@ -138,7 +181,7 @@ class MasterService:
     def create_currency(
         self,
         request: CurrencyCreateRequest,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         data = request.model_dump()
@@ -156,7 +199,7 @@ class MasterService:
         self,
         currency_id: int,
         request: CurrencyUpdateRequest,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         currency = self.get_currency_by_id(currency_id)
@@ -177,18 +220,29 @@ class MasterService:
 
         return currency
 
-    def delete_currency(
+    def set_currency_active(
         self,
         currency_id: int,
-        current_user_id: int|None,
+        active: bool,
+        current_user_id: UUID | None,
     ):
-
+        """Activa o desactiva la moneda (no hay borrado fisico)."""
         currency = self.get_currency_by_id(currency_id)
 
-        currency.active = False
+        currency.active = active
         currency.updated_by = current_user_id
 
         self.repository.commit()
+
+        return currency
+
+    def delete_currency(
+        self,
+        currency_id: int,
+        current_user_id: UUID | None,
+    ):
+        # Mantenido por compatibilidad: desactiva, nunca borra.
+        self.set_currency_active(currency_id, False, current_user_id)
 
         return True
 
@@ -208,7 +262,7 @@ class MasterService:
     def create_mailing_parameter(
         self,
         request: MailingParameterCreateRequest,
-        current_user_id: int | None,
+        current_user_id: UUID | None,
     ):
         data = request.model_dump()
         data["name"] = data["name"].strip()
@@ -227,7 +281,7 @@ class MasterService:
         self,
         parameter_id: int,
         request: MailingParameterUpdateRequest,
-        current_user_id: int | None,
+        current_user_id: UUID | None,
     ):
         parameter = self.get_mailing_parameter_by_id(parameter_id)
         data = request.model_dump(exclude_unset=True)
@@ -246,7 +300,7 @@ class MasterService:
         )
         return parameter
 
-    def delete_mailing_parameter(self, parameter_id: int, current_user_id: int | None):
+    def delete_mailing_parameter(self, parameter_id: int, current_user_id: UUID | None):
         parameter = self.get_mailing_parameter_by_id(parameter_id)
         parameter.active = False
         parameter.updated_by = current_user_id
@@ -257,8 +311,12 @@ class MasterService:
     # AREA
     # ==========================================
 
-    def get_areas(self, search: str | None = None):
-        return self.repository.get_areas(search)
+    def get_areas(
+        self,
+        search: str | None = None,
+        active: bool | None = True,
+    ):
+        return self.repository.get_areas(search, active)
 
     def get_area_by_id(self, area_id: int):
         return get_or_404(
@@ -266,15 +324,29 @@ class MasterService:
             "Area not found",
         )
 
+    def get_active_area_by_id(self, area_id: int):
+        """Valida contra areas vigentes (no sirve una dada de baja)."""
+        return get_or_404(
+            self.repository.get_area_by_id(area_id, only_active=True),
+            "El area indicada no existe o esta inactiva",
+        )
+
     def create_area(
         self,
         request: AreaCreateRequest,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         data = request.model_dump()
         data["code"] = data["code"].strip().upper()
-        if self.repository.get_area_by_code(data["code"]):
+        existing = self.repository.get_area_by_code(data["code"])
+        if existing:
+            # El borrado es logico: el codigo sigue ocupado por el inactivo.
+            if not existing.active:
+                raise ConflictError(
+                    "Ya existe un area inactiva con este codigo, "
+                    "reactivela en lugar de crear una nueva"
+                )
             raise ConflictError("El codigo de area ya existe")
 
         area = Area(**data, created_by=current_user_id)
@@ -286,7 +358,7 @@ class MasterService:
         self,
         area_id: int,
         request: AreaUpdateRequest,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         area = self.get_area_by_id(area_id)
@@ -310,7 +382,7 @@ class MasterService:
     def delete_area(
         self,
         area_id: int,
-        current_user_id: int|None,
+        current_user_id: UUID | None,
     ):
 
         area = self.get_area_by_id(area_id)

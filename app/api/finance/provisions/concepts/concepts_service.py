@@ -118,7 +118,8 @@ class ConceptsService:
         return deleted
 
     def _validate_company(self, company_id: int):
-        MasterService(self.db).get_company_by_id(company_id)
+        # Debe estar vigente: el borrado de maestros es logico.
+        MasterService(self.db).get_active_company_by_id(company_id)
 
     def _get_or_404(self, concept_id: int):
         concept = self.repository.get_concept_by_id(concept_id)

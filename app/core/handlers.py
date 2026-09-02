@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.exceptions import (
     ConflictError,
+    ForbiddenError,
     NotFoundError,
     ValidationError,
 )
@@ -27,6 +28,13 @@ def register_exception_handlers(app):
     async def validation_handler(request: Request, exc: ValidationError):
         return JSONResponse(
             status_code=400,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(ForbiddenError)
+    async def forbidden_handler(request: Request, exc: ForbiddenError):
+        return JSONResponse(
+            status_code=403,
             content={"detail": str(exc)},
         )
 

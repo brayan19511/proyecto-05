@@ -42,11 +42,19 @@ class Currency(Base, AuditMixin):
 
 
 class Area(Base, AuditMixin):
+    """Catalogo global de areas.
+
+    El amarre con la empresa no vive aqui sino en
+    ``security.user_area_access`` (alcance por usuario) y en el
+    ``company_id`` de cada documento, para no duplicar el catalogo por
+    sociedad.
+    """
+
     __tablename__ = "areas"
     __table_args__ = {"schema": "master"}
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

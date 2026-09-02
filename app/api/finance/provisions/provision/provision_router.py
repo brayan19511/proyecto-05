@@ -18,6 +18,7 @@ from app.api.finance.provisions.provision.provision_schema import (
 from app.api.finance.provisions.access import (
     can_edit_all_provisions,
     can_view_all_provisions,
+    resolve_provision_scope,
 )
 from app.api.finance.provisions.provision.provision_service import ProvisionService
 from app.core.access import require_any_permission
@@ -59,12 +60,14 @@ require_provision_access_edit = require_any_permission(
 @router.post("", response_model=ProvisionSummaryResponse)
 def create_provision(
     request: ProvisionCreateRequest,
+    db: Session = Depends(get_db),
     service: ProvisionService = Depends(get_service),
     current_user=Depends(PermissionChecker("provisions.create")),
 ):
     provision = service.create_provision(
         request=request,
         user_id=current_user.id,
+        scope=resolve_provision_scope(db, current_user),
     )
 
     return service.to_summary_response(provision)
@@ -76,6 +79,7 @@ def get_provisions(
     status_id: int | None = Query(default=None),
     area_id: int | None = Query(default=None),
     company_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
     service: ProvisionService = Depends(get_service),
     current_user=Depends(require_provision_view),
 ):
@@ -85,6 +89,7 @@ def get_provisions(
         area_id=area_id,
         company_id=company_id,
         user_id=None if can_view_all_provisions(current_user) else current_user.id,
+        scope=resolve_provision_scope(db, current_user),
     )
 
 
@@ -92,12 +97,14 @@ def get_provisions(
 def get_review_queue(
     area_id: int | None = Query(default=None),
     company_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
     service: ProvisionService = Depends(get_service),
     current_user=Depends(PermissionChecker("provisions.review")),
 ):
     return service.get_review_queue(
         area_id=area_id,
         company_id=company_id,
+        scope=resolve_provision_scope(db, current_user),
     )
 
 

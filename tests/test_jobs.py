@@ -323,14 +323,27 @@ class SapJobContractTests(unittest.TestCase):
     def test_safe_error_has_bounded_size(self):
         self.assertEqual(len(safe_sap_error("x" * 3000)), 2000)
 
-    def test_sap_documents_are_redacted_from_audit_body(self):
+    def test_sap_documents_are_kept_in_audit_body(self):
+        # Los documentos son dato de negocio: quedan visibles en el detalle.
+        payload = {
+            "database": "COMPANY",
+            "documentos": [1001, 1002],
+        }
+
+        self.assertEqual(sanitize_payload(payload), payload)
+
+    def test_sap_credentials_are_redacted_from_audit_body(self):
         sanitized = sanitize_payload(
             {
                 "database": "COMPANY",
-                "documentos": [1001, 1002],
+                "user": "sap-user",
+                "password": "secreto",
             }
         )
-        self.assertEqual(sanitized["documentos"], "[REDACTED]")
+
+        self.assertEqual(sanitized["database"], "COMPANY")
+        self.assertEqual(sanitized["user"], "sap-user")
+        self.assertEqual(sanitized["password"], "[REDACTED]")
 
     def test_credentials_are_encrypted_and_authenticated(self):
         encrypted = encrypt_job_secrets(

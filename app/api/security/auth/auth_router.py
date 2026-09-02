@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from app.api.security.auth.auth_schemas import *
 from app.api.security.auth.auth_service import AuthService
+from app.api.security.user_scope.user_scope_service import UserScopeService
 from app.core.access import require_any_permission
 from app.core.db.db_postgres import get_db
 from app.core.security import get_current_user
@@ -23,8 +24,13 @@ def register(user_data: UserRegisterSchema, db: Session = Depends(get_db)):
     response_model=CurrentUserResponse
 )
 def get_me(
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    # El front necesita saber en que empresas / areas puede operar para
+    # armar los combos de creacion y los filtros de listado.
+    scope = UserScopeService(db).get_user_scope_detail(current_user)
+
     return CurrentUserResponse(
         id=current_user.id,
         email=current_user.email,
@@ -37,7 +43,9 @@ def get_me(
         permissions=[
             p.code
             for p in current_user.permissions
-        ]
+        ],
+        companies=scope.companies,
+        unrestricted_scope=scope.unrestricted,
     )
 
 

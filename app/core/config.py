@@ -1,6 +1,23 @@
+import unicodedata
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
+
+
+def normalize_key(value: str) -> str:
+    """Minuscula y sin tildes, para que "Contrasena" y "contrasena" empaten."""
+    decomposed = unicodedata.normalize("NFKD", value.strip().lower())
+
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def split_config_list(value: str) -> list[str]:
+    """Convierte "a, b ,c" en ["a", "b", "c"], normalizado y sin vacios."""
+    return [
+        normalize_key(item)
+        for item in value.split(",")
+        if normalize_key(item)
+    ]
 
 
 class Settings(BaseSettings):
@@ -83,6 +100,36 @@ class Settings(BaseSettings):
     DATA_LAKE_ROOT: str = "var/data-lake"
     ICG_INCREMENTAL_LOOKBACK_DAYS: int = 3
 
+    # =====================================================
+    # AUDITORIA: QUE SE ENMASCARA EN LOS DETALLES
+    # =====================================================
+    # Palabras que marcan un campo como credencial. La coincidencia es por
+    # substring y sin tildes, asi que "password" ya cubre new_password,
+    # current_password y passwordConfirm; "contrasena" cubre "contraseña".
+    # Es lo unico que se enmascara en los cuerpos y query params: cualquier
+    # otro campo se guarda tal cual para poder revisar el detalle.
+    # Agregar palabras en el .env separadas por coma (ej. sumar "clave").
+    AUDIT_SENSITIVE_KEYS: str = (
+        "password,contrasena,token,secret,api_key,apikey,credential"
+    )
+
+    # Cabeceras que se enmascaran completas (coincidencia exacta, no substring).
+    AUDIT_SENSITIVE_HEADERS: str = "authorization,cookie,set-cookie,x-api-key"
+
+    # Campos cuyo contenido se omite por tamano, no por ser sensible
+    # (adjuntos en base64 que inflarian la tabla de auditoria).
+    AUDIT_FILE_CONTENT_KEYS: str = (
+        "file_base64,base64,content_base64,file_content"
+    )
+
+    # Prefijos de ruta cuyo cuerpo de respuesta no se guarda. Vacio = se
+    # guarda el cuerpo de todas las rutas.
+    AUDIT_REDACT_RESPONSE_PATHS: str = ""
+
+    # Tope del cuerpo de respuesta que se guarda. Arriba de esto se registra
+    # solo el tamano, para que una respuesta enorme no infle la auditoria.
+    AUDIT_MAX_RESPONSE_BODY_BYTES: int = 65_536
+
     @property
     def DATABASE_URL_SAP(self) -> str:
         return (
@@ -123,6 +170,28 @@ class Settings(BaseSettings):
     @property
     def ASYNC_DATABASE_URL(self) -> str:
         return self.DATABASE_URL_POSTGRES
+
+    @property
+    def audit_sensitive_keys(self) -> tuple[str, ...]:
+        return tuple(split_config_list(self.AUDIT_SENSITIVE_KEYS))
+
+    @property
+    def audit_sensitive_headers(self) -> frozenset[str]:
+        return frozenset(split_config_list(self.AUDIT_SENSITIVE_HEADERS))
+
+    @property
+    def audit_file_content_keys(self) -> frozenset[str]:
+        return frozenset(split_config_list(self.AUDIT_FILE_CONTENT_KEYS))
+
+    @property
+    def audit_redact_response_paths(self) -> tuple[str, ...]:
+        # Las rutas no se normalizan como las llaves: se respeta el path tal
+        # cual, solo se limpian espacios y vacios.
+        return tuple(
+            item.strip()
+            for item in self.AUDIT_REDACT_RESPONSE_PATHS.split(",")
+            if item.strip()
+        )
 
     @property
     def cors_origins(self) -> list[str]:

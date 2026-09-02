@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import json
 import time
 import uuid
-from app.core.config import settings
+from app.core.config import normalize_key, settings
 
 from fastapi import BackgroundTasks, Request
 from fastapi.concurrency import iterate_in_threadpool
@@ -13,48 +13,37 @@ from app.core.audit_utils import audit_steps_context
 from app.services.audit.audit_service import AuditService
 
 
-SENSITIVE_HEADER_KEYS = {
-    "authorization",
-    "cookie",
-    "set-cookie",
-    "x-api-key",
-}
+REDACTED = "[REDACTED]"
+FILE_CONTENT_PLACEHOLDER = "[FILE_CONTENT_OMITTED]"
 
-SENSITIVE_BODY_KEYS = {
-    "password",
-    "token",
-    "access_token",
-    "refresh_token",
-    "secret",
-    "api_key",
-    "document_number",
-    "document_numbers",
-    "documentos",
-    "references",
-}
 
-SENSITIVE_QUERY_KEYS = {
-    "document_number",
-    "document_numbers",
-}
+def _is_sensitive_key(key: str) -> bool:
+    """True si la llave parece una credencial.
 
-REDACT_RESPONSE_BODY_PATH_PREFIXES = {
-    "/api/attendance",
-    "/api/jobs",
-    "/api/sap",
-}
+    La coincidencia es por substring sobre la llave normalizada (minuscula y
+    sin tildes), asi que una sola palabra configurada cubre sus variantes:
+    "password" tapa new_password, current_password y passwordConfirm.
 
-FILE_CONTENT_KEYS = {
-    "file_base64",
-    "base64",
-    "content_base64",
-    "file_content",
-}
+    Las palabras se configuran en AUDIT_SENSITIVE_KEYS; por defecto solo
+    credenciales. Cualquier otro campo se guarda tal cual para no perder el
+    detalle al revisar una peticion.
+    """
+    normalized = normalize_key(key)
+
+    return any(word in normalized for word in settings.audit_sensitive_keys)
+
+
+def _is_file_content_key(key: str) -> bool:
+    """Campos que se omiten por tamano (base64), no por ser sensibles."""
+    return normalize_key(key) in settings.audit_file_content_keys
 
 
 def sanitize_headers(headers: dict) -> dict:
+    # Las cabeceras si van por coincidencia exacta: son un conjunto conocido.
+    sensitive = settings.audit_sensitive_headers
+
     return {
-        key: ("[REDACTED]" if key.lower() in SENSITIVE_HEADER_KEYS else value)
+        key: (REDACTED if normalize_key(key) in sensitive else value)
         for key, value in headers.items()
     }
 
@@ -69,11 +58,8 @@ def sanitize_query_params(query_params) -> dict:
     sanitized = {}
 
     for key, value in items:
-        safe_value = (
-            "[REDACTED]"
-            if key.lower() in SENSITIVE_QUERY_KEYS
-            else value
-        )
+        safe_value = REDACTED if _is_sensitive_key(key) else value
+
         if key not in sanitized:
             sanitized[key] = safe_value
         elif isinstance(sanitized[key], list):
@@ -89,14 +75,12 @@ def sanitize_payload(value):
         sanitized = {}
 
         for key, item in value.items():
-            normalized_key = key.lower()
-
-            if normalized_key in FILE_CONTENT_KEYS:
-                sanitized[key] = "[FILE_CONTENT_OMITTED]"
+            if _is_file_content_key(key):
+                sanitized[key] = FILE_CONTENT_PLACEHOLDER
                 continue
 
-            if normalized_key in SENSITIVE_BODY_KEYS:
-                sanitized[key] = "[REDACTED]"
+            if _is_sensitive_key(key):
+                sanitized[key] = REDACTED
                 continue
 
             sanitized[key] = sanitize_payload(item)
@@ -107,6 +91,14 @@ def sanitize_payload(value):
         return [sanitize_payload(item) for item in value]
 
     return value
+
+
+def should_redact_response_body(path: str) -> bool:
+    """True si la ruta esta en AUDIT_REDACT_RESPONSE_PATHS (vacio por defecto)."""
+    return any(
+        path.startswith(prefix)
+        for prefix in settings.audit_redact_response_paths
+    )
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -239,13 +231,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
         response_body = None
 
-        redact_response_body = any(
-            path.startswith(prefix)
-            for prefix in REDACT_RESPONSE_BODY_PATH_PREFIXES
-        )
-
-        if redact_response_body:
-            response_body = {"info": "[REDACTED]"}
+        if should_redact_response_body(path):
+            response_body = {"info": REDACTED}
         elif "application/json" in response.headers.get("content-type", ""):
 
             response_body_bytes = [section async for section in response.body_iterator]
@@ -257,8 +244,17 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 # fragmentada en varias secciones y decodificar solo la
                 # primera registraria un JSON parcial o invalido.
                 raw_body = b"".join(response_body_bytes)
-                response_body = json.loads(raw_body.decode())
-                response_body = sanitize_payload(response_body)
+
+                # Tope de tamano: evita que una respuesta enorme (por ejemplo
+                # un job con miles de documentos) infle la auditoria.
+                if len(raw_body) > settings.AUDIT_MAX_RESPONSE_BODY_BYTES:
+                    response_body = {
+                        "info": "Body omitido por tamano",
+                        "size_bytes": len(raw_body),
+                    }
+                else:
+                    response_body = json.loads(raw_body.decode())
+                    response_body = sanitize_payload(response_body)
             except Exception:
                 response_body = {"info": "Body no serializable"}
 

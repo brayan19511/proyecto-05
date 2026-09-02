@@ -1,7 +1,15 @@
 # app/models/__init__.py
 from app.core.db.db_postgres import Base # Importas tu Base
 from .analytics import AnalyticsIngestionItem, AnalyticsIngestionRun
-from .auth import Auth, Role, UserRole, Information, Permission, RolePermission
+from .auth import (
+    Auth,
+    Role,
+    UserRole,
+    Information,
+    Permission,
+    RolePermission,
+    UserAreaAccess,
+)
 from .audit import AuditLog, AuditLogDetail, AuditStep
 from .finance import Provision, ProvisionAccess, ProvisionConcept, ProvisionDocument, ProvisionStatus
 from .finance import LibroMayor, ReglasGastos
@@ -15,7 +23,8 @@ __all__ = [
     "Base", 
     "AnalyticsIngestionItem", "AnalyticsIngestionRun",
     "Auth", "Role", "UserRole", "Information",
-    "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission" , 
+    "AuditLog", "AuditLogDetail", "AuditStep", "Permission", "RolePermission",
+    "UserAreaAccess",
     "Provision", "ProvisionAccess", "ProvisionConcept", "ProvisionDocument", "ProvisionStatus",
     "Company", "Currency", "Area", "MailingParameter", "Attachment",
     "Job", "JobBatch", "JobItem", "ScheduledJob",

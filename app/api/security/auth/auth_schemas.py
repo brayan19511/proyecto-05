@@ -3,6 +3,8 @@ from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from uuid import UUID
 from typing import  Literal, Optional
 
+from app.api.security.user_scope.user_scope_schema import CompanyScopeResponse
+
 # Lo que el usuario envía para loguearse
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -44,3 +46,7 @@ class CurrentUserResponse(BaseModel):
     active: bool
     roles: list[str]
     permissions: list[str]
+    # Alcance operativo del usuario, agrupado como empresa > areas.
+    companies: list[CompanyScopeResponse] = []
+    # True para admin: ve todas las empresas y areas.
+    unrestricted_scope: bool = False

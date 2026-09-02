@@ -9,7 +9,9 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     func,
+    text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,6 +20,8 @@ from app.core.db.db_postgres import Base
 from app.models.common.mixin_model import AuditMixin
 
 if TYPE_CHECKING:
+    from app.models.master.master_model import Area, Company
+
     from .user_model import Information
 
 
@@ -67,6 +71,12 @@ class Auth(Base):
 
     user_roles_links: Mapped[List["UserRole"]] = relationship(
         back_populates="user", lazy="selectin"
+    )
+
+    area_access_links: Mapped[List["UserAreaAccess"]] = relationship(
+        back_populates="user",
+        foreign_keys="UserAreaAccess.user_id",
+        lazy="selectin",
     )
 
     @property
@@ -161,25 +171,94 @@ class RolePermission(Base):
     permission: Mapped["Permission"] = relationship(lazy="joined")
 
 
-# TODO: agregar relación con empresa para filtrar permisos por empresa
-# class UserCompany(Base):
-#     __tablename__ = "user_companies"
-#     __table_args__ = {"schema": "security"}
+# -------------------------
+# USER - COMPANY / AREA (ALCANCE OPERATIVO)
+# -------------------------
+class UserAreaAccess(Base, AuditMixin):
+    """Alcance operativo de un usuario: en que area de que empresa puede trabajar.
 
-#     user_id: Mapped[UUID] = mapped_column(
-#         ForeignKey("security.auth.id"),
-#         primary_key=True
-#     )
+    Una fila = "este usuario opera en el area X de la empresa Y".
+    Si ``area_id`` es NULL la fila significa "todas las areas de esa empresa"
+    (util para gerentes o para operaciones de una sola empresa, como Peru).
 
-#     company_id: Mapped[int] = mapped_column(
-#         ForeignKey("master.companies.id"),
-#         primary_key=True
-#     )
+    El catalogo de areas se mantiene global (master.areas): el amarre con la
+    empresa vive aqui, para no duplicar el catalogo por cada sociedad.
+    """
 
-#     active: Mapped[bool] = mapped_column(
-#         Boolean,
-#         default=True
-#     )
+    __tablename__ = "user_area_access"
+    __table_args__ = (
+        # En Postgres los NULL no colisionan en un UNIQUE normal, por eso se
+        # usan dos indices parciales en lugar de un UniqueConstraint simple.
+        Index(
+            "uq_user_area_access_area",
+            "user_id",
+            "company_id",
+            "area_id",
+            unique=True,
+            postgresql_where=text("area_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_user_area_access_company",
+            "user_id",
+            "company_id",
+            unique=True,
+            postgresql_where=text("area_id IS NULL"),
+        ),
+        Index("ix_user_area_access_user", "user_id"),
+        Index("ix_user_area_access_company_area", "company_id", "area_id"),
+        {"schema": "security"},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("security.auth.id"),
+        nullable=False,
+    )
+
+    company_id: Mapped[int] = mapped_column(
+        ForeignKey("master.companies.id"),
+        nullable=False,
+    )
+
+    # NULL = todas las areas de la empresa.
+    area_id: Mapped[int | None] = mapped_column(
+        ForeignKey("master.areas.id"),
+        nullable=True,
+    )
+
+    # Borrado logico: estos accesos nunca se eliminan, se desactivan.
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default=text("true"),
+        nullable=False,
+    )
+
+    user: Mapped["Auth"] = relationship(
+        back_populates="area_access_links",
+        foreign_keys=[user_id],
+    )
+
+    company: Mapped["Company"] = relationship(lazy="joined")
+
+    area: Mapped["Area | None"] = relationship(lazy="joined")
+
+    @property
+    def company_code(self) -> str | None:
+        return self.company.code if self.company else None
+
+    @property
+    def company_name(self) -> str | None:
+        return self.company.name if self.company else None
+
+    @property
+    def area_code(self) -> str | None:
+        return self.area.code if self.area else None
+
+    @property
+    def area_name(self) -> str | None:
+        return self.area.name if self.area else None
 
 
 class ApiKey(Base, AuditMixin):

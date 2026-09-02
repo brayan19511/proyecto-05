@@ -6,30 +6,52 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # Company Schemas
 class CompanyCreateRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=20)
+    name: str = Field(..., min_length=1, max_length=255)
+    rut: str | None = Field(default=None, max_length=20)
+    active: Optional[bool] = True
+
+
+class CompanyResponse(BaseModel):
+    id: int
     code: str
     name: str
     rut: str | None = None
-    active: Optional[bool] = True
-class CompanyResponse(CompanyCreateRequest):
-    id: int
+    active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CompanyUpdateRequest(BaseModel):
-    code: Optional[str] = None
-    name: Optional[str] = None
-    rut: Optional[str] = None
+    code: Optional[str] = Field(default=None, min_length=1, max_length=20)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    rut: Optional[str] = Field(default=None, max_length=20)
     active: Optional[bool] = None
+
+
 # Area Schemas
 class AreaCreateRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=255)
+    active: Optional[bool] = True
+
+
+class AreaUpdateRequest(BaseModel):
+    code: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=255)
+    active: Optional[bool] = None
+
+
+class AreaResponse(BaseModel):
+    id: int
     code: str
     name: str
-    description: str
-    active: Optional[bool] = True
-class AreaUpdateRequest(BaseModel):
-    code: Optional[str] = None
-    name: Optional[str] = None
-    description: Optional[str] = None
-    active: Optional[bool] = None
-class AreaResponse(AreaCreateRequest):
-    id: int
+    description: str | None = None
+    active: bool
+
+    model_config = ConfigDict(from_attributes=True)
 # Currency Schemas
 class CurrencyCreateRequest(BaseModel):
     code: str=Field(..., max_length=3) 
@@ -47,8 +69,15 @@ class CurrencyUpdateRequest(BaseModel):
     is_base_currency: Optional[bool] = None
     active: Optional[bool] = None
 
-class CurrencyResponse(CurrencyCreateRequest):
+class CurrencyResponse(BaseModel):
     id: int
+    code: str
+    name: str
+    symbol: str
+    exchange_rate_to_base: Decimal
+    is_base_currency: bool
+    active: bool
+
     model_config = ConfigDict(from_attributes=True)
 
 

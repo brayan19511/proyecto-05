@@ -14,6 +14,9 @@ class ValidationError(DomainError):
 class ConflictError(DomainError):
     pass
 
+class ForbiddenError(DomainError):
+    pass
+
 class BusinessException(DomainError):
     pass
 

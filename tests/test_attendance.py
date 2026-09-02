@@ -119,7 +119,13 @@ class AttendanceServiceTests(unittest.TestCase):
 
 
 class AttendanceAuditTests(unittest.TestCase):
-    def test_repeated_document_numbers_are_preserved_and_redacted(self):
+    """La auditoria solo enmascara credenciales.
+
+    Los numeros de documento son dato de negocio y deben quedar visibles para
+    poder revisar el detalle de una peticion.
+    """
+
+    def test_repeated_document_numbers_are_preserved(self):
         sanitized = sanitize_query_params(
             QueryParams(
                 "document_number=12345678"
@@ -130,11 +136,11 @@ class AttendanceAuditTests(unittest.TestCase):
 
         self.assertEqual(
             sanitized["document_number"],
-            ["[REDACTED]", "[REDACTED]"],
+            ["12345678", "87654321"],
         )
         self.assertEqual(sanitized["limit"], "100")
 
-    def test_document_numbers_are_redacted_from_request_body(self):
+    def test_document_numbers_are_kept_in_request_body(self):
         sanitized = sanitize_payload(
             {
                 "document_numbers": [12345678, 87654321],
@@ -142,8 +148,16 @@ class AttendanceAuditTests(unittest.TestCase):
             }
         )
 
-        self.assertEqual(sanitized["document_numbers"], "[REDACTED]")
+        self.assertEqual(sanitized["document_numbers"], [12345678, 87654321])
         self.assertEqual(sanitized["limit"], 100)
+
+    def test_credentials_are_still_redacted(self):
+        sanitized = sanitize_payload(
+            {"document_number": "12345678", "password": "secreto"}
+        )
+
+        self.assertEqual(sanitized["document_number"], "12345678")
+        self.assertEqual(sanitized["password"], "[REDACTED]")
 
 
 if __name__ == "__main__":

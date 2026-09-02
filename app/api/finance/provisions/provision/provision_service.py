@@ -35,8 +35,10 @@ from app.api.storage.constants import (
     PROVISION_DOCUMENT_ENTITY_TYPE,
     PROVISION_ENTITY_TYPE,
 )
+from app.api.master.master_service import MasterService
 from app.core.db.integrity import raise_integrity_error
 from app.core.exceptions import ConflictError
+from app.core.scope import UserScope, assert_in_scope
 from app.models.storage import Attachment
 
 
@@ -47,6 +49,7 @@ class ProvisionService:
     def __init__(self, db: Session):
         self.db = db
         self.repository = ProvisionRepository(db)
+        self.master_service = MasterService(db)
 
     # =====================================================
     # PROVISION STATUS
@@ -75,8 +78,22 @@ class ProvisionService:
         self,
         request: ProvisionCreateRequest,
         user_id: UUID,
+        scope: UserScope | None = None,
     ):
         ticket_code = request.ticket_code.strip()
+
+        # La empresa y el area deben estar vigentes: el borrado es logico y
+        # sin esto se podia provisionar contra un maestro dado de baja.
+        self.master_service.get_active_company_by_id(request.company_id)
+        self.master_service.get_active_area_by_id(request.area_id)
+
+        if scope is not None:
+            assert_in_scope(
+                scope,
+                request.company_id,
+                request.area_id,
+                "No puedes crear registros para esa empresa/area",
+            )
         access_user_ids = [item.user_id for item in request.access]
         if len(access_user_ids) != len(set(access_user_ids)):
             raise ConflictError(
@@ -394,6 +411,7 @@ class ProvisionService:
         area_id: int | None = None,
         company_id: int | None = None,
         user_id: UUID | None = None,
+        scope: UserScope | None = None,
     ):
         provisions = self.repository.get_provisions(
             search=search,
@@ -401,6 +419,7 @@ class ProvisionService:
             area_id=area_id,
             company_id=company_id,
             user_id=user_id,
+            scope=scope,
         )
 
         return [self.to_summary_response(provision) for provision in provisions]
@@ -409,12 +428,14 @@ class ProvisionService:
         self,
         area_id: int | None = None,
         company_id: int | None = None,
+        scope: UserScope | None = None,
     ):
         provisions = self.repository.get_provisions(
             status_codes=[READY_FOR_REVIEW_STATUS],
             area_id=area_id,
             company_id=company_id,
             review_queue=True,
+            scope=scope,
         )
 
         return [self.to_summary_response(provision) for provision in provisions]
